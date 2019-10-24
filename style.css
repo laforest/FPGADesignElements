@@ -1,0 +1,80 @@
+
+.bordered {
+    border: thin solid black;
+    padding: 1em;
+}
+
+a:hover {
+    background-color: #f0f0f0;
+}
+
+code {
+    font-family: "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Roboto Mono", "Droid Sans Mono", monospace;
+}
+
+pre {
+    font-family: "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Roboto Mono", "Droid Sans Mono", monospace;
+    border: thin solid black;
+    padding: 1em;
+}
+
+body { 
+    font-family: Univers, Calibri, "Myriad Pro", Myriad, "DejaVu Sans Condensed", "Liberation Sans", "Nimbus Sans L", Tahoma, Geneva, Roboto, "Noto Sans", "Droid Sans", sans-serif;
+    max-width:   80em;
+    margin:      0 auto;
+    padding:     5% 2% 2% 2%;
+}
+
+hr {
+    width: 33%;
+}
+
+img {
+    float:  right;
+    margin: 0em 1em 1em 1em;
+    width:  33%;
+}
+
+table {
+    margin-left:auto; 
+    margin-right:auto;
+}
+
+li {
+    padding: 2pt; 
+}
+
+li:hover {
+    background-color: #f0f0f0;
+}
+
+dt {
+    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+}
+
+dt:hover {
+    background-color: #f0f0f0;
+}
+
+
+dd {
+    padding: 2pt; 
+}
+
+dd:hover {
+    background-color: #f0f0f0;
+}
+
+h1 {
+    padding-top:   0;
+    margin-bottom: 3%;
+    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+    border-bottom: thick solid black;
+}
+
+h2, h3, h4, h5, h6 {
+    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+    border-bottom: thin solid black;
+}
+
+

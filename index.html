@@ -1,0 +1,237 @@
+
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FPGA Design Elements</title>
+</head>
+<body>
+
+<h1><center>FPGA Design Elements</center></h1>
+
+<p><center><b>Charles Eric LaForest, PhD.</b>
+<br><a href="http://fpgacpu.ca/gateforge/index.html">GateForge Consulting, Ltd.</a></center></p>
+
+<h2>Introduction</h2>
+
+<ul>
+<li> Purpose and Design Philosophy
+<li> <a href="./legal.html">Licence and Disclaimer</a>
+</ul>
+
+<h2>Input/Output</h2>
+
+<ul>
+<li> I/O Register
+    <ul>
+    <li> Single-Ended
+    <li> Differential
+    </ul>
+<li> Regional Clock Buffer
+<li> Global Clock Buffer
+<li> I/O Bus Capture
+<li> Signal Comparator (LVDS input)
+<li> Debouncer (counter-based)
+<li> Charlieplexer
+</ul>
+
+<h2>Boolean Logic</h2>
+
+<ul>
+<li> Constant
+<li> Bit Reducer
+<li> Bit Reverser
+<li> Word Reducer
+<li> Bit Shifter
+<li> Majority Gate
+<li> Multiplexer (Binary)
+<li> Multiplexer (One-Hot)
+<li> Demultiplexer (Binary)
+<li> Address Decoder (Static)
+<li> Address Decoder (Arithmetic)
+<li> Address Translator (Static)
+<li> Extended Boolean operations 
+    <ul>
+    <li> Bitmask 0 Bit at Rightmost 1 Bit
+    <li> Bitmask 1 Bit at Rightmost 0 Bit
+    <li> Bitmask Isolate Rightmost 1 Bit
+    <li> Bitmask Next with Constant Popcount
+    <li> Bitmask Thermometer from Count
+    <li> Bitmask Thermometer to Rightmost 0 Bit
+    <li> Bitmask Thermometer to Rightmost 1 Bit
+    <li> Bitmask Turn Off Trailing 1 Bits
+    <li> Bitmask Turn On Trailing 0 Bits
+    <li> Turn Off Rightmost 1 Bit
+    <li> Turn Off Rightmost Contiguous 1 Bits
+    <li> Turn Off Trailing 1 Bits
+    <li> Turn On Rightmost 0 Bit
+    <li> Turn On Trailing 0 Bits
+    </ul>
+<li> Universal Dyadic Operator
+<li> Universal Triadic Operator
+<li> Seven-segment Display Decoder (single BCD digit)
+</ul>
+
+<h2>Synchronous Logic</h2>
+
+<ul>
+<li> Register
+<li> Register Pipeline
+<li> Memory
+    <ul>
+    <li> Single-Port RAM (one read/write port)
+    <li> Simple Dual-Port RAM (one read port, one write port)
+    <li> True Dual-Port RAM (two read/write ports)
+    </ul>
+<li> Serial to Parallel Converter
+<li> Parallel to Serial Converter
+<li> Pulse Latch
+<li> Pulse Generator
+<li> Word Change Detector
+<li> Bressenham Rate Converter
+<li> Time Delay (cycles)
+<li> Time Delay (fractions of seconds)
+<li> Wall Clock
+<li> Frequency Counter
+</ul>
+
+<h2>Integer Arithmetic</h2>
+
+<ul>
+<li> Adder/Subtractors
+    <ul>
+    <li>Binary
+    <li>Binary (2-stage)
+    <li>BCD
+    </ul>
+<li> Up/Down Counters
+    <ul>
+    <li>Binary
+    <li>BCD
+    <li>Grey
+    <li>One-Hot
+    <li>Johnson
+    </ul>
+<li> Number Encoding Converters
+    <ul>
+    <li> Binary to One-Hot
+    <li> One-Hot to Binary
+    <li> Binary to Grey
+    <li> Grey to Binary
+    <li> Binary to Johnson
+    <li> Johnson to Binary
+    <li> General Shift-Add Converter (e.g. Binary to multi-digit BCD, or to H/M/S)
+    </ul>
+<li> Multiplier (Binary, parallel)
+<li> Multiplier (BCD, parallel)
+<li> Multiplier (Binary, iterative)
+<li> Multiplier (BCD, iterative)
+<li> Divider (Binary, parallel)
+<li> Divider (BCD, parallel)
+<li> Divider (Binary, iterative)
+<li> Divider (BCD, iterative)
+<li> Comparator
+<li> Scaler
+<li> Accumulators
+    <ul>
+    <li>Sum
+    <li>Min
+    <li>Max
+    <li>Mean
+    <li>Weighted Mean
+    </ul>
+<li> Zero-Crossing Detector
+<li> Pseudo-Random Number Generators (PRNGs)
+    <ul>
+    <li>Linear Feedback (Fibonacci)
+    <li>Linear Feedback (Xorshift family)
+    <li>combinations of above...
+    </ul>
+</ul>
+
+<h2>Synchronization</h2>
+
+<ul>
+<li> Skid Buffer
+<li> FIFO
+<li> Ready/Valid Fork (Lazy)
+<li> Ready/Valid Fork (Eager)
+<li> Ready/Valid Join
+<li> Ready/Valid Branch
+<li> Ready/Valid Merge
+</ul>
+
+<h2>Arbitration</h2>
+
+<ul>
+<li> Priority Encoder
+<li> Priority Arbiter
+<li> Round-Robin Arbiter
+<li> Matrix Arbiter
+</ul>
+
+<h2>Clock Domain Crossing</h2>
+
+<ul>
+<li> CDC Synchronizer
+<li> CDC Synchronizer (optimized for slow clock)
+<li> CDC Pulse Synchronizer (Fast to Slow)
+<li> CDC FIFO
+</ul>
+
+
+<h2>Interfaces</h2>
+
+<ul>
+<li> Key Encoder (NxM, no rollover)
+<li> Quadrature Decoder
+<li> Stepper Motor Driver
+<li> Servo Motor Driver
+<li> Basic I2C (just enough to read/write one address upon a trigger)
+<li> Basic UART (no flow-control, no FIFO, fixed rate via parameter, enough to receive simple commands, or dump data)
+<li> Basic NeoPixel Driver (really another kind of UART)
+</ul>
+
+<h2>Analog Signal Handling</h2>
+
+<ul>
+<li> Basic waveform generator (table-driven)
+<li> PWM driver (for sound, motor, LEDs)
+<li> Sound sample player (simple DAC data, played as PWM?)
+<li> Basic DAC (PMW and output to resistor ladder)
+<li> Basic ADC (SAR using PWM DAC and LVDS input)
+<li> Sound sample recorder (ADC + Memory)
+</ul>
+
+<h2>Communications</h2>
+
+<ul>
+<li> Clock encoding and recovery (e.g. NRZ, MFM, DM, etc... as in old magnetic storage)
+<li> Basic LVDS/TMDS communication (like UART, building block for LCD control, HDMI, multi-FPGA design, serial wire mux)
+<li> Pseudo-differential communication (slower, using regular pins)
+<li> Single-wire communication (tri-state bidir pin, self-clocked like NeoPixel)
+<li> Hamming Code Generator
+<li> Hamming Code Checker (EDAC)
+<li> CRC Generator
+<li> CRC Checker
+<li> 8b/10b Encoder
+<li> 8b/10b Decoder
+</ul>
+
+<h2>Appendices</h2>
+
+<ul>
+<li> On The Design of Finite State Machines
+<li> Some Open Design Questions
+<li> A Verilog Coding Guide
+<li> A System Design Guide
+<li> Some Useful Links
+<li> References
+<li> Tools and templates used to write this book
+<ul>
+
+<hr><center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

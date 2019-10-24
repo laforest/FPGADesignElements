@@ -1,0 +1,78 @@
+
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appendix: Finite State Machines</title>
+</head>
+<body>
+
+<h1>Appendix: Finite State Machines</h1>
+
+<p>With FSMs, the beginner can statefully control data processing logic and
+thus implement arbitrary functions up to a full CPU.  FSMs can be implemented
+in the Design Subset Library using localparams (for named constants and
+states), register modules (for outputs and holding state), comparison modules
+(eq, lt, gt, neq), multiplexer modules (to select the next state), and wires to
+name signals and tie everything together.
+
+<p>Once the beginner has defined the state transition diagram, they can
+build-up the design of the FSM incrementally in the Design Subset Library by:
+
+<ol>
+<li> defining any constraints on outputs (e.g. only asserted in certain states)
+<li> defining the basic operations on the datapath, as Boolean composition of the control inputs and outputs
+<li> defining the transformations on the datapath (what do certain operations means when in given states)
+<li> defining the state transitions (given a certain transformation, what is the next state)
+<li> defining the control outputs (which transformations assert a given output, as simple Boolean logic on the transformations)
+</ol>
+
+<p>In the state transition diagram, each node and its edges are designed as a
+"checker" module which takes the current state and some inputs, and if they are
+equal to the expected values, raises a "match" output. This "match" output is
+then used to set the next state. There are three ways to compose these
+"checker" modules to calculate the nest state:
+
+<ol>
+
+<li>A chain of multiplexers which either pass along the current state or
+previously selected state, or replace that with a new selected state.  This
+design is easy to follow, but depends on the tool's logic optimizer to combine
+terms in the chain of logic. log<sub>2</sub>N bits are required for N states.
+
+<li>A parallel tree of multiplexers outputting either a chosen next state or
+zero, plus one extra bit of logic which outputs either zero or the current
+state if no other multiplexer is outputting a chosen next state. All the
+multiplexer outputs are OR-reduced to the final next state. This design has a
+shorter critical path, but requires a bit more manual design effort, and
+converges a lot of wasted calculations (the outputs of checkers which could
+never be active in the current state) into a large OR gate, which suggests a
+more efficient alternative. log<sub>2</sub>N bits are required for N states.
+
+<li>Separate parallel "checkers" whose output sets or clears a single
+flip-flop. Each flip-flop represents a state. The FSM is in a given state if
+one and only one flip-flop is set (one-hot encoding). This design is the most
+parallel, has the shorted logic path, and may support pipelined operation or
+even overlapping states given suitable state encodings.  N bits are required
+for N states.
+
+</ol>
+
+<p>There's an apparent problem where a chain of multiplexers imposes a priority
+order on "match" outputs, causing some concurrent state transitions to be
+missed, or a tree of multiplexers funneling to a final OR gate before the state
+register could merge multiple set "match" outputs into nonsense state values,
+or multiple bits could become set in an otherwise one-hot encoding.  However,
+these cases are impossible for DFAs (Deterministic Finite Automata), where
+identical combinations of current state and current signals cannot lead to
+multiple, different states.  To create such a condition in the above
+constraints/operations/transformations/transitions/control (COTTC) scheme, we
+would have to explicitly write multiple checkers which test for the same
+transformation but select different next states. Although logically allowable,
+the conflict will be visible to the user.
+
+
+<hr><a href="http://fpgacpu.ca/">fpgacpu.ca</a>
+</body>
+</html>
