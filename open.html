@@ -3,15 +3,21 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Appendix: Open Questions</title>
+<title>Open Design Questions</title>
 </head>
 <body>
 
-<h1>Appendix: Open Questions</h1>
+<h1>Open Design Questions</h1>
 
-<p>For example, implementing a universal multiplexer module (any number of
+<p>As I write out design elements, some questions about how to design them open
+up. The following cases are to explore later, or for the designer to watch out
+for.
+
+<h2>Implementing and Generalizing Multiplexers</h2>
+
+<p>Implementing a universal multiplexer module (any number of
 inputs of a given width, using a binary selector) is straightforward using a
-Verilog vector part select. Implementing it using Design modules first suggests
+Verilog vector part select. Implementing it using design elements first suggests
 using NOT-AND logic to select an input, which would require complex conditional
 generation of NOT gates in a Verilog generate block.
 
@@ -23,23 +29,18 @@ original vector part select design since we could use arbitrary,
 non-consecutive sets of selector values by passing them as a concatenation in a
 parameter.
 
-<p>Given the limits of Verilog parsing and synthesis tools, I expect the limits
-of the Design subset to lie downwards, in low-level implementation details
-which affect synthesis and portability.
+<p>This latter approach also removes the need for Verilog-specific vector part
+selects, which would make the multiplexer design element portable across HDLs.
 
-<p>For example, I have found in the past that implementing addition directly as
-XOR-AND Boolean logic yields unexpectedly poor synthesis results on FPGAs,
-worse than simply inferring from a "+" operator. This is a loss, as it removes
-the possibility of the beginner to open up an adder and see its implementation.
+<h2>Implementing Synchronous Resets</h2>
 
-<p>Similarly, I am currently investigating the inference of synchronous resets
-for FPGA flip-flops: using an AND gate to zero the output results in separate
-logic, while using a multiplexer to select a zero output results in using the
-built-in synchronous reset of the flip-flop. This appears to be simple pattern
-matching by the synthesis tool. Either approach is desirable depending on the
-design, and can be encapsulated and made explicit by the Design subset module
-library.
+<p>There seems to be different ways to infer a synchronous reset for FPGA
+flip-flops: using an AND gate to zero the output results in separate logic,
+while using a multiplexer to select a zero output results in using the built-in
+synchronous reset of the flip-flop. This appears to be simple pattern matching
+by the synthesis tool. Either approach is desirable depending on the design,
+and can be encapsulated and made explicit by the Register design element.
 
-<hr><a href="http://fpgacpu.ca/">fpgacpu.ca</a>
+<hr><a href="./index.html">back to FPGA Design Elements</a>
 </body>
 </html>
