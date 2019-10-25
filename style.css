@@ -1,4 +1,6 @@
 
+/* A simple and portable CSS file. Looks the same under most any browser. */
+
 .bordered {
     border: thin solid black;
     padding: 1em;
