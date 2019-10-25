@@ -1,0 +1,278 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design Standard</title>
+</head>
+<body>
+
+<h1>System Design Standard</h1>
+
+<p>from <a href="./index.html">FPGA Design Elements</a> by <a href="http://fpgacpu.ca/">Charles Eric LaForest, PhD.</a>
+
+<p class="bordered"><i>This is a continually evolving document. Please send any
+feedback to <a href="mailto:eric@fpgacpu.ca?subject=System%20Design%20Standard">eric@fpgacpu.ca</a> or <a
+href="https://twitter.com/elaforest">@elaforest</a>.</i>
+
+<p>Over time, I've found that most of the difficulty in FPGA system design
+comes from a lack of modularity, not having a library of building blocks, and
+from not using the logic optimization work done by the CAD tool to simplify
+design.
+
+<p>It matters to have a system design standard, since the implementation
+<em>doesn't matter</em>. We want to think in terms of the design and its
+blocks, and not concern ourselves (too much) with the implementation of these
+blocks. Nonetheless, a block needs to be well-implemented and understood. I
+describe related implementation practices in the companion <a
+href="verilog.html">Verilog Coding Standard</a>.
+
+<h2>Scope</h2>
+
+<p>This standard mainly describes how to divide a digital design into parts,
+including all the files required by the CAD tools which do not describe the
+design itself. These parts aim to be reusable, easy to understand, and
+cultivate a library of parts and design idioms.
+
+<p>This standard <em>does not</em> define any specification, testing,
+verification, validation, or documentation methodologies (though I hope you
+have some!).
+
+<p>Nor does this standard specify an implementation language, method or CAD
+tool. However, it was written in tandem with a <a href="verilog.html">Verilog
+Coding Standard</a>.
+
+<p>Finally, this standard assumes you are already familiar with digital design
+in general. It is not a language or tool reference.
+
+<h2>Modularization</h2>
+
+Divide your design into modules to a very fine degree, even to the point of a
+simple <a href="http://fpgacpu.ca/fpga/annuller.html">vector of AND gates</a>.
+When a design is entirely composed of modules, the code expresses the design
+itself rather than its implementation, and gives you multiple forms of
+documentation and checking for free, and greater control over implementation.
+
+<p>A module definition forms part of a <em>general</em> design intent and a
+module instance, through its name, parameters, and connections, tells you the
+<em>specific</em> design intent at that point in the design. Without extensive
+modularization, unless the reader already knows the design, they have to
+continually reverse-engineer the meaning of the logic back into the design.
+
+<p>A design composed of modules, when successively viewed in the CAD tool as
+elaboration, synthesis, and implementation schematics, allows you to check many
+things:
+
+<ul>
+
+<li>The post-elaboration schematic gives you a block diagram view of your
+source code, which allows you to more easily find missing connections and count
+pipeline stages (and thus check their alignment).
+
+<li>The post-synthesis schematic allows you to check that your code synthesizes
+as you expect, and shows you the impact of logic optimizations: hardware will
+disappear from a module or move from one module to another. If an entire module
+vanishes, that may indicate a missing connection to that module which disabled
+it.
+
+<li>The post-place-and-route schematic (a.k.a. post-implementation) shows you
+how the synthesized logic ends up on the FPGA, and is often annotated with
+logic and interconnect delays. This view can also show you the critical path as
+it flows from module to module, and that knowledge can feed back into the
+architecture of your design.
+
+</ul>
+
+<p>Without modules, the schematics rapidly become a large mess of random logic,
+which becomes increasingly hard to relate to the original code as you move from
+elaboration to sythesis to implementation. Dividing a design into modules
+preserves the logical design hierarchy (even though in hardware it is usually
+all flattened).
+
+<p class="bordered">Within each module, you only have to think about the
+immediately relevant logic and wires, which give us the guiding principle for
+modular decomposition of a design: <em>move unrelated connections into separate
+modules</em>. If you have lines of logic with connections between them which
+themselves do not connect to the surrounding logic, then those lines should be,
+if possible, parameterized and encapsulated into a sub-module. Then, the other
+connections in the surrounding logic are necessarily more closely related and
+now encapsulated in the enclosing module.
+
+<h3>Building Blocks</h3>
+
+Use the modularization process to create a library of well-commented and tested
+building blocks which will largely remove the need for random logic in most
+cases, and document design knowledge for the future. 
+
+<p>By adjusting the module parameters, setting some inputs constant, and
+leaving some outputs unconnected, the CAD tool can optimize the general case
+logic of a building block, while still keeping the design intent clear in the
+source. A design then becomes a hierarchy of modules, connected by wires, and
+any random logic signifies a very local and special case (e.g.: combining two
+flags into one).
+
+<p>These building blocks should be quite small, implementing logic functions
+common to most any design: counters, <a href="./pulse_level.html">pulse/level
+converters</a>, <a href="./annuller.html">applying Boolean logic to vectors of
+bits</a>, <a href="./delay.html">configurable delay pipelines</a>, <a
+href="./mux.html">universal multiplexers</a>, <a href="./cdc.html">Clock Domain
+Crossing synchronizers</a>, <a href="./decoders.html">static and programmable
+address decoders</a>, <a href="./translation.html">address translators</a>, <a
+href="./priority.html">priority arbiters</a>, <a href="./skid_buffer.html">AXI
+skid buffers</a>, <a href="./master_reset.html">adjustable power-on resets</a>,
+<a href="./triadic.html">universal Boolean operators</a>, <a
+href="./condition.html">calculating equalities and inequalities</a>, <a
+href="./bram.html">on-chip memories</a>.
+
+<p>Using building blocks enables a better separation of control, processing,
+and interface in your design.  Divide a sub-system into one module for
+functionality (processing and storage), one for control (the FSM), and one for
+interfacing to the rest of the system (memory-mapping the data storage and
+configuration registers).
+
+<h2>System Architecture</h2>
+
+<p><i>This section is taken almost verbatim from <a
+href="./shim.html">Core/Instance/Adapter/Shim Architecture</a></i>
+
+<p>In a project with multiple FPGAs and boards and connecting paths between
+them, all designed by separate engineering teams, a common code architecture on
+each FPGA makes managing various mismatches, errors, and last-minute changes
+much easier, as well as improving portability. It also help single-FPGA designs
+for the same reasons.
+
+<p>I'll start explaining at the bottom and work upwards. Each higher layer
+instantiates the one below it as a single module, and performs one specific
+function to support that underlying module. As we move upwards, the functions
+shift from creating and supporting the application logic to managing the
+interface to the outside world: 
+
+<ul>
+<li>The Core and Instance modules deal with the application logic.
+<li>The Adapter module interfaces the application logic to the specific FPGA device.
+<li>The Shim module interfaces the FPGA to the specific PCB it's mounted on.
+</ul>
+
+<h3>Core</h3>
+
+<p>The Core logic of the application contains all the parts needed in the
+abstract, without concern for interface protocols, size of FPGA, number of
+instances, etc... It may culminate in a single module or a few. The only
+FPGA-specific parts are technology-mapping issues like which DSP or BRAM blocks
+are used.  Other than porting to another FPGA family, this code should never
+change.  For example, the core logic could contain the control and data paths
+of a soft-CPU, and the building blocks for a network-on-chip, but all as a
+library of parts.
+
+<h3>Instance</h3>
+
+<p>The Instance culminates in a single module which instantiates the Core
+logic, and specifies the size and number of core logic modules, as well as all
+the wiring between them. The Instance primarily deals with scaling the
+Core logic to the specific FPGA device being used. For example, the instance
+defines how many data paths a soft-CPU will have if it's a SIMD system, and how
+many CPUs in total and the network-on-chip which connects them. There are still
+no concerns about particular external interfaces: buses and clocks are simple
+signals. 
+
+<p>At this point, the design can be simulated to check for logical correctness,
+and synthesized for a preliminary estimate of its final operating frequency,
+assuming the instance is surrounded by a temporary test harness of registers to
+ensure correct static timing analysis.
+
+<h3>Adapter</h3>
+
+<p>The Adapter instantiates the Instance, defines the final interface ports
+expected by the board upon which the FPGA resides, and wires up the instance to
+those ports. The Adapter adds any logic necessary to support the Instance and
+also satisfy the FPGA CAD tools. For example, the Adapter will contain any
+clock generation and management hardware, add any differential buffers to
+signals that need it, even if unused, to satisfy CAD tool constraints, and
+convert interface protocols as required (e.g.: as AXI masters/slaves,
+bi-directional or tri-state buffers, etc...).
+
+<p>At this point, synthesis of the design should find any final errors, such as
+insufficient clock buffers or logic resources, expose any missing/violated
+constraints, and in general point out anything that needs attention. You
+should, of course, fix things to minimize the number of warnings from the CAD
+tool.
+
+<h3>Shim</h3>
+
+<p>The Shim instantiates the Adapter, and nothing else. It has the same
+interface ports as the Adapter, and the Shim's ports are at the top level and
+physically connect to the FPGA pins. What the Shim does, however, is handle the
+problems that crop up with PCBs: unusable connections, schematic errors,
+incompatible voltage standards, etc... For example, if some top-level pins are
+unusable due to a design or manufacturing error, the Shim can shuffle the
+signals between the top-level pins and the adapter ports so as to present a
+uniform, maybe reduced, interface to the Adapter. If you have spare board pins,
+this is where you use them. 
+
+<p>Another example is where, due to how a PCB had been designed, the pins of a
+bus were not connected to consecutive pins along the FPGA's I/O Banks,
+scattering the bus (and it's associated logic) all over the device. The Shim
+file translates the logical bus pins from the adapter to physically consecutive
+pins on the device, which helped keep related logic grouped together.  Of
+course, any other FPGA on the PCB needs a similar Shim file to re-organize the
+now scrambled bus signals coming in.
+
+<p>The Shim file is also a good place to annotate the top level pins: which
+ones are clock-capable, are they usable as differential pairs, which clock
+region or I/O Bank they reside in, etc... which helps future alterations.
+
+<p>Finally, you now can do a full synthesis to get the final operating
+frequency, do post-placement synthesis to check things like the I/O delay
+lines, and do final floorplanning.
+
+<h2>Project Constraints</h2>
+
+<p>Divide different types of CAD tool constraints across different files,
+leaving only a select few constraints applied directly in the source as
+attributes on wires, registers, and modules. This keeps the design as portable
+as possible and easy to manage when the underlying FPGA or the surrounding PCB
+changes. Some constraint types to group into separate files include:
+
+<ul>
+
+<li>Bitstream and configuration, where you define pull-ups/downs on
+configuration pins, what configuration interface is used (e.g.: SPI, parallel
+port, JTAG, etc...), and bistream encryption.
+
+<li>Logic placement, where you define floorplan regions and assign modules to
+them. This is handy to isolate critical logic that needs to meet timing
+reliably as the design grows (e.g.: DDR controllers), and to work around some
+critical paths by physically separating modules which otherwise get placed too
+close together and cause congested routing.
+
+<li>Pin placement, where for each bank of device pins you give each pin a source code
+name, an I/O standard, pull-ups/down, drive strengths, etc.. and make note of
+which pins remain unused, or are particularly dangerous to the design if
+misused or misconfigured. Grouping the pins by bank in device order also shows
+you which signals physically adjacent to eachother on the device, which matters
+for noise and switching current issues.
+
+<li>Timing constraints, where you define the incoming clocks, their
+synchronous/asynchronous relationships, any false paths, and external I/O
+delays.
+
+<li>Optimization constraints, which allow you to preserve logic against some
+optimizations. For example, when you bring up a partially completed system
+where some modules are dangling, or have incomplete connections, preventing
+optimization on those modules (e.g.: via a <code>DONT_TOUCH</code> attribute
+under Vivado) to keep any unused logic will give you a better ongoing estimate
+of the final area and timing.
+
+</ul>
+
+<p>However, some of these constraints may have to be applied in the source code
+itself, as the CAD tool may not read the other constraints files early enough
+in the synthesis, placement, or routing phases. This really depends on the CAD
+tool. And some constraints, like Vivado's <code>ASYNC_REG</code> which declares
+registers as part of a clock domain crossing synchronizer, should be placed in
+the CDC synchronizer module source code so they automatically take effect at
+each CDC synchronizer module instantiation.
+
+<hr>
+
+<a href="http://fpgacpu.ca/">fpgacpu.ca</a> </body> </html>

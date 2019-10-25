@@ -1,0 +1,932 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verilog Coding Standard</title>
+</head>
+<body>
+
+<h1>Verilog Coding Standard</h1>
+
+<p>from <a href="./index.html">FPGA Design Elements</a> by <a href="http://fpgacpu.ca/">Charles Eric LaForest, PhD.</a>
+
+<p class="bordered"><i>This is a continually evolving document. Please send any
+feedback to <a href="mailto:eric@fpgacpu.ca?subject=Verilog%20Coding%20Standard">eric@fpgacpu.ca</a> or <a
+href="https://twitter.com/elaforest">@elaforest</a>.</i>
+
+<p>Over time, I've found that most of the difficulty with Verilog is a problem
+with programming practice which goes away with a certain coding style, which I
+describe here. It's not perfect, but it works and makes Verilog programming
+easier, more pleasant, and more reliable. 
+
+<p>It matters to have a Verilog coding standard, because Verilog <em>doesn't
+matter</em>. We want to quickly get past the nuts-and-bolts of Verilog itself
+so we can focus on the system we are trying to build. I describe the related
+system design practice in the companion <a href="./system.html">System Design
+Standard</a>.
+
+<h2>Scope</h2>
+
+<p>This standard was written with FPGAs in mind so some details may not apply,
+or may be missing, in relation to ASICs. Nonetheless, the standard should still
+largely be applicable to ASIC design.
+
+<p>This standard mainly defines a restricted form of Verilog which uses a
+limited number of programming idioms. These restrictions reduce bugs, make the
+code easier to understand, and aim to give consistent synthesis results across
+CAD tools, whether the code is manually written or machine-generated.
+
+<p>This standard <em>does not</em> define any typesetting conventions such as
+brace style, indentation, variable naming, comment format, etc... You will see
+code examples typeset in a style I recommend, but it is not essential. Like
+regular written language prose, anything that helps readability is good.
+
+<p>Nor does this standard define any testing, simulation, verification, or
+validation methodologies (though I hope you have some!). However, it will
+address some pitfalls and low-level details.
+
+<p>Finally, this standard assumes you are already familiar with Verilog and
+digital design in general. It is not a language or tool reference.
+
+<h2>Verilog Language Versions</h2>
+
+<p>Use Verilog-2001, specifically its synthesizable subset, as it's well
+supported across CAD tools. Anything not synthesizable is for
+simulation/verification and outside the scope of this standard.
+
+<p>The previous version, Verilog-1995, lacks several useful features (named
+port connections, vector part select, generate blocks, etc...) without which
+your code will get longer and more difficult. Avoid mixing Verilog-1995 forms
+into Verilog-2001 code, despite the backwards compatibility.
+
+<p>The following version, SystemVerilog, brings in too many features and thus
+has uneven support across CAD tools. It does have desirable features
+(interfaces, parameterizable port instances, structs, enums, etc...), but until
+support matures and a similarly restricted, synthesizable subset can be agreed
+upon, it should be avoided or used for simulation/verification (which it is
+well suited for!).
+
+<h2>Definitions and Inclusions</h2>
+
+<p>Use <code>`include</code> directives only to bring in common function
+definitions which, due to a limitation of Verilog-2001, must be defined inside
+the body of a module. A common example is an integer logarithm function to
+calculate address width. Place the function in a separate file and include it
+at the start of the body of modules which need it.
+
+<p>Use <code>`define</code> directives only for values which remain valid and
+constant <em>everywhere and always</em> in the design, don't depend on any
+other less-constant values, and can't be passed as module parameters (e.g.:
+opcode encodings for ALU functional units). Place these definitions into a
+separate file and <code>`include</code> it at the beginning of files which need
+them.  Otherwise, construct constants within a module using
+<code>localparam</code>.
+
+<h2>Basic Types and Values</h2>
+
+<p>All variables, modules, constants, etc... must be defined before they are
+used in a file, going from top to bottom. If you have a wire connecting the
+output of a later module to the input of an earlier module, define the wire
+first, before the earliest module using it.
+
+<h3>Defaults</h3>
+
+<p>Use <code>`default_nettype none</code> at the start of each file, before
+module definition. This causes any undefined variable to be an error.
+Otherwise, accidentally undefined variables become 1-bit wires, which may cause
+subtle bugs during synthesis.
+
+<p>For code you cannot control which assumes a default net type (e.g.
+vendor-provided models and IP blocks), wrap the code as follows inside the
+provided source file:
+
+<pre>
+`default_nettype wire
+
+...
+
+`default_nettype none
+</pre>
+
+<h3>Initialization and Logic Values</h3>
+
+<p>Use only <code>reg</code> and <code>wire</code> types. All signals are
+registers except where a wire is mandatory: module input ports, connecting
+module ports together, and inferring tri-state I/O.
+
+<p>Only use <code>0,1,X,Z</code> values, and avoid X and Z if at all possible.
+All registers must be initialized (and reset, if necessary) with a value which
+does not contain X or Z, either at definition or using an <code>initial</code>
+block. Do not assign X to registers or wires, as X propagation will make
+testing difficult, and isn't supported in 2-state simulators (e.g.: Verilator).
+Instead, have a default catch-all or fall-through logic expression which takes
+effect when all others don't. The same idea applies to Boolean tests. Z is
+only used to define tri-state I/O.
+
+<h3>Parameterization</h3>
+
+<p>Wherever possible, parameterize the width of your variables rather than
+using constants. It's more work initially, but makes modules more general and
+avoids tedious and error-prone edits when something inevitably changes. If the
+width can be set by the user, then use a module parameter. If it's an internal
+module constant, use a localparam. Very, very rarely, use a `define constant.
+Never use a hardcoded literal integer: name it with a localparam instead.
+
+<p>Unfortunately, in Verilog-2001, module parameters and localparams are not
+valid width specifiers for literal values, only `define constants and literal
+integers are.  This makes initializing registers of parameterized width with
+values of the exact same width impossible, and it's unclear if the implicit
+width-extension for values like <code>'b0</code> or <code>'d1</code> work
+correctly past 32 or 64 bits width, depending on the CAD tool. As a workaround,
+use concatenation and replication to create the value you need of the proper
+bit width.
+
+<pre>
+// Unclear if extended with zeros or Xs past 32 or 64 bits
+localparam WORD_WIDTH = 72;
+reg [WORD_WIDTH-1:0] foo = 'b0;
+
+// Not legal
+localparam WORD_WIDTH = 72;
+reg [WORD_WIDTH-1:0] foo = WORD_WIDTH'b0;
+
+// Legal workarounds
+localparam WORD_WIDTH     = 72;
+localparam WORD_ZERO      = {WORD_WIDTH{1'b0}};
+localparam WORD_ONE       = {{WORD_WIDTH-1{1'b0}},1'b1};
+localparam WORD_MINUS_ONE = ~WORD_ZERO;
+
+reg [WORD_WIDTH-1:0] foo  = WORD_ZERO;
+
+// Also legal to define bit width
+localparam [WORD_WIDTH-1:0] WORD_CONSTANT = `SOME_INTEGER_CONSTANT;
+</pre>
+
+<h3>Bit Widths</h3>
+
+<p>Always match bit widths of variable assignments. Even with correct implicit
+zero/sign-extension, if the source and sink have different width, it will raise
+a pointless warning in the CAD tool, obscuring other more important warnings.
+And if the extension is incorrect, it will cause subtle bugs.  As before,
+concatenation and replication can avoid this problem, and then any bit width
+mismatch warnings become significant.
+
+<pre>
+// Common
+
+localparam SOURCE_WIDTH = 32;
+localparam SINK_WIDTH   = 16;
+localparam SOURCE_ZERO  = {SOURCE_WIDTH{1'b0}};
+localparam SINK_ZERO    = {SINK_WIDTH{1'b0}};
+
+reg [SOURCE_WIDTH-1:0] source = SOURCE_ZERO; 
+reg [SINK_WIDTH-1:0]   sink   = SINK_ZERO;
+
+// Zero extension
+
+always @(*) begin
+    sink <= {SOURCE_ZERO, source};
+end
+
+// Signed extension
+
+reg source_sign = 1'b0;
+
+// Not a localparam since it's not a constant value
+always @(*) begin
+    source_sign = source[SOURCE_WIDTH-1];
+    sink        = {{SOURCE_WIDTH{source_sign}}, source};
+end
+</pre>
+
+<h3>Concatenations</h3>
+
+<p>Use concatenations to pack/unpack values instead of selecting ranges of
+bits, as possible. Concatenating ranges of bits also works. This idiom is very
+useful to meaningfully extract fields from raw data words (and to concisely
+document the field format), to group related signals into a single wide
+pipeline stage register, or to do fixed permutations of bits. 
+
+<pre>
+localparam A_WIDTH      = 1;
+localparam B_WIDTH      = 2;
+localparam C_WIDTH      = 3;
+localparam PACK_WIDTH   = A_WIDTH + B_WIDTH + C_WIDTH;
+
+reg [A_WIDTH-1:0]       foo;
+reg [B_WIDTH-1:0]       bar;
+reg [C_WIDTH-1:0]       baz;
+reg [PACK_WIDTH-1:0]    all;
+
+// Pack fields into a word
+always @(*) begin
+    all = {foo,bar,baz};
+end
+
+// Unpack the fields
+always @(*) begin
+    {foo,bar,baz} = all;
+end
+</pre>
+
+<h2>Module Definition</h2>
+
+<h3>Parameters</h3>
+
+<p>When defining a module, give all parameters a default value of zero or an
+empty string, to both tell the user what kind of value is expected, and also
+make module elaboration fail if any of the parameters are not set at module
+instantiation.
+
+<p>Use module parameters to define the bit widths of the module ports, as
+localparams can only be defined in a module body, which is too late. If a width
+is globally constant, or calculated from other module parameters and not
+directly provided by the user, then use another module parameter to compute and
+hold the value, and place a comment noting that this parameter is not to be
+used at module instantiation. This is commonly done when a parameterized number
+of items are passed to a module via concatenation, since Verilog-2001 ports are
+always present (no conditional instantiation) and simple bit vectors (no
+arrays of items).
+
+<h3>Ports</h3>
+
+<p>Always define the direction (<code>input, output, inout</code>), type
+(<code>wire</code> or <code>reg</code>), and name of each module port to reduce
+boilerplate code, hint at the structure of the module to help the user, and to
+avoid some synthesis and simulation problems:
+
+<ul>
+
+<li>Defining port direction, type, and name together removes the need to define
+ports multiple times both in the module port section, then as variables in the
+module body. This was how it was done in Verilog-1995 and gets very long in
+large modules and creates useless code you must skip over each time. 
+
+<li>All inputs are necessarily wires. If an output is a wire, then it comes
+from a sub-module instance, which should be the common case in very modular
+design practice. If an output is a reg, then it comes from some local logic,
+which indicates a small, special case is handled here. All inout ports are
+wires, and only used for tri-state I/O at physical pins.
+
+<li>If the port type is not defined, it is possible for different tools to
+infer different types in some cases, leading to inconsistent synthesis and
+simulation results.
+
+</ul>
+
+<p>If you have any register output ports, use an <code>initial</code> block
+immediately after the module port definitions to initialize them to their
+startup value, as ports cannot be initialized at definition like register
+variables.
+
+<pre>
+`default_nettype none
+
+module Foo
+#(
+    parameter INPUT_WIDTH = 0,
+    parameter INPUT_COUNT = 0,
+
+    // Do not set at instantiation
+    parameter TOTAL_WIDTH = INPUT_WIDTH * INPUT_COUNT,
+    parameter CONST_WIDTH = `SOME_GLOBAL_WIDTH
+)
+(
+    input  wire                     clock,
+    input  wire [TOTAL_WIDTH-1:0]   this_input,
+    output wire [CONST_WIDTH-1:0]   that_output,
+    output reg                      another_output,
+    ...
+);
+
+    initial begin
+        another_output = 1'b0;
+    end
+
+...
+
+endmodule
+</pre>
+
+<p>When a module is moderately complicated and the clearest name of an internal
+signal does not match the module port name it connects to, decouple the names
+as follows, assuming you already haven't implicitly done so via a final
+pipeline register stage.
+
+<pre>
+// Port must be a reg type instead of wire, which denotes a special case to the reader,
+// and must be initial'ized for proper simulation.
+always @(*) begin
+    port_name <= internal_name;
+end
+</pre>
+
+<p>Use port name suffixes to denote if they are inputs or outputs only when
+there is unavoidable ambiguity (usually for very simple modules with
+<code>data_in</code> and <code>data_out</code> ports or similar).  See a <a
+href="https://twitter.com/tom_verbeure/status/1070001089624211456">note by
+@tom_verbeure</a> on why <code>_o</code> and <code>_i</code> port name suffixes
+can cause problems.
+
+<h2>Procedural Blocks and Assignments</h2>
+
+<h3>Assign Statements</h3>
+
+<p>Avoid the use of <code>assign</code> statements, except where demanded by
+Verilog, as it favours poor coding style. I have seen assigns used as global
+variables all over a module, and all too often, as an amorphous large number of
+assigns to define logic followed by a single always block to register all the
+outputs. These coding styles make it hard to see the underlying design, and
+make the implementation hard to control for size and performance. There are
+exactly two cases where you must use assign:
+
+<ul>
+
+<li>When inferring a tri-state I/O pin, since the pin must then be a wire, if
+you are not explicitly instantiating a tri-state I/O buffer (e.g.: IOBUF,
+OBUFT, etc...).
+
+<pre>
+localparam WORD_WIDTH       = 36;
+localparam WORD_TRISTATE    = {WORD_WIDTH{1'bZ}};
+
+reg  [WORD_WIDTH-1:0]   data_out;
+reg                     output_enable;
+wire [WORD_WIDTH-1:0]   tristate_bus;
+
+assign tristate_bus = (output_enable == 1'b1) ? data_out : WORD_TRISTATE;
+</pre>
+
+<li>When connecting two wires whose generation you do not control (else you
+could create one wire for the connection). This is a <em>very</em> rare case in
+normal code. It is also discouraged since it affects Verilog event queueing in
+simulation, which can cause impossible behaviour if the two wires are clock
+lines and the associated data lasts only a single cycle, causing some
+transitions to be missed.
+
+<p>(<i>If this behaviour shows up in vendor IP, an ugly workaround is to delay
+the data into the IP by #1. I'm working on a more general solution.</i>)
+
+</ul>
+
+<h3>Always Blocks</h3>
+
+<p>For synchronous designs, there are only two events normally needed to
+trigger an <code>always</code> block: <code>@(posedge clock)</code> (clocked)
+and <code>@(*)</code> (combinational). The only use of <code>@(negedge
+clock)</code> is for capturing incoming I/O data which is sent out on the
+posedge of the I/O clock, so as to sample the data close the center (in the
+absence of programmable delay lines on the I/O). The one exception where
+posedge and negedge logic may be (carefully!) mixed is in Clock Domain Crossing
+(CDC) circuits.
+
+<a name="blocking"></a>
+
+<h3>Blocking and Non-Blocking Assignments</h3>
+
+<p>The repeated dogma about Verilog assignments is exactly correct:
+
+<ul>
+<li>Use only blocking assignments (<code>=</code>) in <code>always @(*)</code> (combinational) blocks.
+<li>Use only non-blocking assignments (<code><=</code>) in <code>always @(posedge clock)</code> blocks.
+</ul>
+
+<p>Blocking assignments should only be used in combinational blocks, despite
+being legal when used with clocked logic, for two reasons: 
+
+<ol>
+
+<li>The CAD tool may consider the destination of each blocking assignment as an
+unused register if the value is later used in the same clocked always block
+(since the value is used before the next clock edge, thus not from the output
+of the inferred register), which then raises a useless warning.
+
+<li>The blocking assignment takes effect immediately, rather than at the end
+of the simulation cycle, so depending on the order in which the simulator
+evaluates clocked always blocks, there could be race conditions giving
+different results between simulation runs, or between simulation and synthesis.
+If you want the deep reasons why, read the IEEE Standard 1364-2001, Section 5,
+"Scheduling Semantics". (Thanks go to Clifford Wolf (<a
+href="https://twitter.com/oe1cxw">@oe1cxw</a>) for enlightening me.).
+
+</ol>
+
+<p>Non-blocking assignments should only be used in clocked always blocks, as
+simulators may disagree on the interpretation or disallow the usage of
+non-blocking assignments in combinational always blocks, yielding inconsistent
+simulations across simulators, and maybe with synthesis results also.  For
+example, see the <a
+href="https://www.veripool.org/wiki/verilator/Manual-verilator#ERRORS-AND-WARNINGS">COMBDLY
+warning</a> explanation in Verilator.
+
+<p>Do not mix blocking and non-blocking assignments within an always block.
+It's legal (unless they assign to the same register!), but not necessary and
+error-prone.
+
+<p>For further blocking/non-blocking assignment code examples and explanations
+(particularly for the Verilog event scheduling model), Clifford E. Cummings'
+dramatically-titled <a
+href="http://www.sunburst-design.com/papers/CummingsSNUG2000SJ_NBA_rev1_2.pdf">"Nonblocking
+Assignments in Verilog Synthesis, Coding Styles That Kill!"</a> is a good,
+clear read.
+
+<h4>Design Rules for Assignments and Blocks</h4>
+
+<p>Blocking assignments (<code>=</code>) enable a very useful and specific
+design idiom: to break-down complex logic into simpler expressions we can then
+think about sequentially and re-use as necessary.
+
+<p>Thus, while simple logic can be correctly computed and assigned in a single
+line in a clocked always block, it's often clearer to implement more complex
+logic in a combinational block using blocking assignments and then register the
+results in an immediately following clocked always block using non-blocking
+assignments.
+
+<p>Given the above design rules, it's easy to selectively pipeline logic by
+having the second always block be clocked or not (and the assignments changed
+to match), without altering the logic or the layout of the code. It also gives
+an easy way to estimate how much logic will be placed between registers, and
+thus get an early grasp on critical paths.
+
+<pre>
+// Breaking down nested ternary operators into two simpler lines,
+// with unrelated and parallel logic alongside. 
+
+always @(*) begin
+    part_one        = (cond1 == 1'b1) ? foo : bar;
+    part_two        = (cond2 == 1'b0) ? baz : part_one;
+    other_result    = wibble1 ^ wibble2;
+end
+
+// If we don't want to register these values,
+// simply change the block trigger to @(*),
+// and the assignments to blocking (=).
+
+always @(posedge clock) begin
+    part_two_reg        <= part_two;
+    other_result_reg    <= other_result;
+    another_result      <= blob1 & blob2;
+end
+</pre>
+
+<h2>Logic Design</h2>
+
+<h3>Boolean Expressions</h3>
+
+<p>Express Boolean values behaviourally as equality/inequality tests against
+the expected value, which clarifies the intent of the code, removes the need to
+understand the polarity of each logic signal, and makes the bit width explicit.
+If you must invert a comparison, be sure to use the logical negation operator
+(<code>!</code>), which always returns 1 bit, rather than the bitwise negation
+(<code>~</code>) of all bits.
+
+<pre>
+// Rather than this
+always @(*) begin
+    C <= A & ~B;
+end
+
+// Do this
+always @(*) begin
+    C <= (A == 1'b1) && (B == 1'b0);
+end
+</pre>
+
+<h3>if/else vs. ternary operators</h3>
+
+<p>Unless otherwise necessary, use ternary operators (<code>?:</code>) instead
+of <code>if/else</code> statements. There are four main reasons:
+
+<ul>
+
+<li>If a variable is assigned a value in one clause of an if/else, but not the
+other, a latch may be synthesized. Using a ternary operator makes this error
+impossible.
+
+<li>Ternary operators are the only way to conditionally assign values to
+localparams and module parameters.
+
+<li>We can replace nested case/if/else statements with chained lines of ternary
+operators in blocking assignments, which make the code more compact and easier
+to follow.
+
+<li>In simulation, Verilog if/else statements treat X and Z values as false, and so
+will fail to propagate these values and give unexpected results:
+
+<pre>
+// Given the following...
+reg       foo = 1'bX;
+reg [1:0] bar = 2'b00;
+
+// Here, in simulation, foo takes on 2'b10, not 2'bXX
+always @(*) begin
+    if (foo == 1b'1) begin
+        bar <= 2'b01;
+    end
+    else begin
+        bar <= 2'b10;
+    end
+end
+
+// Here, in simulation, foo takes 2'bXX
+always @(*) begin
+    bar <= (foo == 1'b1) ? 2'b01 : 2'b10;
+end
+</pre>
+
+</ul>
+
+<p>On the other hand, if/else is necessary to conditionally instantiate logic
+in <code>generate</code> blocks, required by some vendor code templates to
+infer specific hardware, and unavoidable for some reset code.
+
+<p><em>Never</em> nest ternary operators, where one term of a ternary operator
+is itself a ternary operator. That make for unreadable code. Instead, split the
+logic into two blocking assignments, with the second ternary operator using the
+output of the first as one of its terms. This style gives you useful
+intermediate value signals during simulation, extends to an arbitrary number of
+expressions which we can easily reason about in sequence, and becomes a useful
+programming pattern for FSMs and other complex logic.
+
+<pre>
+// Rather than this...
+always @(*) begin
+    result <= (foo == 1'b1) ? ((bar == 1'b1) ? A : B) : C;
+end
+
+// ...do this!
+always @(*) begin
+    partial = (bar == 1'b1) ? A       : B;
+    result  = (foo == 1'b1) ? partial : C;
+end
+</pre>
+
+<h3>Estimating Logic Usage and Speed</h3>
+
+<p>When desiging logic, keep track of how many unique inputs are needed to
+generate the output, and match that to the target FPGA Look-Up Tables (LUTs).
+For example, if the FPGA has 6-input LUTs (6-LUTs), then any logic expression
+of up to 6 terms can (and usually will) map to a single 6-LUT per bit of output
+width. If you construct your logic as series of expressions of 6 or fewer terms
+with registers in between, then you minimize the logic and interconnect delay,
+and give the CAD tool more freedom to place and route.
+
+<p>Keeping the number of unique input terms in mind particularly applies to
+multiplexers. A 4:1 mux has 6 inputs terms (4 input bits and 2 selector bits)
+and so maps exactly to one 6-LUT per result bit, and can be registered "for
+free". If you want to maximize speed, be wary of multiplexers wider than 8:1,
+and avoid designing logic as a single large selection from many options: better
+to pipeline a sequence of smaller selections.
+
+<p><i>I'm glossing over fracturable LUTs and logic packing here, but those are
+things we can usually take for granted from the CAD tool.</i>
+
+<a name="fsm"></a>
+
+<h3>State Machines</h3>
+
+<p>Separate your FSM from your data processing, which also enables you to break
+a larger FSM into smaller ones. For example, each datapath can have its own FSM
+to perform transactions, and these FSMs can be in turn controlled by another FSM
+which deals with error-recovery.
+
+<p>In other words, don't place the state and data processing logic together
+into a single large <code>case</code> statement, with one case per FSM state,
+and nested if/else statements inside each case to handle the input/output
+control signals. Figuring out all possible state transitions and control
+signals, and eliminating redundant and illegal ones, isn't practical past
+simple cases, and can lead to lots of seemingly arbitrary code the next reader
+has to reverse-engineer back into a state diagram. 
+
+<p>Instead, take advantage of the sequential ordering of blocking assignments
+and of ternary operators, using the idiom of starting with a register and
+sequentially testing and passing along its updated value in a combinational
+always block, and registering the updated value in an immediately following
+clocked always block. If none of the conditions are met, the register remains
+unchanged.
+
+<p>Then, using this idiom, describe the possible states of the datapath
+(independent of control), build up definitions of the basic datapath operations
+(independent of state) and of the allowed transformations on the datapath (as
+operations and the states they may occur in), and then express the state
+transition and control signal logic in terms of those datapath transformations.
+This approach describes the FSM at a higher level and reduces code duplication,
+making it easier to read, debug, and maintain. Expect to need a larger than
+usual number of comments in your FSM, as it depends on an external context (the
+datapath) to be meaningful.
+
+<p>To illustrate these idioms, here is the FSM from a simple AXI skid buffer
+which manages the valid/ready handshakes on a master and a slave interface, and
+controls the datapath (implemented elsewhere). For more details, see
+<a href="./skid_buffer.html">Designing A Skid Buffer</a>.
+
+<pre>
+`default_nettype none
+
+module skid_buffer_fsm
+// No parameters
+(
+    input   wire    clock,
+
+    // Slave interface
+    input   wire    s_valid,
+    output  reg     s_ready,
+
+    // Master Interface
+    output  reg     m_valid,
+    input   wire    m_ready,
+
+    // Control to Datapath
+    output  reg     data_out_wren,
+    output  reg     data_buffer_wren,
+    output  reg     use_buffered_data    
+);
+
+// --------------------------------------------------------------------------
+// Have the initial output values match what they would be for an empty
+// datapath.
+
+    initial begin
+        s_ready             = 1'b1; // empty at start, so accept data
+        m_valid             = 1'b0;
+        data_out_wren       = 1'b1; // empty at start, so accept data
+        data_buffer_wren    = 1'b0;
+        use_buffered_data   = 1'b0;
+    end
+
+// --------------------------------------------------------------------------
+// Lets describe the possible states of the datapath, and initialize it.
+
+    localparam STATE_BITS = 2;
+
+    localparam [STATE_BITS-1:0] EMPTY = 'd0; // Output and buffer registers empty
+    localparam [STATE_BITS-1:0] BUSY  = 'd1; // Output register holds data
+    localparam [STATE_BITS-1:0] FULL  = 'd2; // Both output and buffer registers hold data
+    // There is no case where only the buffer register would hold data.
+
+    reg [STATE_BITS-1:0] state      = EMPTY;
+    reg [STATE_BITS-1:0] state_next = EMPTY;
+
+// --------------------------------------------------------------------------
+// Compute the allowable output read/valid handshake signals based on the
+// datapath state. (use state_next so we can have a nice registered output).
+
+    // The slave interface is ready to accept data whenever the datapath is not full.
+    // The master interface has data to give whenever the datapath is not empty.
+    always @(posedge clock) begin
+        s_ready <= (state_next != FULL);
+        m_valid <= (state_next != EMPTY); 
+    end
+
+// --------------------------------------------------------------------------
+// Let's enumerate the possible interface states which transform the contents
+// of the datapath. Here, this means the slave interface inserting and the
+// master interface removing data items from the datapath.
+
+    reg insert = 1'b0;
+    reg remove = 1'b0;
+
+    always @(*) begin
+        insert = (s_valid == 1'b1) && (s_ready == 1'b1);
+        remove = (m_valid == 1'b1) && (m_ready == 1'b1);
+    end
+
+// --------------------------------------------------------------------------
+// Let's describe the possible transformations to the datapath, and in which state
+// they can happen.
+
+    reg load    = 1'b0; // Empty datapath inserts data into output register.
+    reg flow    = 1'b0; // New inserted data into output register as the old data is removed.
+    reg fill    = 1'b0; // New inserted data into buffer register. Data not removed from output register.
+    reg flush   = 1'b0; // Move data from buffer register into output register. Remove old data. No new data inserted.
+    reg unload  = 1'b0; // Remove data from output register, leaving the datapath empty.
+
+    always @(*) begin
+        load    = (state == EMPTY) && (insert == 1'b1);
+        flow    = (state == BUSY)  && (insert == 1'b1) && (remove == 1'b1);
+        fill    = (state == BUSY)  && (insert == 1'b1) && (remove == 1'b0);
+        flush   = (state == FULL)  && (insert == 1'b0) && (remove == 1'b1);
+        unload  = (state == BUSY)  && (insert == 1'b0) && (remove == 1'b1);
+    end
+
+// --------------------------------------------------------------------------
+// Lets calculate the next state after each datapath transformation.
+
+    always @(*) begin
+        state_next = (load   == 1'b1) ? BUSY  : state;
+        state_next = (flow   == 1'b1) ? BUSY  : state_next;
+        state_next = (fill   == 1'b1) ? FULL  : state_next;
+        state_next = (flush  == 1'b1) ? BUSY  : state_next;
+        state_next = (unload == 1'b1) ? EMPTY : state_next;
+    end
+
+    always @(posedge clock) begin
+        state <= state_next;
+    end
+
+// --------------------------------------------------------------------------
+// Finally, from the datapath transformations, compute the necessary control
+// signals. These are not registered here, as they end at registers in the
+// datapath.
+
+    always @(*) begin
+        data_out_wren     = (load  == 1'b1) || (flow == 1'b1) || (flush == 1'b1);
+        data_buffer_wren  = (fill  == 1'b1);
+        use_buffered_data = (flush == 1'b1);
+    end
+
+endmodule
+</pre>
+
+<a name="resets"></a>
+
+<h3>Resets</h3>
+
+<p>(<i>Resets are one place where FPGA and ASIC design practices diverge.</i>)
+
+<p>Make use of the implicit power-on-reset in FPGAs, limit the number of things
+which need an explicit reset signal, and keep that reset synchronous to the
+clock. This means passing an external reset through a CDC synchronizer.
+
+<p><i>True asynchronous resets are an exception when a clock isn't yet available
+(e.g.: PLL reset).</i>
+
+<p>The configuration bitstream of an FPGA includes the initial state of all
+registers and (most) on-chip memories, so most logic does not require a reset
+signal to properly start operating. Set the initial state of registers by
+assigning it at declaration, or assigning it inside an <code>initial</code>
+block for module register output ports. Most on-chip memories can be similarly
+initialized with a known content via a <code>$readmemh()</code> directive, or
+some code in an <code>initial</code> block. See Ken Chapman's <a
+href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
+Smart About Reset: Think Local, Not Global</a> for details.
+
+<p>The common idiom for resets uses an if/else statement, where each
+register must be assigned a value in both clauses (else a latch may be
+synthesized), which means all registers must be reset, maximizing the size of
+the reset tree, which uses more routing and makes timing harder to meet.
+
+<pre>
+// Common idiom, which has a problem...
+always @(posedge clock) begin
+    if (reset == 1'b1) begin
+        foo <= FOO_RESET;
+        bar <= BAR_RESET; // but does not need a reset!
+    end
+    else begin
+        foo <= foo_next;
+        bar <= bar_next;
+    end
+end
+</pre>
+
+<p>If you must reset some registers, use one of the following idioms instead to
+minimize the size of the reset tree:
+
+<pre>
+// Ternary operator assignment for reset
+always @(posedge clock) begin
+    foo <= (reset == 1'b1) ? FOO_RESET : foo_next;
+    bar <= bar_next
+end
+
+// Using "last assignment wins" semantics for reset
+always @(posedge clock) begin
+    foo <= foo_next;
+    bar <= bar_next;
+
+    if (reset == 1'b1) begin
+        foo <= FOO_RESET;
+    end
+end
+</pre>
+
+<p>Credit for the "last assignment wins" idiom goes to Olof Kindgren (<a
+href="https://twitter.com/OlofKindgren">@olofkindgren</a>): <a
+href="https://olofkindgren.blogspot.com/2017/11/resetting-reset-handling.html">Resetting
+reset handling</a>. This idiom also <a
+href="https://stebanoid.blogspot.com/2018/06/minimalistic-resets-coding-style.html">applies
+to VHDL</a>. 
+
+<p>Alse see <a
+href="https://twitter.com/oe1cxw/status/1040917788762812416">this twitter
+thread</a> which discusses a subtlety of "last assignment wins" which explains
+a subtlety of non-blocking assignments and ternary operators. Credit to
+Clifford Wolf (<a href="https://twitter.com/oe1cxw">@oe1cxw</a>).
+
+<h4>Combining Reset and Clock Enable</h4>
+
+<p>On FPGAs, the flip-flop reset hardware is asynchronous, and this causes
+difficulties when inferring flip-flops with clock_enables from Verilog code.
+The "last assignment wins" idiom to implement reset doesn't work here: Forcing
+a synchronous reset converts the reset to extra logic feeding the flip-flop
+data pin. Normally, this logic simply gets folded into the existing logic
+feeding the flip-flop and we can ignore its impact: as mentioned previously,
+reducing the size of the reset tree has a greater impact on circuit timing.
+
+<p>Also, having two separate if-statements (one for clock_enable followed by
+one for reset) does not work when the reset is asynchronously specified
+alongside the clock in the sensitivity list (as shown below), as there is no
+way to determine which signal in the sensitivity list each if statement should
+respond to.
+
+<p>Thus, correct flip-flop hardware inference depends on explicitly expressing
+the priority of the reset over the clock_enable structurally with nested
+if-statements, rather than implicitly through the Verilog event queue via the
+"last assignment wins" idiom.
+
+<p>This is very likely the *only* place you will ever need an asynchronous
+signal in a sensitivity list, or express explicit structural priority.
+
+<p>Also, even though the flip-flop reset hardware is asynchronous, it should be
+fed by a synchronous reset signal, otherwise if the flip-flop was not already
+at zero, it may flip to zero at a time such that the signal change reaches the
+next flip-flops down the line within their metastability window.
+
+<pre>
+`default_nettype none
+
+module Register
+#(
+    parameter WORD_WIDTH  = 0,
+    parameter RESET_VALUE = 0
+)
+(
+    input   wire                        clock,
+    input   wire                        clock_enable,
+    input   wire                        reset,
+    input   wire    [WORD_WIDTH-1:0]    in,
+    output  reg     [WORD_WIDTH-1:0]    out
+);
+
+    initial begin
+        out = RESET_VALUE;
+    end
+
+    always @(posedge clock or posedge reset) begin
+        if (reset == 1'b1) begin
+            out <= RESET_VALUE;
+        end
+        else begin
+            if (clock_enable == 1'b1) begin
+                out <= in;
+            end
+        end
+    end
+
+endmodule
+</pre>
+
+<h4>Reset Sequencing</h4>
+
+<p>Various parts of a design may have to stay in reset for a minimum amount of
+time to properly initialize (e.g.: 200us for DDR2 RAM), and have to come out of
+reset in a certain order to avoid receiving undefined signals. You can sequence
+the resets by creating delayed copies of the power-on-reset with a few counters
+driven by the main clock, with the count values set as top-level design module
+parameters.
+
+<h2>Some Corner Cases</h2>
+
+<h3>Simulated Clock Generation</h3>
+
+<p>In simulation, a race condition can exist at time zero between the initial
+value assignment of a register and the first clock edge. For example:
+
+<pre>
+reg clock = 1'b0; // Counts as a negedge at time zero! (X -> 0)
+reg foo   = 1'b0; // Also does X -> 0 at time zero.
+
+// Simulate the clock
+always begin
+    #`HALF_PERIOD clock <= ~clock;
+end
+
+// It is unclear if the clock edge or the "foo" initialization will happen first,
+// so "bar" can get X for one simulation cycle...
+always @(negedge clock) begin
+    bar <= foo;
+end
+</pre>
+
+<p>This race condition is another reason to only use <code>@(posedge
+clock)</code> in internal logic, but the same race condition will happen if the
+simulation clock happens to be initialized to 1'b1.
+
+<p>Instead, the following clock generation idiom (credit: Clifford Wolf (<a
+href="https://twitter.com/oe1cxw">@oe1cxw</a>)) avoids the race condition by
+making use of undefined values and the identity operator (<code>===</code>)
+instead of the equality (<code>==</code>) operator:
+
+<pre>
+// NOTE: clock is left uninitialized, and thus X in most simulators, and will
+// not trigger a (X -> 0) edge until after the simulated clock half-period delay.
+always begin
+    #`HALF_PERIOD clock <= (clock === 1'b0);
+end
+</pre>
+
+<hr>
+
+<a href="http://fpgacpu.ca/">fpgacpu.ca</a> </body> </html>
