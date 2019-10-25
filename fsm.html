@@ -4,21 +4,21 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Appendix: Finite State Machines</title>
+<title>On The Implementation of Finite State Machines</title>
 </head>
 <body>
 
-<h1>Appendix: Finite State Machines</h1>
+<h1>On The Implementation of Finite State Machines</h1>
 
-<p>With FSMs, the beginner can statefully control data processing logic and
+<p>With FSMs, the designer can statefully control data processing logic and
 thus implement arbitrary functions up to a full CPU.  FSMs can be implemented
-in the Design Subset Library using localparams (for named constants and
-states), register modules (for outputs and holding state), comparison modules
-(eq, lt, gt, neq), multiplexer modules (to select the next state), and wires to
-name signals and tie everything together.
+with design elements using localparams (for named constants and states),
+register modules (for outputs and holding state), comparison modules (eq, lt,
+gt, neq), multiplexer modules (to select the next state), and wires to name
+signals and tie everything together.
 
-<p>Once the beginner has defined the state transition diagram, they can
-build-up the design of the FSM incrementally in the Design Subset Library by:
+<p>Once the designer has defined the state transition diagram, they can
+build-up the design of the FSM incrementally using design elements by:
 
 <ol>
 <li> defining any constraints on outputs (e.g. only asserted in certain states)
@@ -53,7 +53,7 @@ more efficient alternative. log<sub>2</sub>N bits are required for N states.
 <li>Separate parallel "checkers" whose output sets or clears a single
 flip-flop. Each flip-flop represents a state. The FSM is in a given state if
 one and only one flip-flop is set (one-hot encoding). This design is the most
-parallel, has the shorted logic path, and may support pipelined operation or
+parallel, has the shortest logic path, and may support pipelined operation or
 even overlapping states given suitable state encodings.  N bits are required
 for N states.
 
@@ -72,7 +72,6 @@ would have to explicitly write multiple checkers which test for the same
 transformation but select different next states. Although logically allowable,
 the conflict will be visible to the user.
 
-
-<hr><a href="http://fpgacpu.ca/">fpgacpu.ca</a>
+<hr><a href="./index.html">back to FPGA Design Elements</a>
 </body>
 </html>
