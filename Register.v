@@ -1,5 +1,7 @@
 
-// # A synchronous register to store data.
+// # A Synchronous Register to Store Data.
+
+// [Source](./Register.v)
 
 // On FPGAs, the flip-flop hardware reset is usually asynchronous, and so can
 // be used as a forced system reset, but must be fed from a clock-synchronous
