@@ -9,19 +9,18 @@ block.
 
 Thus you can keep the Verilog code, its documentation, and its presentation in sync.
 
-Copyright 2019 Charles Eric LaForest
-License: https://opensource.org/licenses/MIT
+A file is only updated if the newly generated HTML is not identical to the existing HTML file.
 
+Copyright (c) 2019 Charles Eric LaForest
+License: https://opensource.org/licenses/MIT
 """
 
 import markdown
 import sys
 
-
 # Web page header and footer, with a placeholder for the page title.
 
-header = """
-<html>
+header = """<html>
 <head>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
@@ -29,18 +28,26 @@ header = """
 <title>{0}</title>
 </head>
 <body>
+
 """
 
-footer = """
-<hr><a href="http://fpgacpu.ca/">fpgacpu.ca</a>
+footer = """<hr><a href="./index.html">back to FPGA Design Elements</a>
 </body>
 </html>
+
 """
 
-def clean_filename(filename):
-    """Convert the Verilog filename into the web page title.
-       Simple stripping to catch '.v' and '.vh' extensions."""
-    return filename.rstrip(".vh").replace("_", " ")
+def base_filename(filename):
+    """Strip Verilog filename extension"""
+    return filename.rstrip(".vh")
+
+def output_filename(filename):
+    """Convert input Verilog filename to output HTML filename"""
+    return base_filename(filename) + ".html"
+
+def filename_to_title(filename):
+    """Convert the Verilog filename into the web page title"""
+    return base_filename(filename).replace("_", " ")
 
 def is_comment(line):
     return line.lstrip().startswith("//")
@@ -53,7 +60,7 @@ def is_eof(line):
     """readline only ever returns an empty line at EOF"""
     return line == ""
 
-def process_comments(line, f):
+def process_comments(line, processed_contents, f):
     """Take in comment/blank lines until a line is neither.
        Then process them as Markdown and output the XHTML."""
     comment_block = ""
@@ -61,11 +68,10 @@ def process_comments(line, f):
         comment_block = comment_block + line.lstrip("/ ")
         line = f.readline()
     html = markdown.markdown(comment_block)
-    print(html)
-    print()
-    return line
+    processed_contents += html + "\n\n"
+    return line, processed_contents
 
-def process_code(line, f):
+def process_code(line, processed_contents, f):
     """Take in code lines until a line is a comment.
        Then remove the previous line if it's blank.
        Then wrap the code in a <pre> block."""
@@ -75,28 +81,49 @@ def process_code(line, f):
         line = f.readline()
     if is_blank(code_block[-1]):
         code_block.pop()
-    print("<pre>")
+    processed_contents += "<pre>\n"
     for code_line in code_block:
-        print(code_line, end="")
-    print("</pre>\n")
-    return line
+        processed_contents += code_line
+    processed_contents += "</pre>\n\n"
+    return line, processed_contents
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    f = open(filename, 'r')
-    filename = clean_filename(filename)
-    print(header.format(filename))
+    verilog_filename = sys.argv[1]
+    html_filename = output_filename(verilog_filename)
+
+    try:
+        f = open(html_filename, 'r')
+        existing_file_contents = f.read()
+        f.close()
+    except OSError:
+        existing_file_contents = ""
+        pass
+
+    f = open(verilog_filename, 'r')
+    processed_contents = ""
+    title = filename_to_title(verilog_filename)
+    processed_contents += header.format(title)
     line = f.readline()
     # Note the returning of the last line read and restarting of parsing.
     # This avoids the need for look-ahead to know when to end a comment or code block.
     while not is_eof(line):
         if is_comment(line):
-            line = process_comments(line, f)
+            line, processed_contents = process_comments(line, processed_contents, f)
             continue
         if not is_comment(line) and not is_blank(line):
-            line = process_code(line, f)
+            line, processed_contents = process_code(line, processed_contents, f)
             continue
         line = f.readline()
-    print(footer)
+    processed_contents += footer
     f.close()
+
+    if processed_contents != existing_file_contents:
+        print("Updating {0}".format(html_filename));
+        f = open(html_filename, 'w')
+        f.write(processed_contents)
+        f.close()
+    else:
+        print("Skipping {0}".format(html_filename));
+
+    print("Done.")
 
