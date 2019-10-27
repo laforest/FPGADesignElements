@@ -41,11 +41,15 @@ SOFTWARE.</p>
 <p>It's simply not possible for a single person to write and test and
 exhaustively verify all the code in this book, and still get anything done.
 Thus, the state of the code and guidelines in this book ranges from "it should
-work, in theory" to "actively used in commercial applications".  That said, the
-provided design elements are each rather small and easy to manually inspect.
-Each module is run through the Verilator linter to find mistakes, and then
-through the Intel Quartus Prime CAD tool to find any elaboration and synthesis
-issues. <em><b>Use at your own risk.</b></em></p>
+work, in theory" to "actively used in commercial applications".
+<em><b>Use at your own risk.</b></em></p>
+
+<p>That said, each design element is rather small and easy to manually inspect,
+<a href="./tools.html">and checked with a few basic tools</a>. The Verilog
+source is run through the Verilator linter to find mistakes, and then through
+the Intel Quartus Prime CAD tool to find any elaboration and synthesis issues.
+Some more complex designs are further simulated using one of Verilator, Icarus
+Verilog, or Xilinx XSim.</p>
 
 <p>If you do find any bugs, please accept my apologies, and 
 <a href="mailto:eric@fpgacpu.ca?subject=FPGA%20Design%20Elements">do let me know</a> so I can fix them. (Or better
