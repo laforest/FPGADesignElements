@@ -1,4 +1,4 @@
-# FPGADesignElements
+# FPGA Design Elements
 
 ## Copyright (c) 2019 Charles Eric LaForest, PhD.
 
