@@ -2,7 +2,7 @@
 
 ## Copyright (c) 2019 Charles Eric LaForest, PhD.
 
-A self-contained online book containing a library of FPGA design modules and
+A self-contained online book containing a library of FPGA design elements and
 related coding/design guides.
 
 To obtain your own local copy:
