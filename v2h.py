@@ -29,6 +29,8 @@ header = """<html>
 </head>
 <body>
 
+<p><a href="./{1}">Source</a></p>
+
 """
 
 footer = """<hr><a href="./index.html">back to FPGA Design Elements</a>
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     f = open(verilog_filename, 'r')
     processed_contents = ""
     title = filename_to_title(verilog_filename)
-    processed_contents += header.format(title)
+    processed_contents += header.format(title, verilog_filename)
     line = f.readline()
     # Note the returning of the last line read and restarting of parsing.
     # This avoids the need for look-ahead to know when to end a comment or code block.
