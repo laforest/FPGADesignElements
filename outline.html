@@ -1,0 +1,47 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outline</title>
+</head>
+<body>
+
+
+<h1>Outline</h1>
+
+<p>This book provides a reference library of fundamental digital logic design
+elements, along with standards for <a href="./verilog.html">Verilog coding</a>
+and <a href="./system.html">system design</a>. Think of it as a hardware analog
+to the C Standard Library ("libc") and its documentation.</p>
+
+<p>The design elements are grouped into categories (e.g.: Boolean Logic,
+Synchronous Logic, Integer Arithmetic, etc...). Each category entry implements
+and explains a specific design element, starting with the most basic ones
+(including ones meant solely for beginner's education rather than serious use),
+and gradually increase in complexity up to complete interfaces and
+special-purpose engines built using a common design form which heavily re-use
+other design elements. Each entry web page is <a
+href="./tools.html">generated directly</a> from the design element Verilog
+source, and you can find a link to the source at the top of each page.</p>
+
+<p>To obtain your own local copy of the book: <code>git clone
+https://github.com/laforest/FPGADesignElements.git</code> then access <a
+href="./index.html">./index.html</a> from your favourite browser.  All Verilog
+sources and other files are in one directory, so you can use it as a library in
+your CAD tools by simply importing all Verilog files.  See the <a
+href="./legal.html">license and disclaimer</a> for the legal details, but
+overall, you are free to use this book as you please.</p>
+
+<p>Although the design elements in this book are written in Verilog-2001 (for
+portability, better software support, and fine control of the synthesis), I
+expect there is very little code which could not be trivially translated into
+your Hardware Description Language of choice. I also expect the design elements
+themselves to be universal and language-agnostic.<p>
+
+<p>Contributions are welcome. Please email <a href="mailto:eric@fpgacpu.ca?subject=FPGA%20Design%20Elements">eric@fpgacpu.ca</a>
+or Twitter <a href="https://twitter.com/elaforest">@elaforest</a>.
+
+<hr><a href="./index.html">back to FPGA Design Elements</a>
+</body>
+</html>
