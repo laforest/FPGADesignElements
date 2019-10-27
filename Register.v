@@ -1,8 +1,6 @@
 
 // # A Synchronous Register to Store Data.
 
-// [Source](./Register.v)
-
 // On FPGAs, the flip-flop hardware reset is usually asynchronous, and so can
 // be used as a forced system reset, but must be fed from a clock-synchronous
 // signal under normal operation. This means if a complete system reset is
