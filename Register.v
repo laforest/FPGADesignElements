@@ -1,6 +1,15 @@
 
 // # A Synchronous Register to Store Data.
 
+// It may seem silly to explicitly implement a register rather than let the
+// HDL infer it, but having the register as a module solves the problem of
+// forgetting to set the initial and reset value, and of resetting only the
+// registers that need resetting, thus reducing the routing and timing
+// requirements of the reset tree.
+
+// Also, a register module separates control from data with explicit signals
+// to load and clear the register.
+
 // On FPGAs, the flip-flop hardware reset is usually asynchronous, and so can
 // be used as a forced system reset, but must be fed from a clock-synchronous
 // signal under normal operation. This means if a complete system reset is
@@ -13,11 +22,13 @@
 // depend on the initial power-up reset (on FPGAs) to load the reset value.
 // This reduces the size of the reset network and simplifies place-and-route.
 
-// If you need to clear a register during normal operation, use the synchronous
-// "clear" input. This may create extra logic, but abstracts away that case
-// from the surrounding logic.
-
-`timescale 1 ns / 1 ps
+// If you need to clear a register during normal operation, use the
+// synchronous "clear" input. This may create extra logic, but abstracts away
+// that case from the surrounding logic. The asynchronous reset takes effect
+// immediately, before any clock edge, which shows up as impossible "missing"
+// register loads in a behavioural simulation, and impossible
+// shorter-than-the-clock-period pulses, almost glitches, in
+// a timing-annotated post-synthesis simulation.
 
 `default_nettype none
 
@@ -39,29 +50,30 @@ module Register
         out = RESET_VALUE;
     end
 
-    // Normally, I would use the "last assignment wins" idiom to implement
-    // reset, but that doesn't work here: the reset signal into the flip-flop
-    // hardware is asynchronous usually. Forcing a synchronous reset converts
-    // the reset to extra logic feeding the flip-flop data pin. (That's what
-    // the "clear" pin is for.)
+    // Normally, I would use the ["last assignment wins"](./verilog.html#resets)
+    // idiom to implement reset, but that doesn't work here: the reset signal
+    // into the flip-flop hardware is asynchronous usually. Forcing
+    // a synchronous reset converts the reset to extra logic feeding the
+    // flip-flop data pin. (That's what the "clear" pin is for.)
 
-    // Also, having two separate if statements (one for clock_enable followed
+    // Also, having two separate if-statements (one for clock_enable followed
     // by one for reset) does not work when the reset is asynchronously
     // specified in the sensitivity list (as done here), as there is no way to
     // determine which signal in the sensitivity list each if statement should
     // respond to.
 
     // Thus, correct hardware inference depends on explicitly expressing the
-    // priority of the reset over the clock_enable structurally with nested if
-    // statements, rather than implicitly through the Verilog event queue via
-    // the "last assignment wins" idiom.
+    // priority of the reset over the clock_enable structurally with nested
+    // if-statements, rather than implicitly through the Verilog event queue
+    // via the "last assignment wins" idiom.
 
     // This is very likely the *only* place you will ever need an asynchronous
     // signal in a sensitivity list, or express explicit structural priority.
 
     // The synchronous clear implements as logic in front of the register,
-    // which will merge with the logic feeding the "in" pin, without external
-    // logic having to multiplex a "clear" value into "in".
+    // which will merge with the logic feeding the "in" and "clock_enable"
+    // pin, without external logic having to multiplex a "clear" value into
+    // "in".
 
     reg [WORD_WIDTH-1:0] selected = RESET_VALUE;
 
