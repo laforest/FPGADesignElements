@@ -1,0 +1,158 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using Altera's USB-Blaster on Debian Linux</title>
+</head>
+<body>
+
+<h1>Using <s>Altera's</s> Intel's USB-Blaster on Debian Linux</h1>
+
+<p>from <a href="./index.html">FPGA Design Elements</a> by <a href="http://fpgacpu.ca/">Charles Eric LaForest, PhD.</a>
+
+<p>I've tested this on a Terasic DE4 board, but in theory it should work with
+any board which uses a USB-Blaster interface to the JTAG chain for
+programming Altera FPGA devices, such as the DE2 commonly used for education.
+
+<hr>
+
+<p>Additionally, Carl Wernhoff also solved the same problem: <a href="http://www.fpga-dev.com/altera-usb-blaster-with-ubuntu/">Altera USB-Blaster with Ubuntu 14.04</a>
+
+<hr>
+
+<p><b>The usbfs instructions are obsolete, as usbfs has ceased to exist in the
+Linux kernel as of 3.5. I'm keeping them here for historical interest, and
+also because the debugging guide at the end is still relevant.</b>
+
+<p>Current working instructions can be found on the Arch Linux Wiki: <a
+href="https://wiki.archlinux.org/index.php/Altera_Design_Software">Altera
+Design Software</a>. The essential updated bit is:
+
+<pre>
+Create a new udev rule:
+
+/etc/udev/rules.d/51-altera-usb-blaster.rules
+
+# USB-Blaster
+SUBSYSTEM=="usb", ATTR{idVendor}=="09fb", ATTR{idProduct}=="6001", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="09fb", ATTR{idProduct}=="6002", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="09fb", ATTR{idProduct}=="6003", MODE="0666"
+# USB-Blaster II
+SUBSYSTEM=="usb", ATTR{idVendor}=="09fb", ATTR{idProduct}=="6010", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="09fb", ATTR{idProduct}=="6810", MODE="0666"
+
+Then, reload that file using udevadm:
+
+# udevadm control --reload
+</pre>
+
+<p>The rest of the instructions remain essentially the same: jtagd must run as
+root to ensure sufficient permissions.
+
+<hr>
+
+<h4>Allowing non-root access to the USB-Blaster device</h4>
+
+<p>To do this, create a file called
+<code>/etc/udev/rules.d/altera-usb-blaster.rules</code> containing a single
+line:
+
+<br><br><code>ATTR{idVendor}=="09fb", ATTR{idProduct}=="6001", MODE="666"</code>
+
+<p>This grants <code>rw-rw-rw-</code> permision to the device. A more proper
+configuration involves creating a group for the device, say
+<code>usbblaster</code>, placing your user(s) in that group, and defining the
+device permisions like so:
+
+<br><br><code>ATTR{idVendor}=="09fb", ATTR{idProduct}=="6001", GROUP="usbblaster"</code>
+
+<p><em>Note that this is not perfect: multiple USB device entries are created
+for the USB-Blaster, and not all  will have the new permissions, which is why
+<code>jtagd</code> must run as root. (see below)</em>
+
+<h4>Mounting the usbfs filesystem</h4>
+
+Add the following entry to <code>/etc/fstab</code> and mount it:
+
+<br><br><code>none /proc/bus/usb usbfs defaults 0 0</code>
+
+<p>You'll know its good if <code>/proc/bus/usb/devices</code> appears and spits
+out a bunch of textual device info when printed.
+
+<p><em>Note that Ubuntu no longer ships with usbfs enabled. This makes for more
+complicated workarounds, which you will find online.</em>
+
+<h4>Configuring jtagd</h4>
+
+<p>Quartus uses a daemon, <code>jtagd</code>, as intermediate bewteen the
+programming software and the device. This seems needlessly complicated, but
+does enable remote host programming apparently. The key points to configuring
+it correctly are: it must be able to access a list of FPGA descriptions, and
+run as root.
+
+<p>Copy the descriptions from your Quartus installation to the configuration
+directory of <code>jtagd</code>: 
+<br><br><code>mkdir /etc/jtagd</code>
+<br><code>cp &lt;Quartus install path&gt;/linux/quartus/linux/pgm_parts.txt /etc/jtagd/jtagd.pgm_parts</code> (<i>Note
+the change of name!</i>)
+
+<p>Have <code>jtagd</code> start at boot by either placing it in the rc.d
+system, or simply place the followwing line in <code>/etc/rc.local</code>:
+<br><br><code>&lt;Quartus install path&gt;/linux/quartus/bin/jtagd</code> 
+
+<P>Although it might get created automatically, you can create an empty file
+named <code>.jtagd.conf</code> in your home directory.  I hear it's possible to
+edit it to allow external hosts to connect and program/debug. This is only
+necessary if you want to use that feature.
+
+<h4>Testing your setup</h4>
+
+<p>As a final test, plug in your device, run <code>dmesg</code> to see if the
+USB-Blaster device is found, then run (as your usual user)
+<code>jtagconfig</code>. You should see output similar to this:
+
+<pre>
+1) USB-Blaster [USB 1-1.1]
+  020B30DD   EP2C15/20
+</pre>
+
+<p>If USB device permissions are insufficient (they shouldn't, given the rule
+added in <code>/etc/udev/rules.d/altera-usb-blaster.rules</code>), you will
+instead get:
+
+<pre>
+No JTAG hardware available
+</pre>
+
+<p>If USB permissions are OK, but <code>jtagd</code> is not running as root,
+you will see:
+
+<pre>
+1) USB_Blaster [USB 4-1.2]
+  Unable to lock chain (Insufficient port permissions)
+</pre>
+
+<p>Finally, if permissions are OK and <code>jtagd</code> is running as root,
+but it cannot access the FPGA device descriptions, you will see:
+
+<pre>
+1) USB-Blaster [USB 4-1.2]
+  024030DD
+</pre>
+
+<h4>Programming your FPGA device</h4>
+
+<p>You should now be able to use the Programmer in Quartus to load a bitstream
+onto your target FPGA. Alternately, you can use the following shell script to
+do it at the command line:
+
+<pre>
+#!/bin/bash
+quartus_pgm -z -m JTAG -o "p;$1"
+</pre>
+
+<hr><a href="./index.html">back to FPGA Design Elements</a>
+</body>
+</html>
+
