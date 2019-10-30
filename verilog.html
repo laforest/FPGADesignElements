@@ -329,6 +329,14 @@ href="https://twitter.com/tom_verbeure/status/1070001089624211456">note by
 @tom_verbeure</a> on why <code>_o</code> and <code>_i</code> port name suffixes
 can cause problems.
 
+<h4>Vivado limitation in naming</h4>
+
+<p>Although it works in Verilog, and would be a great match for simple modules
+with well-defined functionality, don't name any ports "in" or "out". Those
+names are reserved words in VHDL, and Vivado's IP Integrator will reject those
+names in Verilog source, even if legal. By extension, avoid reserved words in
+both VHDL and Verilog for naming ports, variables, etc...
+
 <h2>Procedural Blocks and Assignments</h2>
 
 <h3>Assign Statements</h3>
