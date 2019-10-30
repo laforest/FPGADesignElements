@@ -743,24 +743,41 @@ endmodule
 
 <h3>Resets</h3>
 
-<p>(<i>Resets are one place where FPGA and ASIC design practices diverge.</i>)
+<p>(<i>Resets are one place where FPGA and ASIC design practices diverge. You
+are also better off encapsulating all the issues discussed below inside a <a
+href="./Register.html">Register module</a></i>)
 
 <p>Make use of the implicit power-on-reset in FPGAs, limit the number of things
-which need an explicit reset signal, and keep that reset synchronous to the
-clock. This means passing an external reset through a CDC synchronizer.
+which need an explicit asynchronous reset signal, and feed it from a signal
+synchronous to the clock. This means passing an external reset through a CDC
+synchronizer. 
+
+<p>On FPGAs, the hardware reset of a flip-flop is usually asynchronous and so
+takes effect immediately rather than at the next clock edge, which can
+cause subtle bugs: a register appears to fail to capture data in
+behavioural simulation, or changes in impossible ways (within less than
+a clock cycle) in timing-annotated post-synthesis simulation.
+
+<p>If you need to reset during normal operation, use a separate synchronous
+"clear" signal controlling the data into the flip-flop. This may create extra
+logic, but that logic gets folded into other logic feeding data to the
+register, and would have been necessary anyway.  
 
 <p><i>True asynchronous resets are an exception when a clock isn't yet available
-(e.g.: PLL reset).</i>
+(e.g.: PLL reset), or when the synchronous control logic is wedged.</i>
 
 <p>The configuration bitstream of an FPGA includes the initial state of all
 registers and (most) on-chip memories, so most logic does not require a reset
-signal to properly start operating. Set the initial state of registers by
-assigning it at declaration, or assigning it inside an <code>initial</code>
-block for module register output ports. Most on-chip memories can be similarly
-initialized with a known content via a <code>$readmemh()</code> directive, or
-some code in an <code>initial</code> block. See Ken Chapman's <a
+signal to properly start operating. See Ken Chapman's <a
 href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
-Smart About Reset: Think Local, Not Global</a> for details.
+Smart About Reset: Think Local, Not Global</a> for details. Set the initial
+state of registers by assigning it at declaration, or assigning it inside an
+<code>initial</code> block for module register output ports. Most on-chip
+memories can be similarly initialized with a known content via a
+<code>$readmemh()</code> directive, or some code in an <code>initial</code>
+block. 
+
+<h4>The "Last Assignment Wins" Reset Idiom</h4>
 
 <p>The common idiom for resets uses an if/else statement, where each
 register must be assigned a value in both clauses (else a latch may be
@@ -815,21 +832,15 @@ thread</a> which discusses a subtlety of "last assignment wins" which explains
 a subtlety of non-blocking assignments and ternary operators. Credit to
 Clifford Wolf (<a href="https://twitter.com/oe1cxw">@oe1cxw</a>).
 
-<h4>Combining Reset and Clock Enable</h4>
+<h4>Combining Asynchronous Reset and Clock Enable</h4>
 
 <p>On FPGAs, the flip-flop reset hardware is asynchronous, and this causes
 difficulties when inferring flip-flops with clock_enables from Verilog code.
-The "last assignment wins" idiom to implement reset doesn't work here: Forcing
-a synchronous reset converts the reset to extra logic feeding the flip-flop
-data pin. Normally, this logic simply gets folded into the existing logic
-feeding the flip-flop and we can ignore its impact: as mentioned previously,
-reducing the size of the reset tree has a greater impact on circuit timing.
-
-<p>Also, having two separate if-statements (one for clock_enable followed by
-one for reset) does not work when the reset is asynchronously specified
-alongside the clock in the sensitivity list (as shown below), as there is no
-way to determine which signal in the sensitivity list each if statement should
-respond to.
+The "last assignment wins" idiom to implement reset doesn't work here: having
+two separate if-statements (one for clock_enable followed by one for reset)
+does not work when the reset is asynchronously specified alongside the clock in
+the sensitivity list (as shown below), as there is no way to determine which
+signal in the sensitivity list each if statement should respond to.
 
 <p>Thus, correct flip-flop hardware inference depends on explicitly expressing
 the priority of the reset over the clock_enable structurally with nested
@@ -855,22 +866,29 @@ module Register
 (
     input   wire                        clock,
     input   wire                        clock_enable,
-    input   wire                        reset,
-    input   wire    [WORD_WIDTH-1:0]    in,
-    output  reg     [WORD_WIDTH-1:0]    out
+    input   wire                        areset,
+    input   wire                        clear,
+    input   wire    [WORD_WIDTH-1:0]    data_in,
+    output  reg     [WORD_WIDTH-1:0]    data_out
 );
 
     initial begin
-        out = RESET_VALUE;
+        data_out = RESET_VALUE;
     end
 
-    always @(posedge clock or posedge reset) begin
-        if (reset == 1'b1) begin
-            out <= RESET_VALUE;
+    reg [WORD_WIDTH-1:0] selected = RESET_VALUE;
+
+    always @(*) begin
+        selected = (clear == 1'b1) ? RESET_VALUE : data_in;
+    end
+
+    always @(posedge clock or posedge areset) begin
+        if (areset == 1'b1) begin
+            data_out <= RESET_VALUE;
         end
         else begin
-            if (clock_enable == 1'b1) begin
-                out <= in;
+            if ((clock_enable == 1'b1) || (clear == 1'b1)) begin
+                data_out <= selected;
             end
         end
     end
