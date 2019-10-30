@@ -1,0 +1,44 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Constant</title>
+</head>
+<body>
+
+<p><a href="./Constant.v">Source</a></p>
+
+<h1>A Constant Value Output</h1>
+<p>Normally a this is merely a <code>localparam</code> inside another module, but it may
+be useful implemented as a module on its own to work with other IP systems
+such as Xilinx's IPI (IP Integrator), where you may need to feed an IP
+block a constant value.</p>
+
+<pre>
+`default_nettype none
+
+module Constant
+#(
+    parameter WORD_WIDTH    = 0,
+    parameter VALUE         = 0
+)
+(
+    output  reg     [WORD_WIDTH-1:0]    constant_out
+);
+
+    initial begin
+        constant_out = VALUE;
+    end
+
+    always @(*) begin
+        constant_out = VALUE;
+    end
+
+endmodule
+</pre>
+
+<hr><a href="./index.html">back to FPGA Design Elements</a>
+</body>
+</html>
+
