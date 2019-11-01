@@ -52,7 +52,7 @@ def filename_to_title(filename):
     return base_filename(filename).replace("_", " ")
 
 def is_comment(line):
-    return line.lstrip().startswith("//")
+    return line.startswith("//")
 
 def is_blank(line):
     """If a line is only spaces or tabs and a return, it's blank."""
