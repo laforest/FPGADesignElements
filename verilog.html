@@ -480,14 +480,16 @@ end
 
 <h2>Logic Design</h2>
 
+<a name="boolean"></a>
+
 <h3>Boolean Expressions</h3>
 
 <p>Express Boolean values behaviourally as equality/inequality tests against
 the expected value, which clarifies the intent of the code, removes the need to
-understand the polarity of each logic signal, and makes the bit width explicit.
-If you must invert a comparison, be sure to use the logical negation operator
-(<code>!</code>), which always returns 1 bit, rather than the bitwise negation
-(<code>~</code>) of all bits.
+understand the polarity of each logic signal, and makes the bit width explicit,
+which will avoid some bugs and warnings.  If you must invert a comparison, be
+sure to use the logical negation operator (<code>!</code>), which always
+returns 1 bit, rather than the bitwise negation (<code>~</code>) of all bits.
 
 <pre>
 // Rather than this
