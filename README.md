@@ -5,6 +5,8 @@
 A self-contained online book containing a library of FPGA design elements and
 related coding/design guides.
 
+You can read it online at http://fpgacpu.ca/fpga/
+
 To obtain your own local copy:
 ```
 git clone https://github.com/laforest/FPGADesignElements.git
