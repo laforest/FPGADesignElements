@@ -63,22 +63,22 @@ module Register
         data_out = RESET_VALUE;
     end
 
-    // Normally, I would use the "last assignment wins" idiom (See
-    // [Resets](./verilog.html#resets) in the [Verilog Coding
-    // Standard](./verilog.html)) to implement reset, but that doesn't work
-    // here: having two separate if-statements (one for clock_enable followed
-    // by one for reset) does not work when the reset is asynchronously
-    // specified in the sensitivity list (as done here), as there is no way to
-    // determine which signal in the sensitivity list each if statement should
-    // respond to.
+// Normally, I would use the "last assignment wins" idiom (See
+// [Resets](./verilog.html#resets) in the [Verilog Coding
+// Standard](./verilog.html)) to implement reset, but that doesn't work
+// here: having two separate if-statements (one for clock_enable followed
+// by one for reset) does not work when the reset is asynchronously
+// specified in the sensitivity list (as done here), as there is no way to
+// determine which signal in the sensitivity list each if statement should
+// respond to.
 
-    // Thus, correct hardware inference depends on explicitly expressing the
-    // priority of the reset over the clock_enable structurally with nested
-    // if-statements, rather than implicitly through the Verilog event queue
-    // via the "last assignment wins" idiom.
+// Thus, correct hardware inference depends on explicitly expressing the
+// priority of the reset over the clock_enable structurally with nested
+// if-statements, rather than implicitly through the Verilog event queue
+// via the "last assignment wins" idiom.
 
-    // This is very likely the *only* place you will ever need an asynchronous
-    // signal in a sensitivity list, or express explicit structural priority.
+// This is very likely the *only* place you will ever need an asynchronous
+// signal in a sensitivity list, or express explicit structural priority.
 
     reg [WORD_WIDTH-1:0] selected = RESET_VALUE;
 
