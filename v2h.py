@@ -33,7 +33,9 @@ header = """<html>
 
 """
 
-footer = """<hr><a href="./index.html">back to FPGA Design Elements</a>
+footer = """<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
 </body>
 </html>
 
@@ -67,7 +69,7 @@ def process_comments(line, processed_contents, f):
        Then process them as Markdown and output the XHTML."""
     comment_block = ""
     while (is_comment(line) or is_blank(line)) and not is_eof(line):
-        comment_block = comment_block + line.lstrip("/ ")
+        comment_block = comment_block + line.lstrip("/")
         line = f.readline()
     html = markdown.markdown(comment_block)
     processed_contents += html + "\n\n"
