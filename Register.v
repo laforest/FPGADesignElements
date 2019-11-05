@@ -1,5 +1,5 @@
 
-// # A Synchronous Register to Store and Control Data
+//# A Synchronous Register to Store and Control Data
 
 // It may seem silly to implement a register module rather than let the HDL
 // infer it, but doing so separates data and control at the most basic level,
@@ -7,14 +7,14 @@
 // separation of data and control allows us to simplify the control logic and
 // reduce the need for some routing resources.
 
-// ## Power-on-Reset
+//## Power-on-Reset
 //
 // On FPGAs, the initial state of registers is set in the configuration
 // bitstream and applied by special power-on reset circuitry. The initial
 // state of a design is available "for free" *and can be returned to at
 // run-time*, which removes the need for that control and data logic.
 
-// ## Asynchronous Reset
+//## Asynchronous Reset
 
 // On FPGAs, the hardware reset of a flip-flop is usually asynchronous and so
 // takes effect immediately rather than at the next clock edge, which can
@@ -30,7 +30,7 @@
 // reset from a clock-sychronous source so registers don't flip value close to
 // the metastability window of a downstream register.
 
-// ## Synchronous Reset (a.k.a. Clear)
+//## Synchronous Reset (a.k.a. Clear)
 
 // If you need to clear the register during normal operation, use the
 // synchronous clear input. This may create extra logic, but that logic gets
@@ -39,7 +39,7 @@
 // Having a clear input allows us to get to the initial power-on-reset state
 // without complicating the design.
 
-// ## Implementation
+//## Implementation
 
 // Let's begin with the usual front matter:
 

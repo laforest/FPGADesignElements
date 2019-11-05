@@ -11,35 +11,35 @@
 
 <h1>A Synchronous Register to Store and Control Data</h1>
 <p>It may seem silly to implement a register module rather than let the HDL
-infer it, but doing so separates data and control at the most basic level,
-including various kinds of resets, which are part of control. This
-separation of data and control allows us to simplify the control logic and
-reduce the need for some routing resources.</p>
+ infer it, but doing so separates data and control at the most basic level,
+ including various kinds of resets, which are part of control. This
+ separation of data and control allows us to simplify the control logic and
+ reduce the need for some routing resources.</p>
 <h2>Power-on-Reset</h2>
 <p>On FPGAs, the initial state of registers is set in the configuration
-bitstream and applied by special power-on reset circuitry. The initial
-state of a design is available "for free" <em>and can be returned to at
-run-time</em>, which removes the need for that control and data logic.</p>
+ bitstream and applied by special power-on reset circuitry. The initial
+ state of a design is available "for free" <em>and can be returned to at
+ run-time</em>, which removes the need for that control and data logic.</p>
 <h2>Asynchronous Reset</h2>
 <p>On FPGAs, the hardware reset of a flip-flop is usually asynchronous and so
-takes effect immediately rather than at the next clock edge, which can
-cause subtle bugs: a register appears to fail to capture data in
-behavioural simulation, or changes in impossible ways (within less than
-a clock cycle) in timing-annotated post-synthesis simulation.  Where
-possible, avoid the use of the asynchronous reset and instead depend on the
-power-on-reset to initially load the reset value. This reduces the size of
-the reset network and simplifies place-and-route.</p>
+ takes effect immediately rather than at the next clock edge, which can
+ cause subtle bugs: a register appears to fail to capture data in
+ behavioural simulation, or changes in impossible ways (within less than
+ a clock cycle) in timing-annotated post-synthesis simulation.  Where
+ possible, avoid the use of the asynchronous reset and instead depend on the
+ power-on-reset to initially load the reset value. This reduces the size of
+ the reset network and simplifies place-and-route.</p>
 <p>The asynchronous reset is necessary to force a register reset where the
-control logic to the register(s) might be stuck. It is necessary to feed the
-reset from a clock-sychronous source so registers don't flip value close to
-the metastability window of a downstream register.</p>
+ control logic to the register(s) might be stuck. It is necessary to feed the
+ reset from a clock-sychronous source so registers don't flip value close to
+ the metastability window of a downstream register.</p>
 <h2>Synchronous Reset (a.k.a. Clear)</h2>
 <p>If you need to clear the register during normal operation, use the
-synchronous clear input. This may create extra logic, but that logic gets
-folded into other logic feeding data to the register, and would have been
-necessary anyway but present as another case in the surrounding logic.
-Having a clear input allows us to get to the initial power-on-reset state
-without complicating the design.</p>
+ synchronous clear input. This may create extra logic, but that logic gets
+ folded into other logic feeding data to the register, and would have been
+ necessary anyway but present as another case in the surrounding logic.
+ Having a clear input allows us to get to the initial power-on-reset state
+ without complicating the design.</p>
 <h2>Implementation</h2>
 <p>Let's begin with the usual front matter:</p>
 
@@ -66,19 +66,19 @@ module Register
 </pre>
 
 <p>Normally, I would use the "last assignment wins" idiom (See
-<a href="./verilog.html#resets">Resets</a> in the <a href="./verilog.html">Verilog Coding
-Standard</a>) to implement reset, but that doesn't work
-here: having two separate if-statements (one for clock_enable followed
-by one for reset) does not work when the reset is asynchronously
-specified in the sensitivity list (as done here), as there is no way to
-determine which signal in the sensitivity list each if statement should
-respond to.</p>
+ <a href="./verilog.html#resets">Resets</a> in the <a href="./verilog.html">Verilog Coding
+ Standard</a>) to implement reset, but that doesn't work
+ here: having two separate if-statements (one for clock_enable followed
+ by one for reset) does not work when the reset is asynchronously
+ specified in the sensitivity list (as done here), as there is no way to
+ determine which signal in the sensitivity list each if statement should
+ respond to.</p>
 <p>Thus, correct hardware inference depends on explicitly expressing the
-priority of the reset over the clock_enable structurally with nested
-if-statements, rather than implicitly through the Verilog event queue
-via the "last assignment wins" idiom.</p>
+ priority of the reset over the clock_enable structurally with nested
+ if-statements, rather than implicitly through the Verilog event queue
+ via the "last assignment wins" idiom.</p>
 <p>This is very likely the <em>only</em> place you will ever need an asynchronous
-signal in a sensitivity list, or express explicit structural priority.</p>
+ signal in a sensitivity list, or express explicit structural priority.</p>
 
 <pre>
     reg [WORD_WIDTH-1:0] selected = RESET_VALUE;
@@ -101,7 +101,9 @@ signal in a sensitivity list, or express explicit structural priority.</p>
 endmodule
 </pre>
 
-<hr><a href="./index.html">back to FPGA Design Elements</a>
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
 </body>
 </html>
 

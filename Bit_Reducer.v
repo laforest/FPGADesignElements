@@ -1,5 +1,5 @@
 
-// # Boolean Bit Reducer
+//# Boolean Bit Reducer
 
 // This module generalizes the usual 2-input Boolean functions to their
 // n-input reductions, which are interesting and useful:

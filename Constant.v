@@ -1,5 +1,5 @@
 
-// # A Constant Value Output
+//# A Constant Value Output
 //
 // Normally a this is merely a `localparam` inside another module, but it may
 // be useful implemented as a module on its own to work with other IP systems
