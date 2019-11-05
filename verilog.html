@@ -551,6 +551,10 @@ end
 in <code>generate</code> blocks, required by some vendor code templates to
 infer specific hardware, and unavoidable for some reset code.
 
+<a name="ternary"></a>
+
+<h4>Chaining Ternary Operators</h4>
+
 <p><em>Never</em> nest ternary operators, where one term of a ternary operator
 is itself a ternary operator. That make for unreadable code. Instead, split the
 logic into two blocking assignments, with the second ternary operator using the
