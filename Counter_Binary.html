@@ -1,0 +1,114 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counter Binary</title>
+</head>
+<body>
+
+<p><a href="./Counter_Binary.v">Source</a></p>
+
+<h1>A Binary Up/Down Counter</h1>
+<p>This counter counts by the <code>INCREMENT</code> parameter value, up or down, when
+ <code>run</code> is high.  Set <code>up_down</code> to 0 to count up, or to 1 to count down.
+ Load overrides counting, so you can load a <code>load_count</code> value even if <code>run</code>
+ is low.  <code>areset</code> puts the counter back at INITIAL_COUNT (<em>use only at
+ reset!</em>), as does <code>clear</code> (use during operation).  The counter will wrap
+ around if it goes below zero or above (2^WORD_WIDTH)-1.</p>
+<p>The <code>INCREMENT</code> parameter allows you to deal with situations where, for
+ example, you need to count the number of bytes transferred, but your
+ interface transfers multiple bytes per cycle.</p>
+<p>When chaining counters, which may happen if you are counting in unusual
+ bases where each digit has its own counter, AND the <code>carry_out</code> of the
+ previous counter with the signal fed to the <code>run</code> input of the next
+ counter. The <code>carry_in</code> is kept for generality.</p>
+
+<pre>
+`default_nettype none
+
+module Counter_Binary
+#(
+    parameter                   WORD_WIDTH      = 0,
+    parameter [WORD_WIDTH-1:0]  INCREMENT       = 0,
+    parameter [WORD_WIDTH-1:0]  INITIAL_COUNT   = 0
+)
+(
+    input   wire                        clock,
+    input   wire                        areset,
+    input   wire                        clear,
+    input   wire                        up_down,
+    input   wire                        run,
+    input   wire                        load,
+    input   wire    [WORD_WIDTH-1:0]    load_count,
+    input   wire                        carry_in,
+    output  wire                        carry_out,
+    output  wire    [WORD_WIDTH-1:0]    count
+);
+
+    localparam ZERO = {WORD_WIDTH{1'b0}};
+</pre>
+
+<p>First we calculate the next counter value using a <a href="./Adder_Subtractor_Binary.html">Binary
+ Adder/Subtractor</a>. Having a dedicated
+ module for this allows us to change how the counter works (e.g.: BCD or
+ other counting schemes) without altering any other logic. It also hides the
+ tricks needed for correct arithmetic logic inference.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] incremented_count;
+
+    Adder_Subtractor_Binary
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    calc_next_count
+    (
+        .add_sub    (up_down), // 0/1 -> A+B/A-B
+        .carry_in   (carry_in),
+        .A_in       (count),
+        .B_in       (INCREMENT),
+        .sum_out    (incremented_count),
+        .carry_out  (carry_out)
+    );
+</pre>
+
+<p>Then calculate which value to load into the counter, and when.</p>
+
+<pre>
+    reg [WORD_WIDTH-1:0]    next_count      = ZERO;
+    reg                     clock_enable    = 0;
+
+    always @(*) begin
+        next_count      = (load == 1'b1) ? load_count : incremented_count;
+        clock_enable    = (run == 1'b1) || (load == 1'b1);
+    end
+</pre>
+
+<p>Finally, store the next count value, using a <a href="./Register.html">Register</a>.</p>
+
+<pre>
+    Register
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .RESET_VALUE    (INITIAL_COUNT)
+    )
+    Counter
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .areset         (areset),
+        .clear          (clear),
+        .data_in        (next_count),
+        .data_out       (count)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
