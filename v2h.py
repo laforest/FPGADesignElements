@@ -53,6 +53,10 @@ def filename_to_title(filename):
     """Convert the Verilog filename into the web page title"""
     return base_filename(filename).replace("_", " ")
 
+def is_verilog_filename(filename):
+    """This prevents accidentally processing other files of the same prefix name"""
+    return verilog_filename[-2:] == ".v"
+
 def is_comment(line):
     return line.startswith("//")
 
@@ -92,42 +96,45 @@ def process_code(line, processed_contents, f):
     return line, processed_contents
 
 if __name__ == "__main__":
-    verilog_filename = sys.argv[1]
-    html_filename = output_filename(verilog_filename)
-
-    try:
-        f = open(html_filename, 'r')
-        existing_file_contents = f.read()
-        f.close()
-    except OSError:
-        existing_file_contents = ""
-        pass
-
-    f = open(verilog_filename, 'r')
-    processed_contents = ""
-    title = filename_to_title(verilog_filename)
-    processed_contents += header.format(title, verilog_filename)
-    line = f.readline()
-    # Note the returning of the last line read and restarting of parsing.
-    # This avoids the need for look-ahead to know when to end a comment or code block.
-    while not is_eof(line):
-        if is_comment(line):
-            line, processed_contents = process_comments(line, processed_contents, f)
+    # Skip argv[0] (the script name)
+    for verilog_filename in sys.argv[1:]:
+        if not is_verilog_filename(verilog_filename):
             continue
-        if not is_comment(line) and not is_blank(line):
-            line, processed_contents = process_code(line, processed_contents, f)
-            continue
+        html_filename = output_filename(verilog_filename)
+
+        try:
+            f = open(html_filename, 'r')
+            existing_file_contents = f.read()
+            f.close()
+        except OSError:
+            existing_file_contents = ""
+            pass
+
+        f = open(verilog_filename, 'r')
+        processed_contents = ""
+        title = filename_to_title(verilog_filename)
+        processed_contents += header.format(title, verilog_filename)
         line = f.readline()
-    processed_contents += footer
-    f.close()
-
-    if processed_contents != existing_file_contents:
-        print("Updating {0}".format(html_filename));
-        f = open(html_filename, 'w')
-        f.write(processed_contents)
+        # Note the returning of the last line read and restarting of parsing.
+        # This avoids the need for look-ahead to know when to end a comment or code block.
+        while not is_eof(line):
+            if is_comment(line):
+                line, processed_contents = process_comments(line, processed_contents, f)
+                continue
+            if not is_comment(line) and not is_blank(line):
+                line, processed_contents = process_code(line, processed_contents, f)
+                continue
+            line = f.readline()
+        processed_contents += footer
         f.close()
-    else:
-        print("Skipping {0}".format(html_filename));
+
+        if processed_contents != existing_file_contents:
+            print("Updating {0}".format(html_filename));
+            f = open(html_filename, 'w')
+            f.write(processed_contents)
+            f.close()
+        else:
+            print("Skipping {0}".format(html_filename));
 
     print("Done.")
 
