@@ -1,0 +1,70 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Reverser</title>
+</head>
+<body>
+
+<p><a href="./Word_Reverser.v">Source</a></p>
+
+<h1>Word Reverser</h1>
+<p>Reverses the order of words in the input vector, composed of concatenated
+ words, with the first word at the right.  We can't reverse vectors via
+ reversed indices in Verilog, so we must use a for loop to manually move the
+ bits around.</p>
+<p>The <code>WORD_WIDTH</code> and <code>WORD_COUNT</code> parameters express how the input vector
+ is split-up, and so defines which reversal happens. The total width is
+ always the product of the word width and count. For example:</p>
+<ul>
+<li><code>WORD_WIDTH = 1</code> and <code>WORD_COUNT = 32</code> reverses all the bits in a 32-bit word.</li>
+<li><code>WORD_WIDTH = 8</code> and <code>WORD_COUNT = 4</code> reverses the endianness of bytes in a 32-bit word.</li>
+</ul>
+<p>There is no clock or Boolean logic, and everything is computed at
+ elaboration time, so this module simply moves wires around and consumes no
+ logic resources.</p>
+
+<pre>
+`default_nettype none
+
+module Word_Reverser
+#(
+    parameter WORD_WIDTH = 0,
+    parameter WORD_COUNT = 0,
+
+    // Do not set at instantiation
+    parameter TOTAL_WIDTH = WORD_WIDTH * WORD_COUNT
+)
+(
+    input   wire    [TOTAL_WIDTH-1:0]   words_in,
+    output  reg     [TOTAL_WIDTH-1:0]   words_out
+);
+
+    initial begin
+        words_out = {TOTAL_WIDTH{1'b0}};
+    end
+</pre>
+
+<p>For each input word, starting from the right, place it in the output word,
+ but starting at the left.</p>
+
+<pre>
+    generate
+        genvar i;
+        for (i=0; i < WORD_COUNT; i=i+1) begin : per_word
+            always @(*) begin
+                words_out[WORD_WIDTH*(WORD_COUNT-i-1) +: WORD_WIDTH] = words_in[WORD_WIDTH*i +: WORD_WIDTH];
+            end
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
