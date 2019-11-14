@@ -1,0 +1,134 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arithmetic Predicates Binary</title>
+</head>
+<body>
+
+<p><a href="./Arithmetic_Predicates_Binary.v">Source</a></p>
+
+<h1>Arithmetic Predicates (Binary)</h1>
+<p>Given two integers, <code>A</code> and <code>B</code>, derives all the possible arithmetic
+ predictates (equal, greater-than, less-than-equal, etc...) as both signed
+ and unsigned integers.</p>
+<p>This code implements "<em>How the Computer Sets the Comparison Predicates</em>" in
+ Section 2-12 of Henry S. Warren, Jr.'s <a href="./books.html#Warren2013">Hacker's
+ Delight</a>, which describes how to compute all the
+ integer comparisons, based on the condition flags generated after
+ a (2's-complement) subtraction <code>A-B</code>.</p>
+
+<pre>
+module Arithmetic_Predicates_Binary
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire    [WORD_WIDTH-1:0]    A,
+    input   wire    [WORD_WIDTH-1:0]    B,
+
+    output  reg                         A_eq_B,
+
+    output  reg                         A_lt_B_unsigned,
+    output  reg                         A_lte_B_unsigned,
+    output  reg                         A_gt_B_unsigned,
+    output  reg                         A_gte_B_unsigned,
+
+    output  reg                         A_lt_B_signed,
+    output  reg                         A_lte_B_signed,
+    output  reg                         A_gt_B_signed,
+    output  reg                         A_gte_B_signed
+);
+
+    localparam ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        A_eq_B              = 1'b0;
+        A_lt_B_unsigned     = 1'b0;
+        A_lte_B_unsigned    = 1'b0;
+        A_gt_B_unsigned     = 1'b0;
+        A_gte_B_unsigned    = 1'b0;
+        A_lt_B_signed       = 1'b0;
+        A_lte_B_signed      = 1'b0;
+        A_gt_B_signed       = 1'b0;
+        A_gte_B_signed      = 1'b0;
+    end
+</pre>
+
+<p>First, let's subtract B from A, and get the the carry-out.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0]   difference;
+    wire                    carry_out;
+
+    Adder_Subtractor_Binary
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    subtraction
+    (
+        .add_sub    (1'b1),    // 0/1 -> A+B/A-B
+        .carry_in   (1'b0),
+        .A_in       (A),
+        .B_in       (B),
+        .sum_out    (difference),
+        .carry_out  (carry_out)
+    );
+</pre>
+
+<p>Then, let's <a href="./CarryIn_Binary.html">reconstruct the carry-in</a> into the last
+ (most-significant) bit position of the result.</p>
+
+<pre>
+    wire final_carry_in;
+
+    CarryIn_Binary
+    #(
+        .WORD_WIDTH (1)
+    )
+    calc_final_carry_in
+    (
+        .A          (A          [WORD_WIDTH-1]),
+        .B          (B          [WORD_WIDTH-1]),
+        .sum        (difference [WORD_WIDTH-1]),
+        .carryin    (final_carry_in)
+    );
+</pre>
+
+<p>We now have enough information to compute all the arithmetic predicates.
+ Note that in 2's-complement subtraction, the meaning of the carry-out bit
+ is reversed, and that special care must be taken for signed comparisons to
+ distinguish the carry-out from an overflow.  This code takes advantage of
+ the sequential evaluation of blocking assignments in a Verilog procedural
+ block to re-use and optimize the logic expressions.</p>
+
+<pre>
+    reg negative        = 1'b0;
+    reg overflow_signed = 1'b0;
+
+    always @(*) begin
+        negative            = (difference[WORD_WIDTH-1] == 1'b1);
+        overflow_signed     = (carry_out != final_carry_in);
+        A_eq_B              = (difference == ZERO);
+
+        A_lt_B_unsigned     = (carry_out == 1'b0);
+        A_lte_B_unsigned    = (A_lt_B_unsigned == 1'b1) || (A_eq_B == 1'b1);
+        A_gte_B_unsigned    = (carry_out == 1'b1);
+        A_gt_B_unsigned     = (A_gte_B_unsigned == 1'b1) && (A_eq_B == 1'b0);
+
+        A_lt_B_signed       = (negative != overflow_signed);
+        A_lte_B_signed      = (A_lt_B_signed == 1'b1) || (A_eq_B == 1'b1);
+        A_gte_B_signed      = (negative == overflow_signed);
+        A_gt_B_signed       = (A_gte_B_signed == 1'b1) && (A_eq_B == 1'b0);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
