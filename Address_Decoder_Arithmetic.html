@@ -1,0 +1,115 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Address Decoder Arithmetic</title>
+</head>
+<body>
+
+<p><a href="./Address_Decoder_Arithmetic.v">Source</a></p>
+
+<h1>Address Decoder (Arithmetic)</h1>
+<p>A programmable address decoder. Works for any address range at any starting
+ point, <em>and the base and bound addresses can be changed at runtime</em>.  We do
+ this with two parallel subtractions <a href="./Arithmetic_Predicates_Binary.html">to calculate lesser/greater/equal
+ predicates</a> to check if the input
+ address lies between the base and bound addresses, inclusively.</p>
+<p>This decoder scales to larger address ranges (20 bits or more) without
+ hitting any Verilog implementation vector width limits or requiring long
+ optimization of enormous netlists, as with the <a href="./Address_Decoder_Static.html">static Address
+ Decoder</a>.</p>
+<p>For very small address ranges, this decoder will be larger (2 subtractors
+ instead of a few LUTs). For very large address ranges (e.g. 32 bits or
+ more), the speed of the arithmetic operations will become a limit, <em>but it
+ is unclear if this will be slower than the log<sub>2</sub>(ADDR_WIDTH) deep
+ tree of LUT logic</em> obtainable from a Behavioural Address Decoder.</p>
+<p>The base, bound, and input addresses all use the same width, which avoids
+ the need for selecting parts of vectors and makes the enclosing code
+ cleaner and more general.</p>
+<p><strong>Use this implementation if you must use arithmetic circuitry.</strong>
+ Otherwise, I recommend using the <a href="./Address_Decoder_Behavioural.html">Behavioural Address
+ Decoder</a>.</p>
+
+<pre>
+`default_nettype none
+
+module Address_Decoder_Arithmetic
+#(
+    parameter       ADDR_WIDTH          = 0
+)
+(
+    input   wire    [ADDR_WIDTH-1:0]    base_addr,
+    input   wire    [ADDR_WIDTH-1:0]    bound_addr,
+    input   wire    [ADDR_WIDTH-1:0]    addr,
+    output  reg                         hit
+);
+
+    initial begin
+        hit = 1'b0;
+    end
+
+    wire base_or_higher;
+    wire bound_or_lower;
+
+    Arithmetic_Predicates_Binary
+    #(
+        .WORD_WIDTH         (ADDR_WIDTH)
+    )
+    lower_bound
+    (
+        .A                  (addr),
+        .B                  (base_addr),
+
+        // verilator lint_off PINCONNECTEMPTY
+        .A_eq_B             (),
+
+        .A_lt_B_unsigned    (),
+        .A_lte_B_unsigned   (),
+        .A_gt_B_unsigned    (),
+        .A_gte_B_unsigned   (base_or_higher),
+
+        .A_lt_B_signed      (),
+        .A_lte_B_signed     (),
+        .A_gt_B_signed      (),
+        .A_gte_B_signed     ()
+        // verilator lint_on PINCONNECTEMPTY
+    );
+
+    Arithmetic_Predicates_Binary
+    #(
+        .WORD_WIDTH         (ADDR_WIDTH)
+    )
+    upper_bound
+    (
+        .A                  (addr),
+        .B                  (bound_addr),
+
+        // verilator lint_off PINCONNECTEMPTY
+        .A_eq_B             (),
+
+        .A_lt_B_unsigned    (),
+        .A_lte_B_unsigned   (bound_or_lower),
+        .A_gt_B_unsigned    (),
+        .A_gte_B_unsigned   (),
+
+        .A_lt_B_signed      (),
+        .A_lte_B_signed     (),
+        .A_gt_B_signed      (),
+        .A_gte_B_signed     ()
+        // verilator lint_on PINCONNECTEMPTY
+    );
+
+    always @(*) begin
+        hit  = (base_or_higher == 1'b1) && (bound_or_lower == 1'b1);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
