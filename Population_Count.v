@@ -1,0 +1,150 @@
+
+//# Population Count (a.k.a. Hamming Weight)
+
+// Returns the number of bits set in the input word.  The popcount is always
+// log<sub>2</sub>(N)+1 bits wide given an N-bit input word.  (e.g.: a 32-bit
+// word has a 6-bit popcount, so you can represent the integer "32")
+
+// The algorithm is straightforward: split the input word into bit pairs and
+// count the number of bits set in each pair using a lookup table, then extend
+// each count to log<sub>2</sub>(N)+1 bits, and sum all the counts one after
+// the other, which expresses a chain of (N/2)-1 small adders (e.g.: 15 6-bit
+// adders for a 32-bit input word) rather than the obvious tree of adders,
+// which would require more difficult, recursive code. However, the CAD tool
+// can reduce the logic (most of the added bits are constant zeros) and
+// generate a tree of LUTs and adders with a carry-chain log<sub>2</sub>(N)+1
+// bits long, which is the length of the expected final adder were this a tree
+// of adders.
+
+// There are many applications of population count. Think of it as mapping
+// bitmasks to the integers, allowing us to use arithmetic operations to
+// determine properties.
+
+//## Leaning on Logic Optimization to Reduce User Errors
+
+// When I originally wrote this, the POPCOUNT_WIDTH was a module parameter
+// rather than being calculated internally, as the enclosing module needs to
+// know the width of the output, so it should calculate log<sub>2</sub>(N)+1
+// and pass it to this module. If the value is smaller than that, then the
+// missing bits will not be computed. If the value is larger, the extra bits
+// will be always zero.
+
+// However, it turns out that it's error-prone to expect the user to remember
+// that the output width should be log<sub>2</sub>(N)+1 and not
+// log<sub>2</sub>(N). It is easier to leave the output width at WORD_WIDTH as
+// this simplifies code and the post-elaboration diagram, and the logic
+// optimization of the successive additions automatically infers the
+// log<sub>2</sub>(N)+1 output width and eliminates the redundant logic.
+// I left the code as-is, and hardwired the POPCOUNT_WIDTH parameter instead.
+
+//## Portability and Readability
+
+// This implementation depends heavily on Verilog's vector part select
+// operation, which might cause difficulties when porting to other HDLs, and
+// also means you should read it carefully as some lines are long and have
+// a lot of bits being moved around between vectors, but this design choice
+// also makes the code easily parameterizable.
+
+module Population_Count
+#(
+    parameter WORD_WIDTH        = 33,
+
+    // Don't set at instantiation (see above)
+    parameter POPCOUNT_WIDTH    = WORD_WIDTH
+)
+(
+    input   wire    [WORD_WIDTH-1:0]        word_in,
+    output  reg     [POPCOUNT_WIDTH-1:0]    count_out
+);
+
+    initial begin
+        count_out = {POPCOUNT_WIDTH{1'b0}};
+    end
+
+// This part of the code never changes regardless of input word width, so to
+// keep the code concise, I'll break the rule of always naming constants and
+// instead use the literals: a 4-entry table of 2-bit values, converting the
+// integer described by a pair of bits into an integer describing the number
+// of bits set in that pair of bits (the "paircount"). Since both have 2 bits,
+// we can conveniently just replace the input bit pairs by their paircounts.
+// We put a ramstyle attribute to tell the CAD tool this should NOT be
+// synthesized as a memory, but just as LUT logic. It works without it, but
+// I have seen my CAD tool randomly decide to use Block RAM instead.
+
+    (* ramstyle = "logic" *)
+    reg [1:0] popcount2bits [0:3];
+
+    initial begin
+        popcount2bits[0] = 2'd0;
+        popcount2bits[1] = 2'd1;
+        popcount2bits[2] = 2'd1;
+        popcount2bits[3] = 2'd2;
+    end
+
+// Then let's calculate how many pairs of bits we have to process, and the
+// zero-padding we will use to extend them to POPCOUNT_WIDTH, so all the
+// adders work on the same number of bits. Using the maximum number of
+// bits is a lot easier than figuring out the necessary adder bit width at
+// each step, and since the padding is constant zero, it wil be optimized
+// away during synthesis.
+
+    localparam PAIR_COUNT       = WORD_WIDTH / 2;
+    localparam PAIR_WORD_WIDTH  = PAIR_COUNT * 2;
+    localparam PAD_WIDTH        = POPCOUNT_WIDTH - 2;
+    localparam PAD              = {PAD_WIDTH{1'b0}};
+
+// Then define our working space: a vector of paircounts holding all bit
+// pairs (might be less than WORD_WIDTH if its value is odd), and
+// a vector of popcount words, one popcount for each paircount. We will
+// accumulate popcounts and paircounts into each successive popcount word,
+// and the last popcount will hold our final result.
+
+// Veril\*tor can't quite see what we're doing here, so we tell it to ignore
+// the apparent combinational loop. (The "*" is so that program doesn't see
+// this comment as an erroneous directive.)
+
+    reg [PAIR_WORD_WIDTH-1:0]               paircount   = {PAIR_WORD_WIDTH{1'b0}};
+    // verilator lint_off UNOPTFLAT
+    reg [(POPCOUNT_WIDTH*PAIR_COUNT)-1:0]   popcount    = {POPCOUNT_WIDTH*PAIR_COUNT{1'b0}};
+    // verilator lint_on  UNOPTFLAT
+
+// Finally, if WORD_WIDTH is odd, we will have to account for the last bit not
+// in a pair. So let's compute that flag now.
+
+    localparam WORD_WIDTH_IS_ODD = (WORD_WIDTH % 2) == 1;
+
+// Translate the initial bit pair into a paircount and then pad it into
+// a popcount value. Doing this also peels out the first iteration of the
+// following loop so we can refer to the previous loop index without having
+// a negative number (which is not allowed).
+
+    integer i;
+
+    always @(*) begin
+        paircount[0 +: 2]               = popcount2bits[word_in[0 +: 2]];
+        popcount[0 +: POPCOUNT_WIDTH]   = {PAD,paircount[0 +: 2]};
+
+// Now repeat for all remaining bit pairs, but also accumulate the popcount
+// from the previous iteration.  Note the start index due to the peeled-out
+// first iteration.
+
+        for(i=1; i < PAIR_COUNT; i=i+1) begin : per_paircount
+            paircount[2*i +: 2]                          = popcount2bits[word_in[2*i +: 2]];
+            popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = {PAD,paircount[2*i +: 2]} + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
+        end
+
+// If the input word width was odd, pad up the last bit not in a pair to the
+// popcount width and add it to the last popcount.
+
+        if (WORD_WIDTH_IS_ODD == 1'b1) begin
+            popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] + {{POPCOUNT_WIDTH-1{1'b0}},word_in[WORD_WIDTH-1]};
+        end
+
+// Then the last popcount is the total for the whole input word.
+
+        count_out = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH];
+    end
+
+endmodule
+
+
