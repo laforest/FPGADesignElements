@@ -33,7 +33,7 @@
 
 module Address_Decoder_Behavioural
 #(
-    parameter       ADDR_WIDTH          = 8
+    parameter       ADDR_WIDTH          = 0
 )
 (
     input   wire    [ADDR_WIDTH-1:0]    base_addr,
