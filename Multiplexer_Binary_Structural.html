@@ -1,0 +1,92 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiplexer Binary Structural</title>
+</head>
+<body>
+
+<p><a href="./Multiplexer_Binary_Structural.v">Source</a></p>
+
+<h1>A Reliable and Generic Binary Multiplexer (Structural Implementation)</h1>
+<p>Takes in a concatenation of words (<code>words_in</code>) with the zeroth element on
+ the right.  The binary selector then selects one of the input words. If the
+ selector value is greater than the number of input words, the output will
+ be the Boolean combination (given by <code>IMPLEMENTATION</code>) of an all-zero input
+ (since no input word will be selected, so all are annulled).</p>
+<p>This structural implementation generalizes and makes portable the original
+ <a href="./Multiplexer_Binary.html">Behavioural Binary Multiplexer</a>, and also
+ avoids the same simulation/synthesis mismatch. Neither the <a href="./Binary_to_One_Hot.html">Binary to
+ One-Hot Converter</a> or the <a href="./Multiplexer_One_Hot.html">One-Hot
+ Multiplexer</a> use Verilog-specific constructs,
+ and so should directly translate into other HDLs, and the output function
+ is no longer limited to a Boolean OR word reduction, which allows some
+ computation to be folded in.</p>
+
+<pre>
+`default_nettype none
+
+module Multiplexer_Binary_Structural
+#(
+    parameter   WORD_WIDTH      = 0,
+    parameter   ADDR_WIDTH      = 0,
+    parameter   INPUT_COUNT     = 0,
+    parameter   OPERATION       = "OR",
+    parameter   IMPLEMENTATION  = "AND",
+
+    // Do not set at instantiation
+    parameter   TOTAL_WIDTH = WORD_WIDTH * INPUT_COUNT
+)
+(
+    input   wire    [ADDR_WIDTH-1:0]    selector,
+    input   wire    [TOTAL_WIDTH-1:0]   words_in,
+    output  wire    [WORD_WIDTH-1:0]    word_out
+);
+</pre>
+
+<p>First, we convert the binary selector to a one-hot selector.</p>
+
+<pre>
+    wire [INPUT_COUNT-1:0] selector_one_hot;
+
+    Binary_to_One_Hot
+    #(
+        .BINARY_WIDTH   (ADDR_WIDTH),
+        .OUTPUT_WIDTH   (INPUT_COUNT) 
+    )
+    selector_convertor
+    (
+        .binary_in      (selector),
+        .one_hot_out    (selector_one_hot)
+    );
+</pre>
+
+<p>Then we use a One-Hot Multiplexer, which will annul the unselected input
+ words then reduce them to the output word using the specified Boolean
+ operation.</p>
+
+<pre>
+    Multiplexer_One_Hot
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .WORD_COUNT     (INPUT_COUNT),
+        .OPERATION      (OPERATION),
+        .IMPLEMENTATION (IMPLEMENTATION)
+    )
+    multiplexer_core
+    (
+        .selectors      (selector_one_hot),
+        .words_in       (words_in),
+        .word_out       (word_out)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
