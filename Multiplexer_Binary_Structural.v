@@ -44,7 +44,7 @@ module Multiplexer_Binary_Structural
         .BINARY_WIDTH   (ADDR_WIDTH),
         .OUTPUT_WIDTH   (INPUT_COUNT) 
     )
-    selector_convertor
+    selector_converter
     (
         .binary_in      (selector),
         .one_hot_out    (selector_one_hot)
