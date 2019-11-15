@@ -70,7 +70,7 @@
 
 `default_nettype none
 
-module Multiplexer
+module Multiplexer_Binary
 #(
     parameter       WORD_WIDTH          = 0,
     parameter       ADDR_WIDTH          = 0,
