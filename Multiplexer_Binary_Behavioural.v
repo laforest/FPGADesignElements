@@ -1,5 +1,5 @@
 
-//# A Reliable and Generic Binary Multiplexer
+//# A Reliable and Generic Binary Multiplexer (Behavioural Implementation)
 
 // But first, some background on the problems with multiplexers...
 
@@ -40,7 +40,7 @@
 //         result = (selector == 1'b0) ? option_A : option_B;
 //     end
 
-//## Inflexible Implementation
+//## Inflexible Implementations
 
 // However, [the ternary operator gets impractical for more that two
 // options](./verilog.html#ternary), and the `case` statement gets tedious and
@@ -70,7 +70,7 @@
 
 `default_nettype none
 
-module Multiplexer_Binary
+module Multiplexer_Binary_Behavioural
 #(
     parameter       WORD_WIDTH          = 0,
     parameter       ADDR_WIDTH          = 0,
@@ -96,9 +96,10 @@ module Multiplexer_Binary
 endmodule
 
 //## Portability
-//
-//There's one problem here: if your HDL of choice does not have an analog of
-//Verilog's vector part select, this design can't be translated. Thus, there
-//must be another, more structural implementation, which can be ported to
-//other HDLs. (*to be continued...*)
+
+// There's one problem here: if your HDL of choice does not have an analog of
+// Verilog's vector part select, this design can't be translated. Thus, there
+// exists [another, more structural implementation, which can be ported to
+// other HDLs](./Multiplexer_Binary_Structural.html), and also expands the output
+// function beyond the implicit Boolean OR found here.
 

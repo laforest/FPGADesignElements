@@ -3,13 +3,13 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Multiplexer Binary</title>
+<title>Multiplexer Binary Behavioural</title>
 </head>
 <body>
 
-<p><a href="./Multiplexer_Binary.v">Source</a></p>
+<p><a href="./Multiplexer_Binary_Behavioural.v">Source</a></p>
 
-<h1>A Reliable and Generic Binary Multiplexer</h1>
+<h1>A Reliable and Generic Binary Multiplexer (Behavioural Implementation)</h1>
 <p>But first, some background on the problems with multiplexers...</p>
 <h2>Simulation and Synthesis Mismatch</h2>
 <p>A pitfall in the Verilog language is the treatment of unknown X values in
@@ -44,7 +44,7 @@
      result = (selector == 1'b0) ? option_A : option_B;
  end
 </code></pre>
-<h2>Inflexible Implementation</h2>
+<h2>Inflexible Implementations</h2>
 <p>However, <a href="./verilog.html#ternary">the ternary operator gets impractical for more that two
  options</a>, and the <code>case</code> statement gets tedious and
  error-prone as the number of cases increases. And both are too rigid,
@@ -70,7 +70,7 @@
 <pre>
 `default_nettype none
 
-module Multiplexer_Binary
+module Multiplexer_Binary_Behavioural
 #(
     parameter       WORD_WIDTH          = 0,
     parameter       ADDR_WIDTH          = 0,
@@ -98,9 +98,10 @@ endmodule
 
 <h2>Portability</h2>
 <p>There's one problem here: if your HDL of choice does not have an analog of
-Verilog's vector part select, this design can't be translated. Thus, there
-must be another, more structural implementation, which can be ported to
-other HDLs. (<em>to be continued...</em>)</p>
+ Verilog's vector part select, this design can't be translated. Thus, there
+ exists <a href="./Multiplexer_Binary_Structural.html">another, more structural implementation, which can be ported to
+ other HDLs</a>, and also expands the output
+ function beyond the implicit Boolean OR found here.</p>
 
 <hr>
 <p><a href="./index.html">back to FPGA Design Elements</a>
