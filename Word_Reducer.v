@@ -9,7 +9,7 @@
 // A common use case is to compute multiple results and their selecting
 // conditions in parallel, then [annul](./Annuller.html) all but the result you
 // want and OR-reduce them into a single result. Or don't annul the results,
-// but XOR them to see each bit position where the results disagree, and then
+// but NAND them to see each bit position where the results disagree, and then
 // maybe bit-reduce *that* to signal if *any* of the results disagree,
 // possibly signalling an error.
 
