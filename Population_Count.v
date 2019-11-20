@@ -47,7 +47,7 @@
 
 module Population_Count
 #(
-    parameter WORD_WIDTH        = 33,
+    parameter WORD_WIDTH        = 0,
 
     // Don't set at instantiation (see above)
     parameter POPCOUNT_WIDTH    = WORD_WIDTH
