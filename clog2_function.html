@@ -1,0 +1,51 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clog2 function</title>
+</head>
+<body>
+
+<p><a href="./clog2_function.vh">Source</a></p>
+
+<h1>Ceiling of log<sub>2</sub>(N) function</h1>
+<p>Taken from the Verilog-2001 Language Reference Manual (LRM) standard example
+ since $clog2() doesn't exist prior to Verilog-2005 (and thus,
+ SystemVerilog).</p>
+<p>This returns the necessary number of bits to index N items with a binary
+ integer. For example:</p>
+<ul>
+<li>clog2(15) returns 4</li>
+<li>clog2(16) returns 4</li>
+<li>clog2(17) returns 5</li>
+<li>etc...</li>
+</ul>
+<p>Bring in the function at the start of the body of your module like so:</p>
+<pre><code>`include "clog2_function.vh"
+</code></pre>
+<p>Pass the function a value which, at elaboration time, is either a constant
+ or an expression which evaluates to a constant. Then use that value as an
+ integer for a localparam, genvar, etc...</p>
+<p>You don't need this function often, but it's very handy when a module
+ receives some item count as a parameter, and you need to create an internal
+ register to hold an index to those items (e.g.: a binary counter).</p>
+
+<pre>
+function integer clog2;
+    input integer value;
+    begin
+        value = value - 1;
+        for (clog2 = 0; value > 0; clog2 = clog2 + 1) begin
+            value = value >> 1;
+        end
+    end
+endfunction
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
