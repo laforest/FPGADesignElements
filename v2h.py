@@ -55,7 +55,7 @@ def filename_to_title(filename):
 
 def is_verilog_filename(filename):
     """This prevents accidentally processing other files of the same prefix name"""
-    return verilog_filename[-2:] == ".v"
+    return verilog_filename[-2:] == ".v" or verilog_filename[-3:] == ".vh"
 
 def is_comment(line):
     return line.startswith("//")
