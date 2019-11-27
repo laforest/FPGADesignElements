@@ -339,6 +339,8 @@ both VHDL and Verilog for naming ports, variables, etc...
 
 <h2>Procedural Blocks and Assignments</h2>
 
+<a name="assign"></a>
+
 <h3>Assign Statements</h3>
 
 <p>Avoid the use of <code>assign</code> statements, except where demanded by
@@ -349,11 +351,20 @@ outputs. These coding styles make it hard to see the underlying design, and
 make the implementation hard to control for size and performance. There are
 exactly two cases where you must use assign:
 
-<ul>
+<ol>
 
 <li>When inferring a tri-state I/O pin, since the pin must then be a wire, if
 you are not explicitly instantiating a tri-state I/O buffer (e.g.: IOBUF,
 OBUFT, etc...).
+
+<p><em>Inferring a tri-state I/O like this may fail if the module is not at the
+top-level of the design. I have been bitten by this in Vivado, where it created
+an AND gate instead of a tri-state buffer. Thus, unless you can't for some
+reason, implement the I/O blocks directly using the CAD vendor modules, which
+will instantiate correctly regardless of location in the design hierarchy. This
+is also a reason why FPGA-specific I/O ports <a
+href="./system.html#adapter">should be instantiated in their own enclosing
+Adapter module</a>.</em>
 
 <pre>
 localparam WORD_WIDTH       = 36;
@@ -367,16 +378,18 @@ assign tristate_bus = (output_enable == 1'b1) ? data_out : WORD_TRISTATE;
 </pre>
 
 <li>When connecting two wires whose generation you do not control (else you
-could create one wire for the connection). This is a <em>very</em> rare case in
-normal code. It is also discouraged since it affects Verilog event queueing in
-simulation, which can cause impossible behaviour if the two wires are clock
-lines and the associated data lasts only a single cycle, causing some
+could create only one wire for the connection). This is a rare case which
+usually happens when a module in a <code>generate</code> block is not
+conditionally instantiated, and you must connect the dangling wires. Using
+<code>assign</code> is also discouraged since it affects Verilog event queueing
+in simulation, which can cause impossible behaviour if the two wires are clock
+lines and the associated data lasts only a single cycle, causing some data
 transitions to be missed.
 
 <p>(<i>If this behaviour shows up in vendor IP, an ugly workaround is to delay
 the data into the IP by #1. I'm working on a more general solution.</i>)
 
-</ul>
+</ol>
 
 <h3>Always Blocks</h3>
 
