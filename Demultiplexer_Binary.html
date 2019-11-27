@@ -1,0 +1,87 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demultiplexer Binary</title>
+</head>
+<body>
+
+<p><a href="./Demultiplexer_Binary.v">Source</a></p>
+
+<h1>Binary Demultiplexer</h1>
+<p>Connects the <code>word_in</code> input port to one of the words in the <code>words_out</code>
+ output port, as selected by the <code>output_port_selector</code> binary address, and
+ raises the corresponding valid bit in the <code>valids_out</code> output port.</p>
+<p>All unselected output ports and valid bits are set to zero, and if the
+ <code>output_port_selector</code> value is greater than the number of output words,
+ then <em>all</em> output words and valid bits stay at zero.  This costs some logic,
+ but makes tracing a simulation easier, and adds some design security and
+ robustness since unselected downstream logic cannot snoop or accidentally
+ receive other data.</p>
+
+<pre>
+module Demultiplexer_Binary
+#(
+    parameter       WORD_WIDTH          = 0,
+    parameter       ADDR_WIDTH          = 0,
+    parameter       OUTPUT_COUNT        = 0,
+
+    // Do not set at instantiation
+    parameter   TOTAL_WIDTH = WORD_WIDTH * OUTPUT_COUNT
+)
+(
+    input   wire    [ADDR_WIDTH-1:0]    output_port_selector,
+    input   wire    [WORD_WIDTH-1:0]    word_in,
+    output  wire    [TOTAL_WIDTH-1:0]   words_out,
+    output  wire    [OUTPUT_COUNT-1:0]  valids_out
+);
+</pre>
+
+<p>Convert the binary <code>output_port_selector</code> to a single one-hot bit vector
+ which signals which output port will receive the input word.</p>
+
+<pre>
+    Binary_to_One_Hot
+    #(
+        .BINARY_WIDTH   (ADDR_WIDTH),
+        .OUTPUT_WIDTH   (OUTPUT_COUNT)
+    )
+    valid_out
+    (
+        .binary_in      (output_port_selector),
+        .one_hot_out    (valids_out)
+    );
+</pre>
+
+<p>Then, for each output port, annul the output if its valid bit is not set.
+ Thus, only the selected output port will have the <code>word_in</code> data. All
+ others will stay at zero.</p>
+
+<pre>
+    generate
+        genvar i;
+        for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
+            Annuller
+            #(
+                .WORD_WIDTH     (WORD_WIDTH),
+                .IMPLEMENTATION ("AND")
+            )
+            output_gate
+            (
+                .annul          (valids_out[i] == 1'b0),
+                .data_in        (word_in),
+                .data_out       (words_out[WORD_WIDTH*i +: WORD_WIDTH])
+            );
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
