@@ -1,0 +1,192 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register Pipeline</title>
+</head>
+<body>
+
+<p><a href="./Register_Pipeline.v">Source</a></p>
+
+<h1>Register Pipeline</h1>
+<p>Pipelines data words through a number of register stages, with both
+ parallel and serial inputs and outputs. Besides the obvious uses for
+ serial/parallel conversion and pipeline alignment, a register pipeline can
+ be part of shift-and-add algorithms such as multiplication through
+ conditional addition.</p>
+<p>Each cycle <code>clock_enable</code> is high, the pipeline shifts by one from LSB to
+ MSB, or loads a new set of parallel values. <strong>Load overrides shift</strong>.
+ <code>pipe_in</code> feeds the LSB, and <code>pipe_out</code> read from the MSB.</p>
+<p>Depending on how you parameterize and use it, a register pipeline can act
+ as a delay pipeline or a shift register:</p>
+<ul>
+<li>For a delay pipeline, set <code>WORD_WIDTH</code> to the width of the data word, then
+ <code>PIPE_DEPTH</code> to the number of delay stages. This will move whole data words
+ along the pipeline. </li>
+<li>For a shift register, set <code>WORD_WIDTH</code> to 1, and <code>PIPE_DEPTH</code> to the
+ width of the data word you wish to shift in or out bit-by-bit. Load the
+ word via <code>parallel_in</code>, then shift it out through <code>pipe_out</code>. Or, shift in
+ <code>PIPE_DEPTH</code> bits through <code>pipe_in</code>, then read the data word on
+ <code>parallel_out</code>.</li>
+</ul>
+<p>If no parallel loads are required, hardwire <code>parallel_load</code> to zero, and the
+ multiplexers will optimize away, if any.</p>
+<p>The <code>RESET_VALUES</code> parameter allows each pipeline stage to start loaded
+ with a known initial value, which can simplify system startup. The pipeline
+ will also areset or clear to the same values. Set <code>RESET_VALUES</code> to the
+ concatenation of all initial/reset values, with the rightmost value being
+ the first one (at the least-significant bit (LSB)).</p>
+
+<pre>
+`default_nettype none
+
+module Register_Pipeline
+#(
+    parameter                   WORD_WIDTH      = 0,
+    parameter                   PIPE_DEPTH      = 0,
+    // Don't set at instantiation
+    parameter                   TOTAL_WIDTH     = WORD_WIDTH * PIPE_DEPTH,
+
+    // concatenation of each stage initial/reset value
+    parameter [TOTAL_WIDTH-1:0] RESET_VALUES    = 0
+)
+(
+    input   wire                        clock,
+    input   wire                        clock_enable,
+    input   wire                        areset,
+    input   wire                        clear,
+    input   wire                        parallel_load,
+    input   wire    [TOTAL_WIDTH-1:0]   parallel_in,
+    output  reg     [TOTAL_WIDTH-1:0]   parallel_out,
+    input   wire    [WORD_WIDTH-1:0]    pipe_in,
+    output  reg     [WORD_WIDTH-1:0]    pipe_out
+);
+</pre>
+
+<p>Each pipeline state is composed of a Multiplexer feeding a Register, so we
+ can select either the output of the previous Register, or the parallel load
+ data. So we need a set of input and ouput wires for each stage. </p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] pipe_stage_in     [PIPE_DEPTH-1:0];
+    wire [WORD_WIDTH-1:0] pipe_stage_out    [PIPE_DEPTH-1:0];
+</pre>
+
+<p>The following attributes prevent the implementation of the multiplexer with
+ DSP blocks. This can be a useful implementation choice sometimes, but here
+ it's terrible, since FPGA flip-flops usually have separate data and
+ synchronous load inputs, giving us a 2:1 mux for free. If not, then we
+ should use LUTs instead, or other multiplexers built into the logic blocks.</p>
+
+<pre>
+    (* multstyle = "logic" *) // Quartus
+    (* use_dsp   = "no" *)    // Vivado
+</pre>
+
+<p>We strip out first iteration of module instantiations to avoid having to
+ refer to index -1 in the generate loop, and also to connect to <code>pipe_in</code>
+ rather than the output of a previous register.</p>
+
+<pre>
+    Multiplexer_Binary_Behavioural
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .ADDR_WIDTH     (1),
+        .INPUT_COUNT    (2)
+    )
+    pipe_input_select
+    (
+        .selector       (parallel_load),    
+        .words_in       ({parallel_in[0 +: WORD_WIDTH], pipe_in}),
+        .word_out       (pipe_stage_in[0])
+    );
+
+    Register
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .RESET_VALUE    (RESET_VALUES[0 +: WORD_WIDTH])
+    )
+    pipe_stage
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .areset         (areset),
+        .clear          (clear),
+        .data_in        (pipe_stage_in[0]),
+        .data_out       (pipe_stage_out[0])
+    );
+
+    always @(*) begin
+        parallel_out[0 +: WORD_WIDTH] = pipe_stage_out[0];
+    end
+</pre>
+
+<p>Now repeat over the remainder of the pipeline stages, starting at stage 1,
+ connecting each pipeline stage to the output of the previous pipeline
+ stage.</p>
+
+<pre>
+    generate
+
+        genvar i;
+
+        for(i=1; i < PIPE_DEPTH; i=i+1) begin : pipe_stages
+
+            (* multstyle = "logic" *) // Quartus
+            (* use_dsp   = "no" *)    // Vivado
+
+            Multiplexer_Binary_Behavioural
+            #(
+                .WORD_WIDTH     (WORD_WIDTH),
+                .ADDR_WIDTH     (1),
+                .INPUT_COUNT    (2)
+            )
+            pipe_input_select
+            (
+                .selector       (parallel_load),    
+                .words_in       ({parallel_in[WORD_WIDTH*i +: WORD_WIDTH], pipe_stage_out[i-1]}),
+                .word_out       (pipe_stage_in[i])
+            );
+
+
+            Register
+            #(
+                .WORD_WIDTH     (WORD_WIDTH),
+                .RESET_VALUE    (RESET_VALUES[WORD_WIDTH*i +: WORD_WIDTH])
+            )
+            pipe_stage
+            (
+                .clock          (clock),
+                .clock_enable   (clock_enable),
+                .areset         (areset),
+                .clear          (clear),
+                .data_in        (pipe_stage_in[i]),
+                .data_out       (pipe_stage_out[i])
+            );
+
+            always @(*) begin
+                parallel_out[WORD_WIDTH*i +: WORD_WIDTH] = pipe_stage_out[i];
+            end
+
+        end
+
+    endgenerate
+</pre>
+
+<p>And finally, connect the output of the last register to the module pipe output.</p>
+
+<pre>
+    always @(*) begin
+        pipe_out = pipe_stage_out[PIPE_DEPTH-1];
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
