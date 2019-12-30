@@ -24,7 +24,10 @@
 // `parallel_out`.
 
 // If no parallel loads are required, hardwire `parallel_load` to zero, and the
-// multiplexers will optimize away, if any.
+// multiplexers will optimize away, if any, and you'll end up with a pure
+// shift register. Conversely, hardwire `parallel_load` to one, and tie off
+// the `pipe_in` input, and you'll end up with a conveniently packaged bank
+// of registers.
 
 // The `RESET_VALUES` parameter allows each pipeline stage to start loaded
 // with a known initial value, which can simplify system startup. The pipeline
