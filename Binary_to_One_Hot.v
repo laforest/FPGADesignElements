@@ -42,8 +42,8 @@ module Binary_to_One_Hot
             )
             one_hot_bit
             (
-                .base_addr  (i),
-                .bound_addr (i),
+                .base_addr  (i[BINARY_WIDTH-1:0]),
+                .bound_addr (i[BINARY_WIDTH-1:0]),
                 .addr       (binary_in),
                 .hit        (one_hot_out[i])
             );
