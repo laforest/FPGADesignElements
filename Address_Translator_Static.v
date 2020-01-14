@@ -1,6 +1,9 @@
 
 //# Address Translator (Static)
 
+// *This is the fixed-range version of the [Arithmetic Address
+// Translator](./Address_Translator_Arithmetic.html).*
+
 // Translates a *fixed*, arbitrary, unaligned range of N locations into an
 // aligned range (starting at zero, up to N-1) so the translated address can
 // be used to sequentially index into other addressed components
