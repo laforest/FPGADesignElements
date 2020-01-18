@@ -1,0 +1,53 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmask Thermometer from Count</title>
+</head>
+<body>
+
+<p><a href="./Bitmask_Thermometer_from_Count.v">Source</a></p>
+
+<h1>Bitmask: Thermometer from Count</h1>
+<p>Credit: <a href="./books.html#Warren2013">Hacker's Delight</a>, Section 2-1: Manipulating Rightmost Bits</p>
+<p>Sets the first N least-significant bits given integer N.
+ If N is greater than WORD_WIDTH, then the mask is all-ones.</p>
+<p>This thermometer bitmask is also the lexicographically first member of the
+ set of bitmasks with a given number of set bits (that is, with a constant
+ population count). The last member is the same sequence, but with the bit
+ order reversed (see: <a href="./Word_Reverser.html">Word Reverser</a>). To generate
+ all members, use <a href="./Bitmask_Next_with_Constant_Popcount.html">Bitmask: Next with Constant
+ Popcount</a>.</p>
+
+<pre>
+`default_nettype none
+
+module Bitmask_Thermometer_from_Count
+#(
+    parameter WORD_WIDTH    = 0
+)
+(
+    input   wire    [WORD_WIDTH-1:0]    count_in,
+    output  reg     [WORD_WIDTH-1:0]    word_out
+);
+
+    localparam ONE = {{WORD_WIDTH-1{1'b0}},1'b1};
+
+    initial begin
+        word_out = {WORD_WIDTH{1'b0}};
+    end
+
+    always @(*) begin
+        word_out = (ONE << count_in) - ONE;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

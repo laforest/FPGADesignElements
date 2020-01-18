@@ -1,0 +1,48 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmask Turn On Trailing 0 Bits</title>
+</head>
+<body>
+
+<p><a href="./Bitmask_Turn_On_Trailing_0_Bits.v">Source</a></p>
+
+<h1>Bitmask: Turn On Trailing 0 Bits</h1>
+<p>Credit: <a href="./books.html#Warren2013">Hacker's Delight</a>, Section 2-1: Manipulating Rightmost Bits</p>
+<p>Use one of the following formulas to create a word with 1’s at the
+ positions of the trailing 0’s in the input, and 0’s elsewhere, producing
+ 0 if none (e.g., 01011000 -&gt; 00000111)</p>
+
+<pre>
+`default_nettype none
+
+module Bitmask_Turn_On_Trailing_0_Bits
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire    [WORD_WIDTH-1:0]    word_in,
+    output  reg     [WORD_WIDTH-1:0]    word_out
+);
+
+    initial begin
+        word_out = {WORD_WIDTH{1'b0}};
+    end
+
+    localparam ONE = {{WORD_WIDTH-1{1'b0}},1'b1};
+
+    always @(*) begin
+        word_out = ~word_in & (word_in - ONE);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
