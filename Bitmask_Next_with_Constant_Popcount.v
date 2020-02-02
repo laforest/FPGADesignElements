@@ -21,8 +21,8 @@
 // * c = carry(s + x)
 // * y = r | ((1 << (popcount(x^r)-(2-(2c)))-1)
 
-// We implement the popcount-based version since it does not require a full
-// shifter (since we shift a constant value), nor an integer division.
+// We implement the popcount-based version since, while it does need
+// a variable bit-shift, it does not require variable integer division.
 
 `default_nettype none
 
@@ -142,7 +142,7 @@ module Bitmask_Next_with_Constant_Popcount
 
     wire [WORD_WIDTH-1:0] adjusted_distance;
 
-    Adder_Subtractor
+    Adder_Subtractor_Binary
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -191,7 +191,7 @@ module Bitmask_Next_with_Constant_Popcount
 
     wire [WORD_WIDTH-1:0] lost_ones;
 
-    Adder_Subtractor
+    Adder_Subtractor_Binary
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
