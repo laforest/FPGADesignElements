@@ -133,8 +133,8 @@ if __name__ == "__main__":
             f = open(html_filename, 'w')
             f.write(processed_contents)
             f.close()
-        else:
-            print("Skipping {0}".format(html_filename));
+        #else:
+        #    print("Skipping {0}".format(html_filename));
 
     print("Done.")
 
