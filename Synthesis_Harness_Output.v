@@ -3,7 +3,7 @@
 
 // When developing a new module, it's very convenient to run it through your
 // CAD tool by itself, on a smaller target FPGA, with any random automatic pin
-// assignments, to iterate quickly and find synthesis and timing issues.
+// assignments, to iterate quickly and find synth and timing issues.
 // However, you can run out of physical pins, and your logic will get
 // scattered all over the FPGA as it tries to stay close to the pins, wrecking
 // your timing estimates.  Also, any input or output logic which isn't
@@ -21,7 +21,7 @@
 // It would seem natural to do the reverse of the [Synthesis Harness
 // Input](./Synthesis_Harness_Input.html) and do a parallel-to-serial
 // conversion to the output bits to a single bit, but that might
-// pollute our timing analysis since synthesis might create multiplexers
+// pollute our timing analysis since synth might create multiplexers
 // between the outputs and the registers. So we bit-reduce instead.
 
 // You must also constrain the harness registers to *not* be placed in the
@@ -67,7 +67,7 @@ module Synthesis_Harness_Output
     wire [WORD_WIDTH-1:0] word_out;
 
     // Vivado: don't put in I/O buffers, and keep netlists separate in
-    // synthesis and implementation.
+    // synth and implementation.
     (* IOB = "false" *)
     (* DONT_TOUCH = "true" *)
 
