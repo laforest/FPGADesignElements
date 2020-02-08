@@ -40,6 +40,12 @@
 // Delight](./books.html#Warren2013), Section 10-1, "Signed Division by
 // a Known Power of 2". 
 
+// When combined with [Bitmask: Isolate Rightmost
+// 1 Bit](./Bitmask_Isolate_Rightmost_1_Bit.html), this module forms the basis
+// for the very useful Number of Trailing Zeros (ntz) function. Add a [Word
+// Reverser](./Word_Reverser.html) and you can compute Number of Leading Zeros
+// (nlz).
+
 `default_nettype none
 
 module Logarithm_of_Powers_of_Two
