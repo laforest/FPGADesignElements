@@ -3,43 +3,48 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bitmask Next with Constant Popcount</title>
+<title>Bitmask Next with Constant Popcount pop</title>
 </head>
 <body>
 
-<p><a href="./Bitmask_Next_with_Constant_Popcount.v">Source</a></p>
+<p><a href="./Bitmask_Next_with_Constant_Popcount_pop.v">Source</a></p>
 
-<h1>Bitmask: Next with Constant Popcount</h1>
+<h1>Bitmask: Next with Constant Popcount (via Population Count)</h1>
 <p>Credit: <a href="./books.html#Warren2013">Hacker's Delight</a>, Section 2-1: Manipulating Rightmost Bits, "A Novel Application"</p>
 <p>Given a bitmask, gives the next bitmask, in lexicographic order (a.k.a.
  strictly incrementing order), with the same number of bits set (a.k.a. same
  population count). For example: 00100011 -&gt; 00100101.</p>
-<p>Modified to wraparound correctly at the end of the word, which allows you
- to start with any given bitmask, then know you have tried all possible
+<p>Modified here to wraparound correctly at the end of the word, which allows
+ you to start with any given bitmask, then know you have tried all possible
  cases when the next bitmask is identical to the starting bitmask.  This
  property avoids having to calculate n-choose-k (for a k-bit bitmask in an
- n-bit word) as a count, which requires calculating factorials, and thus
- does not scale well.</p>
+ n-bit word) as a count, or have to detect and handle the highest-valued
+ bitmask (i.e.: 11100000) as a special case.</p>
 <p>Implementation, for x -&gt; y:</p>
 <ul>
 <li>s = x &amp; -x</li>
 <li>r = s + x</li>
 <li>c = carry(s + x)</li>
-<li>y = r | ((1 &lt;&lt; (popcount(x^r)-(2-(2c)))-1)</li>
+<li>y = r | [(1 &lt;&lt; (popcount(x^r)-2-2c))-1]</li>
 </ul>
-<p>We implement the popcount-based version since, while it does need
- a variable bit-shift, it does not require variable integer division.</p>
+<p>While this version uses the relatively large <a href="./Population_Count.html">Population
+ Count</a> module instead of the much smaller
+ <a href="./Logarithm_of_Powers_of_Two.html">Logarithm of Powers of Two</a> module, its
+ variable bit-shift is only for the fixed input value of 1, which requires
+ much less hardware than the full-word shifter found in the <a href="./Bitmask_Next_with_Constant_Popcount_ntz.html">ntz-based
+ version</a>. I don't yet know
+ whether this is a good tradeoff for speed or area.</p>
 
 <pre>
 `default_nettype none
 
-module Bitmask_Next_with_Constant_Popcount
+module Bitmask_Next_with_Constant_Popcount_pop
 #(
     parameter WORD_WIDTH = 0
 )
 (
     input   wire    [WORD_WIDTH-1:0]    word_in,
-    output  wire    [WORD_WIDTH-1:0]    word_out
+    output  reg     [WORD_WIDTH-1:0]    word_out
 );
 </pre>
 
@@ -51,6 +56,10 @@ module Bitmask_Next_with_Constant_Popcount
     localparam ZERO = {WORD_WIDTH{1'b0}};
     localparam ONE  = {{WORD_WIDTH-1{1'b0}},1'b1};
     localparam TWO  = {{WORD_WIDTH-2{1'b0}},2'b10};
+
+    initial begin
+        word_out = ZERO;
+    end
 </pre>
 
 <p>We find the least-significant bit set in the bitmask.</p>
@@ -120,20 +129,11 @@ module Bitmask_Next_with_Constant_Popcount
  a correction of two, else zero.</p>
 
 <pre>
-    wire [WORD_WIDTH-1:0] distance_adjustment;
-    
-    Multiplexer_Binary_Behavioural
-    #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .ADDR_WIDTH     (1),
-        .INPUT_COUNT    (2)
-    )
-    adjustment_select
-    (
-        .selector       (ripple_carry_out),    
-        .words_in       ({ZERO, TWO}),
-        .word_out       (distance_adjustment)
-    );
+    reg [WORD_WIDTH-1:0] distance_adjustment = ZERO;
+
+    always @(*) begin
+        distance_adjustment = (ripple_carry_out == 1'b1) ? ZERO : TWO;
+    end
 </pre>
 
 <p>If only one bit was rippled leftwards, then the Hamming Distance is
@@ -148,12 +148,11 @@ module Bitmask_Next_with_Constant_Popcount
  Hamming Distance. We have to rebuild the lost set bits at the far right
  end of the word, and the corrected Hamming Distance will allow us to do
  that later.</p>
-<p>If we rippled all the way into the carry bit, then the Hamming Distance
- is necessarily equal to the number of bits in the bitmask, as the carry
+<p>If we rippled all the way into the carry bit, then the Hamming Distance is
+ necessarily equal to the number of set bits in the bitmask, as the carry
  bit is not included in the Hamming Distance calculation. We need that
- number to wraparound and create the first possible bitmask at the right
- end of the word (e.g.: 11100000 -&gt; 00000111), so we subtract zero
- instead.</p>
+ number to wraparound and create the first possible bitmask at the right end
+ of the word (e.g.: 11100000 -&gt; 00000111), so we subtract zero instead.</p>
 
 <pre>
     wire [WORD_WIDTH-1:0] adjusted_distance;
@@ -235,17 +234,9 @@ module Bitmask_Next_with_Constant_Popcount
  order).</p>
 
 <pre>
-    Word_Reducer
-    #(
-        .OPERATION  ("OR"),
-        .WORD_WIDTH (WORD_WIDTH),
-        .WORD_COUNT (2)
-    )
-    calc_result
-    (
-        .words_in   ({ripple, lost_ones}),
-        .word_out   (word_out)
-    );
+    always @(*) begin
+        word_out = ripple | lost_ones;
+    end
 
 endmodule
 </pre>

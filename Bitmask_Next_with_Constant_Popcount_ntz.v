@@ -1,5 +1,5 @@
 
-//# Bitmask: Next with Constant Popcount
+//# Bitmask: Next with Constant Popcount (via Number of Trailing Zeros)
 
 // Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits, "A Novel Application"
 
@@ -11,33 +11,46 @@
 // you to start with any given bitmask, then know you have tried all possible
 // cases when the next bitmask is identical to the starting bitmask.  This
 // property avoids having to calculate n-choose-k (for a k-bit bitmask in an
-// n-bit word) as a count.
+// n-bit word) as a count, or have to detect and handle the highest-valued
+// bitmask (i.e.: 11100000) as a special case.
 
 // Implementation, for x -> y:
 
 // * s = x & -x
 // * r = s + x
 // * c = carry(s + x)
-// * y = r | (((x^r) >> (2-2c)) / s)
+// * y = r | [((x^r) >> (2-2c)) / s]
 
-// While this version requires a division (unlike the popcount-based version),
-// the divisor (s) is always a power-of-two ([Bitmask: Isolate Rightmost
+// While this version requires a division (unlike the [popcount-based
+// version](./Bitmask_Next_with_Constant_Popcount_pop.html)), the divisor (s)
+// is always a power-of-two ([Bitmask: Isolate Rightmost
 // 1 Bit](./Bitmask_Isolate_Rightmost_1_Bit.v)), so the (unsigned) division
 // simplifies to a logical shift right by log<sub>2</sub>(s). The two
-// consecutive logical shift right can now be combined or commuted:
+// consecutive logical shift right can now be combined or commuted, and
+// ultimately reduce to a shift by the number of trailing zeros (ntz), with a
+// correction of 2 or 0:
 
-// * y = r | (((x^r) >> (2-2c)) >> log<sub>2</sub>(s))
+// * y = r | [((x^r) >> (2-2c)) >> log<sub>2</sub>(s)]
 // * y = r | (x^r) >> [(2-2c) + log<sub>2</sub>(s)]
+// * y = r | (x^r) >> [(2-2c) + ntz(x)]
 
-// We will use the first form since it doesn't require another adder and the
-// first shift is predictable: either by 2 or zero, so we can provide both,
-// select one, and feed it to the second, data-dependent shift.
+// We will use the first above form since it doesn't require another adder of
+// yet another bit width (log<sub>2</sub>(WORD_WIDTH)) which complicates
+// writing clean Verilog, and the correction shift is predictable: either by
+// 2 or zero, so we can provide both, select one, and feed it to the second,
+// data-dependent shift.
+
+// While this version replaces the relatively large [Population
+// Count](./Population_Count.html) module with the much smaller [Logarithm of
+// Powers of Two](./Logarithm_of_Powers_of_Two.html) module, it does require
+// a full-word variable bit-shift, which costs more. I don't yet know whether
+// this is a good tradeoff for speed or area.
 
 `default_nettype none
 
-module Bitmask_Next_with_Constant_Popcount
+module Bitmask_Next_with_Constant_Popcount_ntz
 #(
-    parameter WORD_WIDTH = 32
+    parameter WORD_WIDTH = 0
 )
 (
     input   wire    [WORD_WIDTH-1:0]    word_in,
@@ -72,7 +85,7 @@ module Bitmask_Next_with_Constant_Popcount
 // of consecutive 1 bits at the right to ripple up into the next 0 bit. (e.g.:
 // 1001100 -> 1010000)
 
-// Compute `c`: also save the carry-out to later deal with the case where the
+// Compute `c`: save the carry-out to later deal with the case where the
 // consecutive 1 bits were at the left end of the word and rippled up into the
 // carry out. In this case, we want to remove a correction to the shift amount
 // described later.
@@ -107,45 +120,22 @@ module Bitmask_Next_with_Constant_Popcount
 
 // We need a correction to the upcoming right shift: If we have not reached
 // the left end of the word, then we need an extra right shift of two, else of
-// zero. The extra shift by two is to discard the bit at the position of the
-// least-significant set bit (s) which is always zero-ed out by the addition,
-// and the next bit (why?)
+// zero.  Normally, after the ripple, we shift right once to discard the
+// now-cleared least-significant set bit, and once more to bring the new
+// least-significant set bit into the position of that original
+// least-significant set bit. If we rippled right up into the carry bit, then
+// no new least-significant set bit is created, so we don't have anything to
+// discard and so we don't shift left here.
 
-    wire [WORD_WIDTH-1:0] changed_bits_corrected;
-    
-    Multiplexer_Binary_Behavioural
-    #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .ADDR_WIDTH     (1),
-        .INPUT_COUNT    (2)
-    )
-    correction_select
-    (
-        .selector       (ripple_carry_out),    
-        .words_in       ({changed_bits, changed_bits >> 2}),
-        .word_out       (changed_bits_corrected)
-    );
+    reg [WORD_WIDTH-1:0] changed_bits_corrected = WORD_ZERO;
 
-// If only one bit was rippled leftwards, then the Hamming Distance is
-// necessarily two (e.g.: 010010 ripples to 010100, which changes two
-// bits). So we subtract two from the Hamming Distance to bring it to zero
-// and call that the normal case, as no set bits were lost.  (Remember: we
-// want to find the next bitmask with the same number of set bits.)
+    always @(*) begin
+        changed_bits_corrected = (ripple_carry_out == 1'b1) ? changed_bits : changed_bits >> 2;
+    end
 
-// If there was a run of 1 bits, these would all have rippled leftwards
-// into another bit. The Hamming Distance would therefore be the number of
-// 1 bits in that run, plus the changed bit at the left (e.g.: 00111000 ->
-// 01000000, for a Hamming Distance of 4). We also subtract two from this
-// Hamming Distance. We have to rebuild the lost set bits at the far right
-// end of the word, and the corrected Hamming Distance will allow us to do
-// that later.
-
-// If we rippled all the way into the carry bit, then the Hamming Distance
-// is necessarily equal to the number of bits in the bitmask, as the carry
-// bit is not included in the Hamming Distance calculation. We need that
-// number to wraparound and create the first possible bitmask at the right
-// end of the word (e.g.: 11100000 -> 00000111), so we subtract zero
-// instead.
+// Later, we will need to re-align our changed bits back to the right (plus
+// any correction), so let's find out the index of the original
+// least-significant set bit.
 
     wire [WORD_WIDTH-1:0] final_shift_amount;
 
@@ -162,9 +152,9 @@ module Bitmask_Next_with_Constant_Popcount
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-// Now we shift the rippled bits back to the right end of the word, giving us
-// the next sequence of changed bits with the same number of bits set that is
-// also necessarily the smallest possible such...
+// Now we shift the post-ripple changed bits (x^r) back to the right end of
+// the word (plus correction), giving us the next sequence of changed bits
+// with the same number of bits set.
 
     wire [WORD_WIDTH-1:0] changed_bits_shifted; 
 
@@ -189,7 +179,7 @@ module Bitmask_Next_with_Constant_Popcount
     );
 
 // Finally, we OR the rippled bits (which contains the unchanged left-most
-// part, plus the new set ripple bit) with the reconstructed bits lost to
+// part, plus the newly set/cleared ripple bits) with the changed bits lost to
 // the initial ripple (if any). We now have the next bitmask with the same
 // number of set bits, in strict incrementing order (a.k.a. lexicographic
 // order).
