@@ -7,43 +7,54 @@
 // strictly incrementing order), with the same number of bits set (a.k.a. same
 // population count). For example: 00100011 -> 00100101.
 
-// Modified to wraparound correctly at the end of the word, which allows you
-// to start with any given bitmask, then know you have tried all possible
+// Modified here to wraparound correctly at the end of the word, which allows
+// you to start with any given bitmask, then know you have tried all possible
 // cases when the next bitmask is identical to the starting bitmask.  This
 // property avoids having to calculate n-choose-k (for a k-bit bitmask in an
-// n-bit word) as a count, which requires calculating factorials, and thus
-// does not scale well.
+// n-bit word) as a count.
 
 // Implementation, for x -> y:
 
 // * s = x & -x
 // * r = s + x
 // * c = carry(s + x)
-// * y = r | ((1 << (popcount(x^r)-(2-(2c)))-1)
+// * y = r | (((x^r) >> (2-2c)) / s)
 
-// We implement the popcount-based version since, while it does need
-// a variable bit-shift, it does not require variable integer division.
+// While this version requires a division (unlike the popcount-based version),
+// the divisor (s) is always a power-of-two ([Bitmask: Isolate Rightmost
+// 1 Bit](./Bitmask_Isolate_Rightmost_1_Bit.v)), so the (unsigned) division
+// simplifies to a logical shift right by log<sub>2</sub>(s). The two
+// consecutive logical shift right can now be combined or commuted:
+
+// * y = r | (((x^r) >> (2-2c)) >> log<sub>2</sub>(s))
+// * y = r | (x^r) >> [(2-2c) + log<sub>2</sub>(s)]
+
+// We will use the first form since it doesn't require another adder and the
+// first shift is predictable: either by 2 or zero, so we can provide both,
+// select one, and feed it to the second, data-dependent shift.
 
 `default_nettype none
 
 module Bitmask_Next_with_Constant_Popcount
 #(
-    parameter WORD_WIDTH = 0
+    parameter WORD_WIDTH = 32
 )
 (
     input   wire    [WORD_WIDTH-1:0]    word_in,
-    output  wire    [WORD_WIDTH-1:0]    word_out
+    output  reg     [WORD_WIDTH-1:0]    word_out
 );
 
 // First, let's define some constants used throughout. Rather than expect
 // the simulator/synthesizer to get the Verilog spec right and extend
 // integers correctly, we defensively specify the entire word.
 
-    localparam ZERO = {WORD_WIDTH{1'b0}};
-    localparam ONE  = {{WORD_WIDTH-1{1'b0}},1'b1};
-    localparam TWO  = {{WORD_WIDTH-2{1'b0}},2'b10};
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 
-// We find the least-significant bit set in the bitmask.
+    initial begin
+        word_out = WORD_ZERO;
+    end
+
+// Compute `s`: the least-significant bit set in the bitmask.
 
     wire [WORD_WIDTH-1:0] smallest;
 
@@ -57,13 +68,14 @@ module Bitmask_Next_with_Constant_Popcount
         .word_out   (smallest)
     );
 
-// Then add that smallest bit to the input, causing any run of consecutive
-// 1 bits to ripple up into the next 0 bit. (e.g.: 1001100 -> 1010000)
+// Compute `r`: add that least-significant bit to the input, causing any run
+// of consecutive 1 bits at the right to ripple up into the next 0 bit. (e.g.:
+// 1001100 -> 1010000)
 
-// We also save the carry-out to later deal with the case where the
-// consecutive 1 bits were at the left end of the word and rippled into
-// the carry out, so we can wraparound back to the right end without
-// information loss.
+// Compute `c`: also save the carry-out to later deal with the case where the
+// consecutive 1 bits were at the left end of the word and rippled up into the
+// carry out. In this case, we want to remove a correction to the shift amount
+// described later.
 
     wire [WORD_WIDTH-1:0]   ripple;
     wire                    ripple_carry_out;
@@ -82,29 +94,24 @@ module Bitmask_Next_with_Constant_Popcount
         .carry_out  (ripple_carry_out)
     );
 
-// Now we compute the number of bits which changed after the ripple
-// addition. Any changed bits are on the right side of the ripple: the
-// left side is always unchanged, except at the limit case where the carry
-// out is set.
+// Compute `x^r`: find the bits which changed after the ripple
+// addition. Any changed bits are on the right side of the ripple: the left
+// side is always unchanged, except at the limit case where the carry out is
+// set.
 
-    wire [WORD_WIDTH-1:0] changed_bits;
+    reg [WORD_WIDTH-1:0] changed_bits = WORD_ZERO;
 
-    Hamming_Distance
-    #(
-        .WORD_WIDTH     (WORD_WIDTH)
-    )
-    calc_changed_bits
-    (
-        .word_A           (word_in),
-        .word_B           (ripple),
-        .distance         (changed_bits)
-    );
+    always @(*) begin
+        changed_bits = word_in ^ ripple;
+    end
 
-// We need some corrections to the Hamming Distance, which are explained
-// later. If we have not reached the left end of the word, then we need
-// a correction of two, else zero.
+// We need a correction to the upcoming right shift: If we have not reached
+// the left end of the word, then we need an extra right shift of two, else of
+// zero. The extra shift by two is to discard the bit at the position of the
+// least-significant set bit (s) which is always zero-ed out by the addition,
+// and the next bit (why?)
 
-    wire [WORD_WIDTH-1:0] distance_adjustment;
+    wire [WORD_WIDTH-1:0] changed_bits_corrected;
     
     Multiplexer_Binary_Behavioural
     #(
@@ -112,11 +119,11 @@ module Bitmask_Next_with_Constant_Popcount
         .ADDR_WIDTH     (1),
         .INPUT_COUNT    (2)
     )
-    adjustment_select
+    correction_select
     (
         .selector       (ripple_carry_out),    
-        .words_in       ({ZERO, TWO}),
-        .word_out       (distance_adjustment)
+        .words_in       ({changed_bits, changed_bits >> 2}),
+        .word_out       (changed_bits_corrected)
     );
 
 // If only one bit was rippled leftwards, then the Hamming Distance is
@@ -140,70 +147,44 @@ module Bitmask_Next_with_Constant_Popcount
 // end of the word (e.g.: 11100000 -> 00000111), so we subtract zero
 // instead.
 
-    wire [WORD_WIDTH-1:0] adjusted_distance;
+    wire [WORD_WIDTH-1:0] final_shift_amount;
 
-    Adder_Subtractor_Binary
+    Logarithm_of_Powers_of_Two
     #(
-        .WORD_WIDTH (WORD_WIDTH)
+        .WORD_WIDTH             (WORD_WIDTH)
     )
-    calc_adjusted_distance
+    calc_final_shift_amount
     (
-        .add_sub    (1'b1), // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A_in       (changed_bits),
-        .B_in       (distance_adjustment),
-        .sum_out    (adjusted_distance),
+        .one_hot_in             (smallest),
+        .logarithm_out          (final_shift_amount),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
+        .logarithm_undefined    ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-// To rebuild any lost set bits, we left-shift a 1 bit by the corrected
-// Hamming Distance....
+// Now we shift the rippled bits back to the right end of the word, giving us
+// the next sequence of changed bits with the same number of bits set that is
+// also necessarily the smallest possible such...
 
-    wire [WORD_WIDTH-1:0] shifted_one;
+    wire [WORD_WIDTH-1:0] changed_bits_shifted; 
 
     Bit_Shifter
     #(
         .WORD_WIDTH         (WORD_WIDTH)
     )
-    calc_shifted_ones
+    move_changed_bits
     (
-        .word_in_left       (ZERO),
-        .word_in            (ONE),
-        .word_in_right      (ZERO),
+        .word_in_left       (WORD_ZERO),
+        .word_in            (changed_bits_corrected),
+        .word_in_right      (WORD_ZERO),
 
-        .shift_amount       (adjusted_distance),
-        .shift_direction    (1'b0), // 0/1 -> left/right
+        .shift_amount       (final_shift_amount),
+        .shift_direction    (1'b1), // 0/1 -> left/right
 
         // verilator lint_off PINCONNECTEMPTY
         .word_out_left      (),
-        .word_out           (shifted_one),
+        .word_out           (changed_bits_shifted),
         .word_out_right     ()
-        // verilator lint_on  PINCONNECTEMPTY
-    );
-
-// ...and then subtract 1 to "reverse ripple" that bit into all the bits
-// to the right, creating the lost run of set bits at the rightmost
-// position. If there was only one bit rippled initially, then no set bit
-// was lost, the corrected Hamming Distance was zero, the 1 bit is not
-// shifted, and gets subtracted to zero, without affecting other bits.
-
-    wire [WORD_WIDTH-1:0] lost_ones;
-
-    Adder_Subtractor_Binary
-    #(
-        .WORD_WIDTH (WORD_WIDTH)
-    )
-    calc_lost_ones
-    (
-        .add_sub    (1'b1), // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A_in       (shifted_one),
-        .B_in       (ONE),
-        .sum_out    (lost_ones),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 
@@ -213,17 +194,9 @@ module Bitmask_Next_with_Constant_Popcount
 // number of set bits, in strict incrementing order (a.k.a. lexicographic
 // order).
 
-    Word_Reducer
-    #(
-        .OPERATION  ("OR"),
-        .WORD_WIDTH (WORD_WIDTH),
-        .WORD_COUNT (2)
-    )
-    calc_result
-    (
-        .words_in   ({ripple, lost_ones}),
-        .word_out   (word_out)
-    );
+    always @(*) begin
+        word_out = ripple | changed_bits_shifted;
+    end
 
 endmodule
 
