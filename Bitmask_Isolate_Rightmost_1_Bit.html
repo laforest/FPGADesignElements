@@ -32,8 +32,6 @@ module Bitmask_Isolate_Rightmost_1_Bit
         word_out = {WORD_WIDTH{1'b0}};
     end
 
-    localparam ONE = {{WORD_WIDTH-1{1'b0}},1'b1};
-
     always @(*) begin
         word_out = word_in & (-word_in);
     end
