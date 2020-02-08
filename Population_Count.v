@@ -71,7 +71,9 @@ module Population_Count
 // synthesized as a memory, but just as LUT logic. It works without it, but
 // I have seen my CAD tool randomly decide to use Block RAM instead.
 
-    (* ramstyle = "logic" *)
+    (* ramstyle = "logic" *)        // Quartus
+    (* ram_style = "distributed" *) // Vivado
+
     reg [1:0] popcount2bits [0:3];
 
     initial begin
