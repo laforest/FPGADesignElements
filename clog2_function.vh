@@ -25,12 +25,16 @@
 // receives some item count as a parameter, and you need to create an internal
 // register to hold an index to those items (e.g.: a binary counter).
 
+// We use a temp value for calculations since Vivado raises warnings if we
+// internally assign a value to a function input port.
+
 function integer clog2;
     input integer value;
+          integer temp;
     begin
-        value = value - 1;
-        for (clog2 = 0; value > 0; clog2 = clog2 + 1) begin
-            value = value >> 1;
+        temp = value - 1;
+        for (clog2 = 0; temp > 0; clog2 = clog2 + 1) begin
+            temp = temp >> 1;
         end
     end
 endfunction
