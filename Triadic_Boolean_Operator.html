@@ -1,0 +1,190 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triadic Boolean Operator</title>
+</head>
+<body>
+
+<p><a href="./Triadic_Boolean_Operator.v">Source</a></p>
+
+<h1>Triadic Boolean Operator (Dual Output)</h1>
+<p>Computes one of the 256 possible three-variable (triadic) Boolean operations,
+ selectable at run-time, on the <code>A</code>, <code>B</code>, and <code>C</code> input words, with optional
+ dual output.</p>
+<p>We could implement a triadic Boolean operator in hardware the same way as
+ we did the <a href="./Dyadic_Boolean_Operator.html">dyadic Boolean operator</a>, but
+ with an 8:1 multiplexer instead of a 4:1 multiplexer. However, unlike a 4:1
+ mux, an 8:1 mux doesn't fit into a 6-LUT on a modern FPGA, which distances
+ our design from the underlying FPGA hardware: we might not be able to
+ pipeline it as required for best operating speed, we are more at the mercy
+ of the register retiming and logic packing of the CAD tool, and as we'll
+ see, we lock ourselves out of a useful break in abstraction which gives
+ a triadic operator special uses.</p>
+<p>Instead, we can decompose a triadic Boolean function <code>f(A,B,C)</code> into two
+ dyadic sub-functions based on the two possible values of <code>C</code>: <code>g(A,B)
+ = f(A,B,0)</code> and <code>h(A,B) = f(A,B,1)</code>. We can then reconstruct the original
+ triadic function like so: <code>f(A,B,C) = (g(A,B) &amp; ~C) | (h(A,B) &amp; C)</code>: the
+ value of <code>C</code> selects one of the two dyadic Boolean functions of <code>A</code> and
+ <code>B</code>.  Note that <code>C</code> selects bit-wise, not word-wise: each bit of <code>C</code>
+ selects the corresponding bit of <code>g(A,B)</code> or <code>h(A,B)</code>.  This useful
+ mathematical identity is known as "Shannon Decomposition" or "Boole's
+ Expansion Theorem".</p>
+<p>We can use a triadic operator to implement very diverse functions:</p>
+<ul>
+<li><a href="./Bit_Voting.html">Majority</a>: <code>AB | AC | BC</code>, which is used in Triple Modular Redundancy (TMR). </li>
+<li><a href="./Bit_Voting.html">Minority</a>, which tells you if a TMR unit had a corrected error. </li>
+<li>Given <code>A</code>, <code>B</code>, and their sum <code>A+B</code>, you can <a href="./CarryIn_Binary.html">recover the carries into each bit position</a> like so: <code>A ^ B ^ (A+B)</code>. This can allow you to find overflows in packed sub-word parallel arithmetic (e.g.: adding two 32-bit words as two vectors of 4 bytes) </li>
+<li>Bitfield masking and swapping between <code>A</code> and <code>B</code>, as selected by the bitmask <code>C</code>.</li>
+</ul>
+<p>When used to implement Boolean functions with 4 or more variables
+ (tetradic or n-adic), triadic functions approximately halve the number of steps
+ required compared to using ordinary dyadic functions. This is likely one
+ reason the NVIDIA Maxwell GPUs implemented triadic Boolean functions with
+ the <code>LOP3</code> instruction, and Intel CPUs with AVX-512 support with the
+ <code>VPTERNLOG</code> instruction.</p>
+<p>However, if you look at the implementation of <code>f(A,B,C)</code> above, we always
+ throw away half of the total work done by both dyadic halves <code>g(A,B)</code> and
+ <code>h(A,B)</code>.  Discarded work is a clue that we are missing out on some
+ computational capacity or efficiency. So let's provide a way to output that
+ discarded work. We can add a second output multiplexer, driven by the same
+ functions <code>g(A,B)</code> and <code>h(A,B)</code>, but controlled by an inverted version of
+ <code>C</code>, called <code>D</code>, which outputs the bits not selected by <code>C</code>. And, instead
+ of hardcoding <code>D</code> as the inverse of <code>C</code>, we can control it with a 1-bit
+ <code>dual</code> signal. If <code>dual</code> is not set, then <code>C</code> and <code>D</code> are the same, and
+ both triadic outputs are identical.</p>
+<p>With two outputs, our triadic Boolean operator can now do more. When <code>dual</code> is set:</p>
+<ul>
+<li>We can compute 2 independent <a href="./Dyadic_Boolean_Operations.html">dyadic Boolean functions</a>.</li>
+<li>We can set <code>g(A,B)</code> and <code>h(A,B)</code> to always output <code>A</code> or <code>B</code>, and depending on <code>C</code>, send those outputs either straight through or crossed-over. This acts as a Banyan Switch, which is the building block of a lot of switching networks.</li>
+</ul>
+<p>I have not gone through the trouble of defining all 256 triadic Boolean
+ operations, but given the <a href="./Dyadic_Boolean_Operations.html">definitions of the 16 possible dyadic Boolean
+ operations</a>, you can easily create
+ triadic definitions as needed: write out the 8-entry truth table for your
+ desired triadic function, split the table into two 4-entry truth tables
+ with the most-significant input bit (<code>C</code>, as above) always 1 in one table,
+ and always 0 in the other, then use those two dyadic definitions as
+ functions <code>g(A,B)</code> and <code>h(A,B)</code> as explained above.</p>
+<p>You can, of course, repeat this process to implement tetradic or n-adic
+ functions, but the <em>size</em> of the truth tables grows exponentially
+ (2<sup>n</sup>), and the <em>number</em> of truth tables grows super-exponentially
+ (65,536 possible tetradic functions, or 2<sup>2<sup>n</sup></sup> for
+ n-adic functions), so there are increasingly fewer functions of general
+ interest in that space, with some exceptions such as <a href="./Bit_Reducer.html">bit
+ reductions</a> and <a href="./Word_Reducer.html">word reductions</a>.</p>
+
+<pre>
+`include "Dyadic_Boolean_Operations.vh"
+
+`default_nettype none
+
+module Triadic_Boolean_Operator
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire    [`DYADIC_TRUTH_TABLE_WIDTH-1:0]     dyadic_truth_table_1,
+    input   wire    [`DYADIC_TRUTH_TABLE_WIDTH-1:0]     dyadic_truth_table_2,
+    input   wire    [WORD_WIDTH-1:0]                    word_A,
+    input   wire    [WORD_WIDTH-1:0]                    word_B,
+    input   wire    [WORD_WIDTH-1:0]                    word_C,
+    input   wire                                        dual,
+    output  wire    [WORD_WIDTH-1:0]                    result_1,
+    output  wire    [WORD_WIDTH-1:0]                    result_2
+    
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+</pre>
+
+<p>First dyadic Boolean operation: <code>g(A,B)</code></p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] g;
+
+    Dyadic_Boolean_Operator
+    #(
+        .WORD_WIDTH     (WORD_WIDTH)
+    )
+    first
+    (
+        .truth_table    (dyadic_truth_table_1),
+        .word_A         (word_A),
+        .word_B         (word_B),
+        .result         (g)
+    );
+</pre>
+
+<p>Second dyadic Boolean operation: <code>h(A,B)</code></p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] h;
+
+    Dyadic_Boolean_Operator
+    #(
+        .WORD_WIDTH     (WORD_WIDTH)
+    )
+    second
+    (
+        .truth_table    (dyadic_truth_table_2),
+        .word_A         (word_A),
+        .word_B         (word_B),
+        .result         (h)
+    );
+</pre>
+
+<p>Now we select each bit from either <code>g(A,B)</code> or <code>h(A,B)</code>, giving us the
+ first result.</p>
+
+<pre>
+    Multiplexer_Bitwise_2to1
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    select_1
+    (
+        .bitmask    (word_C),
+        .word_in_0  (g),
+        .word_in_1  (h), 
+        .word_out   (result_1)
+    );
+</pre>
+
+<p>Then, conditionally invert <code>word_C</code> if <code>dual</code> is set.</p>
+
+<pre>
+    reg [WORD_WIDTH-1:0] word_D = WORD_ZERO;
+
+    always @(*) begin
+        word_D = (dual == 1'b1) ? ~word_C : word_C;
+    end
+</pre>
+
+<p>And select again for the second result, but selected by <code>word_D</code>, giving us
+ all the bits <em>not</em> selected by the previous multiplexer if <code>dual</code> is set,
+ else the same bits.</p>
+
+<pre>
+    Multiplexer_Bitwise_2to1
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    select_2
+    (
+        .bitmask    (word_D),
+        .word_in_0  (g),
+        .word_in_1  (h), 
+        .word_out   (result_2)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
