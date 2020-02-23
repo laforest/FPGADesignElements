@@ -5,6 +5,19 @@
 // rotates. It synthesizes to LUT logic and can be quite large if not
 // specialized to a particular situation.
 
+//## A Warning About Shift Right and Signed Division
+
+// While a left shift by N is always equivalent to a multiplication by
+// 2<sup>N</sup> for both signed and unsigned binary integers, an arithmetic
+// shift right by N is only a truncating division by 2<sup>N</sup> for
+// *positive* binary integers. For negative integers, the result is so-called
+// modulus division, and the quotient ends up off by one in magnitude, and
+// must be corrected by adding +1, *but only if an odd number results as part
+// of the intermediate division steps*. That is, if a non-zero bit was shifted
+// out to the right.
+
+//## Usage
+
 // We can treat the `shift_amount` and the `shift_direction` together as
 // a signed magnitude number: the amount is an absolute value, and the
 // direction is the sign of the value. Here, a `shift_direction` of `1`,

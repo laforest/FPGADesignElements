@@ -13,6 +13,16 @@
 <p>This module is a building block for application-specific shifts and
  rotates. It synthesizes to LUT logic and can be quite large if not
  specialized to a particular situation.</p>
+<h2>A Warning About Shift Right and Signed Division</h2>
+<p>While a left shift by N is always equivalent to a multiplication by
+ 2<sup>N</sup> for both signed and unsigned binary integers, an arithmetic
+ shift right by N is only a truncating division by 2<sup>N</sup> for
+ <em>positive</em> binary integers. For negative integers, the result is so-called
+ modulus division, and the quotient ends up off by one in magnitude, and
+ must be corrected by adding +1, <em>but only if an odd number results as part
+ of the intermediate division steps</em>. That is, if a non-zero bit was shifted
+ out to the right.</p>
+<h2>Usage</h2>
 <p>We can treat the <code>shift_amount</code> and the <code>shift_direction</code> together as
  a signed magnitude number: the amount is an absolute value, and the
  direction is the sign of the value. Here, a <code>shift_direction</code> of <code>1</code>,
