@@ -1,0 +1,59 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dyadic Boolean Operations</title>
+</head>
+<body>
+
+<p><a href="./Dyadic_Boolean_Operations.vh">Source</a></p>
+
+<h1>List of Dyadic Boolean Truth Tables</h1>
+<p>Include this file before using a <a href="./Dyadic_Boolean_Operator.html">Dyadic Boolean
+ Operator</a>.</p>
+<p>Avoid redefinition warnings in case your CAD tool makes definitions exist
+ across files.</p>
+
+<pre>
+`ifndef DYADIC_BOOLEAN_OPERATIONS
+`define DYADIC_BOOLEAN_OPERATIONS
+</pre>
+
+<p>Number of bits to define dyadic boolean operations. These never change.</p>
+
+<pre>
+    `define DYADIC_TRUTH_TABLE_WIDTH    4
+    `define DYADIC_SELECTOR_WIDTH       2
+</pre>
+
+<p>These truth tables assume A is the most-significant bit of the index into
+ the truth table.</p>
+
+<pre>
+    `define DYADIC_ZERO         4'b0000
+    `define DYADIC_A_AND_B      4'b1000
+    `define DYADIC_A_AND_NOT_B  4'b0100
+    `define DYADIC_A            4'b1100
+    `define DYADIC_NOT_A_AND_B  4'b0010
+    `define DYADIC_B            4'b1010
+    `define DYADIC_A_XOR_B      4'b0110
+    `define DYADIC_A_OR_B       4'b1110
+    `define DYADIC_A_NOR_B      4'b0001
+    `define DYADIC_A_XNOR_B     4'b1001
+    `define DYADIC_NOT_B        4'b0101
+    `define DYADIC_A_OR_NOT_B   4'b1101
+    `define DYADIC_NOT_A        4'b0011
+    `define DYADIC_NOT_A_OR_B   4'b1011
+    `define DYADIC_A_NAND_B     4'b0111
+    `define DYADIC_ONE          4'b1111
+
+`endif
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
