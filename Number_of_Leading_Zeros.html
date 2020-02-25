@@ -1,0 +1,76 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Number of Leading Zeros</title>
+</head>
+<body>
+
+<p><a href="./Number_of_Leading_Zeros.v">Source</a></p>
+
+<h1>Number of Leading Zeros</h1>
+<p>Takes in a binary number and returns an unsigned binary number of the same
+ width containing the count of zeros from the most-significant bit down to
+ the first 1 bit (leading zeros), or the width of the word if all-zero. 
+ For example:</p>
+<ul>
+<li>11111 --&gt; 00000 (0)</li>
+<li>11000 --&gt; 00000 (0)</li>
+<li>10000 --&gt; 00000 (0)</li>
+<li>01100 --&gt; 00001 (1)</li>
+<li>00010 --&gt; 00011 (3)</li>
+<li>00000 --&gt; 00101 (5)</li>
+</ul>
+<p>We can trivially implement this at no extra hardware cost by wiring the
+ input number backwards (bit-reversed) into a <a href="./Number_of_Trailing_Zeros.html">Number of Trailing
+ Zeros</a> function.
+ Bit-reversing the input word converts the leftmost bit of interest into
+ the rightmost bit of interest, enabling us to use the right-to-left bit
+ parallelism of Extended Boolean Operations (specifically: <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">isolating the
+ rightmost 1 bit</a>).</p>
+
+<pre>
+`default_nettype none
+
+module Number_of_Leading_Zeros
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire    [WORD_WIDTH-1:0]    word_in,
+    output  wire    [WORD_WIDTH-1:0]    word_out
+);
+
+    wire [WORD_WIDTH-1:0] word_in_reversed;
+
+    Word_Reverser
+    #(
+        .WORD_WIDTH (1),
+        .WORD_COUNT (WORD_WIDTH)
+    )
+    bit_reverse
+    (
+        .words_in   (word_in),
+        .words_out  (word_in_reversed)
+    );
+
+    Number_of_Trailing_Zeros
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    calc_ntz
+    (
+        .word_in    (word_in_reversed),
+        .word_out   (word_out)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

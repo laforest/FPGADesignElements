@@ -1,0 +1,97 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Number of Trailing Zeros</title>
+</head>
+<body>
+
+<p><a href="./Number_of_Trailing_Zeros.v">Source</a></p>
+
+<h1>Number of Trailing Zeros</h1>
+<p>Takes in a binary number and returns an unsigned binary number of the same
+ width containing the count of zeros from the least-significant bit up to
+ the first 1 bit (trailing zeros), or the width of the word if all-zero. 
+ For example:</p>
+<ul>
+<li>11111 --&gt; 00000 (0)</li>
+<li>00010 --&gt; 00001 (1)</li>
+<li>01100 --&gt; 00010 (2)</li>
+<li>11000 --&gt; 00011 (3)</li>
+<li>10000 --&gt; 00011 (4)</li>
+<li>00000 --&gt; 00101 (5)</li>
+</ul>
+
+<pre>
+`default_nettype none
+
+module Number_of_Trailing_Zeros
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire    [WORD_WIDTH-1:0]    word_in,
+    output  reg     [WORD_WIDTH-1:0]    word_out
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        word_out = WORD_ZERO;
+    end
+</pre>
+
+<p>First, isolate the least-significant 1 bit</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] lsb_1;
+
+    Bitmask_Isolate_Rightmost_1_Bit
+    #(
+        .WORD_WIDTH (WORD_WIDTH)
+    )
+    find_lsb_1
+    (
+        .word_in    (word_in),
+        .word_out   (lsb_1)
+    );
+</pre>
+
+<p>A single bit is a power of two, so take its logarithm, which returns its
+ zero-based index, which is also the number of trailing zeros behind it.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0]   trailing_zero_count_raw;
+    wire                    logarithm_undefined;
+
+    Logarithm_of_Powers_of_Two
+    #(
+        .WORD_WIDTH             (WORD_WIDTH)
+    )
+    calc_bit_index
+    (
+        .one_hot_in             (lsb_1),
+        .logarithm_out          (trailing_zero_count_raw),
+        .logarithm_undefined    (logarithm_undefined)
+    );
+</pre>
+
+<p>However, there is a corner case: if the input word is all zero, then the
+ logarithm output is undefined, and the number of trailing zeros is equal
+ to WORD_WIDTH, which is a value the logarithm (base 2) can never take.</p>
+
+<pre>
+    always @(*) begin
+        word_out = (logarithm_undefined == 1'b1) ? WORD_WIDTH : trailing_zero_count_raw;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
