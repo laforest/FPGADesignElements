@@ -1,21 +1,27 @@
 
 //# True Dual-Ported RAM
 
-// Made for on-chip Block RAMs (BRAMs) and LUT-RAM.  Two read/write ports,
-// separately addressed, with a common clock.  Common data width on both
-// ports.  The READ_NEW_DATA parameter controls the behaviour of simultaneous
-// reads and writes to the same address. This is the most important parameter
-// when considering what kind of memory block the CAD tool will infer.
+// Defines a memory, of various implementation, with two read/write ports
+// (2WR), separately addressed, with a common clock.  Common data
+// width on both ports.
+// There is no synchronous clear on the output: In Quartus at least, any
+// register driving it cannot be retimed, and it may not be as portable.
+// Instead, use separate logic (e.g.: an [Annuller](./Annuller.html)) to
+// zero-out the output down the line.
 
-// `READ_NEW_DATA = 0`
-// describes a memory which returns the OLD value (in the memory) on
-// coincident read and write (no write-forwarding).
-// This is well-suited for LUT-based memory, such as MLABs.
+//## Write Forwarding
 
-// `READ_NEW_DATA = 1` (or any non-zero value)
-// describes a memory which returns NEW data (from the write) on coincident
-// read and write, usually by inferring some surrounding write-forwarding logic.
-// Good for dedicated Block RAMs, such as M10K.
+// The READ_NEW_DATA parameter control the behaviour of simultaneous reads and
+// writes to the same address. This is the most important parameter when
+// considering what kind of memory block the CAD tool will infer.
+
+// * `READ_NEW_DATA = 0` describes a memory which returns the OLD value (in the
+// memory) on coincident read and write (no write-forwarding).  This is
+// well-suited for LUT-based memory, such as MLABs.
+// * `READ_NEW_DATA = 1` (or any non-zero value) describes a memory which
+// returns NEW data (from the write) on coincident read and write, usually by
+// inferring some surrounding write-forwarding logic.  Good for dedicated
+// Block RAMs, such as M10K.
 
 // The inferred write-forwarding logic also allows the RAM to operate at
 // higher frequency, since a read corrupted by a simultaneous write to the
@@ -24,33 +30,36 @@
 // perform the write on one edge of the clock, and the read on the other,
 // which requires a longer cycle time.
 
-// If you do not want write-forwarding, but keep the high speed, at the price
-// of indeterminate behaviour on coincident read/writes, use "no_rw_check" (in
-// Quartus) as part of the RAMSTYLE (e.g.: "M10K, no_rw_check").  Depending on
-// the FPGA hardware, this may also help when returning OLD data.
+//### Quartus
 
-// **NOTE FOR QUARTUS:** set_global_assignment -name
-// ADD_PASS_THROUGH_LOGIC_TO_INFERRED_RAMS OFF to disable creation of
-// write-forwarding logic, as Quartus ignores the "no_rw_check" RAMSTYLE for
-// M10K BRAMs.
+// For Quartus, if you do not want write-forwarding, but still get the higher
+// speed at the price of indeterminate behaviour on coincident read/writes,
+// use "no_rw_check" as part of the RAMSTYLE (e.g.: "M10K, no_rw_check").
+// Depending on the FPGA hardware, this may also help when returning OLD data.
+// If that fails, add this setting to your Quartus project:
+// `set_global_assignment -name ADD_PASS_THROUGH_LOGIC_TO_INFERRED_RAMS OFF`
+// to disable creation of write-forwarding logic, as Quartus ignores the
+// "no_rw_check" RAMSTYLE for M10K BRAMs.
 
-// Also, we don't want a synchronous clear on the output: In Quartus at least,
-// any register driving it cannot be retimed, and it may not be as portable.
-// Instead, use separate logic (e.g.: an [Annuller](./Annuller.html)) to
-// zero-out the output down the line.
+//### Vivado
+
+// Vivado uses a different mechanism to control write-forwarding: set
+// RW_ADDR_COLLISION to "yes" to force the inference of write forwarding
+// logic, or "no" to prevent it. Otherwise, set it to "auto".
 
 `default_nettype none
 
 module RAM_True_Dual_Port 
 #(
-    parameter                       WORD_WIDTH      = 0,
-    parameter                       ADDR_WIDTH      = 0,
-    parameter                       DEPTH           = 0,
-    parameter                       RAMSTYLE        = "",
-    parameter                       READ_NEW_DATA   = 0,
-    parameter                       USE_INIT_FILE   = 0,
-    parameter                       INIT_FILE       = "",
-    parameter   [WORD_WIDTH-1:0]    INIT_VALUE      = 0
+    parameter                       WORD_WIDTH          = 0,
+    parameter                       ADDR_WIDTH          = 0,
+    parameter                       DEPTH               = 0,
+    parameter                       RAMSTYLE            = "",
+    parameter                       READ_NEW_DATA       = 0,
+    parameter                       RW_ADDR_COLLISION   = "",
+    parameter                       USE_INIT_FILE       = 0,
+    parameter                       INIT_FILE           = "",
+    parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0
 )
 (
     input  wire                         clock,
@@ -76,8 +85,9 @@ module RAM_True_Dual_Port
 // Set the ram style to control implementation.
 // See your CAD tool documentation for available options.
 
-    (* ramstyle  = RAMSTYLE *) // Quartus
-    (* ram_style = RAMSTYLE *) // Vivado
+    (* ramstyle             = RAMSTYLE *)           // Quartus
+    (* ram_style            = RAMSTYLE *)           // Vivado
+    (* rw_addr_collision    = RW_ADDR_COLLISION *)  // Vivado
 
 // This is the RAM array proper. Not how we access or implement it.
 
@@ -101,7 +111,7 @@ module RAM_True_Dual_Port
 // leaving the CAD tool free to infer RAM as it could. Finally, FPGA Block
 // RAMs, and their CAD tools, have since changed and may no longer infer
 // memory in the same way or have exactly the same supported behaviours in
-// hardware.  These modules should be sufficient for most purposes, but check
+// hardware.  This module should be sufficient for most purposes, but check
 // your synthesis results! 
 
 // **NOTE:** We place ports A and B in their own always blocks to express they
@@ -152,6 +162,13 @@ module RAM_True_Dual_Port
 // having to deal with an init file.  Your CAD tool may complain about too
 // many for-loop iterations if your memory is very deep. Adjust the tool
 // settings to allow more loop iterations.
+
+// At a minimum, the initialization file format is one value per line, one for
+// each memory word from 0 to DEPTH-1, in bare hexadecimal (e.g.: 0012 to init
+// a 16-bit memory word with 16'h12). Note that if your WORD_WIDTH isn't
+// a multiple of 4, the CAD tool may complain about the width mismatch.
+// You can base yourself on this Python [memory initialization file
+// generator](./RAM_generate_empty_init_file.py).
 
     generate
         if (USE_INIT_FILE == 0) begin
