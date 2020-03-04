@@ -52,7 +52,7 @@ module Bit_Reducer
 
         // verilator lint_off WIDTH
         if (OPERATION == "AND") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = &bits_in;
             end
@@ -60,7 +60,7 @@ module Bit_Reducer
         else
         // verilator lint_off WIDTH
         if (OPERATION == "NAND") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = ~&bits_in;
             end
@@ -68,7 +68,7 @@ module Bit_Reducer
         else
         // verilator lint_off WIDTH
         if (OPERATION == "OR") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = |bits_in;
             end
@@ -76,7 +76,7 @@ module Bit_Reducer
         else
         // verilator lint_off WIDTH
         if (OPERATION == "NOR") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = ~|bits_in;
             end
@@ -84,7 +84,7 @@ module Bit_Reducer
         else
         // verilator lint_off WIDTH
         if (OPERATION == "XOR") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = ^bits_in;
             end
@@ -92,7 +92,7 @@ module Bit_Reducer
         else
         // verilator lint_off WIDTH
         if (OPERATION == "XNOR") begin
-        // verilator lint_off WIDTH
+        // verilator lint_on  WIDTH
             always @(*) begin
                 bit_out = ~^bits_in;
             end
