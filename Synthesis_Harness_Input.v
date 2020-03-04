@@ -48,7 +48,6 @@ module Synthesis_Harness_Input
 )
 (
     input   wire                        clock,  
-    input   wire                        areset,
     input   wire                        clear,
     input   wire                        bit_in,
     input   wire                        bit_in_valid,
@@ -76,7 +75,6 @@ module Synthesis_Harness_Input
     (
         .clock          (clock),
         .clock_enable   (bit_in_valid),
-        .areset         (areset),
         .clear          (clear),
         .parallel_load  (1'b0),
         .parallel_in    (WORD_ZERO),

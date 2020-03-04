@@ -82,7 +82,6 @@ module Pipeline_Skid_Buffer
 )
 (
     input   wire                        clock,
-    input   wire                        areset,
     input   wire                        clear,
 
     input   wire                        input_valid,
@@ -123,7 +122,6 @@ module Pipeline_Skid_Buffer
     (
         .clock          (clock),
         .clock_enable   (data_buffer_wren),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (input_data),
         .data_out       (data_buffer_out)
@@ -146,7 +144,6 @@ module Pipeline_Skid_Buffer
     (
         .clock          (clock),
         .clock_enable   (data_out_wren),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (selected_data),
         .data_out       (output_data)
@@ -262,7 +259,6 @@ module Pipeline_Skid_Buffer
     (
         .clock          (clock),
         .clock_enable   (1'b1),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (state_next != FULL),
         .data_out       (input_ready)
@@ -279,7 +275,6 @@ module Pipeline_Skid_Buffer
     (
         .clock          (clock),
         .clock_enable   (1'b1),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (state_next != EMPTY),
         .data_out       (output_valid)
@@ -339,7 +334,6 @@ module Pipeline_Skid_Buffer
     (
         .clock          (clock),
         .clock_enable   (1'b1),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (state_next),
         .data_out       (state)

@@ -51,7 +51,6 @@ module Synthesis_Harness_Output
 )
 (
     input       wire                        clock,
-    input       wire                        areset,
     input       wire                        clear,
     input       wire    [WORD_WIDTH-1:0]    word_in,
     input       wire                        word_in_valid,
@@ -85,7 +84,6 @@ module Synthesis_Harness_Output
     (
         .clock          (clock),
         .clock_enable   (word_in_valid),
-        .areset         (areset),
         .clear          (clear),
         .parallel_load  (1'b0),
         .parallel_in    (WORD_ZERO),

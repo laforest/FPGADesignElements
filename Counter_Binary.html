@@ -13,9 +13,8 @@
 <p>This counter counts by the <code>INCREMENT</code> parameter value, up or down, when
  <code>run</code> is high.  Set <code>up_down</code> to 0 to count up, or to 1 to count down.
  Load overrides counting, so you can load a <code>load_count</code> value even if <code>run</code>
- is low.  <code>areset</code> puts the counter back at INITIAL_COUNT (<em>use only at
- reset!</em>), as does <code>clear</code> (use during operation).  The counter will wrap
- around if it goes below zero or above (2^WORD_WIDTH)-1.</p>
+ is low.  <code>clear</code> puts the counter back at INITIAL_COUNT.  The counter will
+ wrap around if it goes below zero or above (2^WORD_WIDTH)-1.</p>
 <p>The <code>INCREMENT</code> parameter allows you to deal with situations where, for
  example, you need to count the number of bytes transferred, but your
  interface transfers multiple bytes per cycle.</p>
@@ -35,7 +34,6 @@ module Counter_Binary
 )
 (
     input   wire                        clock,
-    input   wire                        areset,
     input   wire                        clear,
     input   wire                        up_down,
     input   wire                        run,
@@ -97,7 +95,6 @@ module Counter_Binary
     (
         .clock          (clock),
         .clock_enable   (clock_enable),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (next_count),
         .data_out       (count)

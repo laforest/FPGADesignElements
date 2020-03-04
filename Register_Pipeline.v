@@ -31,9 +31,9 @@
 
 // The `RESET_VALUES` parameter allows each pipeline stage to start loaded
 // with a known initial value, which can simplify system startup. The pipeline
-// will also areset or clear to the same values. Set `RESET_VALUES` to the
-// concatenation of all initial/reset values, with the rightmost value being
-// the first one (at the least-significant bit (LSB)).
+// will also clear to the same values. Set `RESET_VALUES` to the concatenation
+// of all initial/reset values, with the rightmost value being the first one
+// (at the least-significant bit (LSB)).
 
 
 `default_nettype none
@@ -51,7 +51,6 @@ module Register_Pipeline
 (
     input   wire                        clock,
     input   wire                        clock_enable,
-    input   wire                        areset,
     input   wire                        clear,
     input   wire                        parallel_load,
     input   wire    [TOTAL_WIDTH-1:0]   parallel_in,
@@ -102,7 +101,6 @@ module Register_Pipeline
     (
         .clock          (clock),
         .clock_enable   (clock_enable),
-        .areset         (areset),
         .clear          (clear),
         .data_in        (pipe_stage_in[0]),
         .data_out       (pipe_stage_out[0])
@@ -148,7 +146,6 @@ module Register_Pipeline
             (
                 .clock          (clock),
                 .clock_enable   (clock_enable),
-                .areset         (areset),
                 .clear          (clear),
                 .data_in        (pipe_stage_in[i]),
                 .data_out       (pipe_stage_out[i])
