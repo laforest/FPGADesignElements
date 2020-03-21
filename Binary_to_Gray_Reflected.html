@@ -1,0 +1,89 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary to Gray Reflected</title>
+</head>
+<body>
+
+<p><a href="./Binary_to_Gray_Reflected.v">Source</a></p>
+
+<h1>Binary to Gray (Reflected Binary)</h1>
+<p><em>(This code was contributed by Jeff Cassidy at Isophase Computing
+ (<a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#106;&#101;&#102;&#102;&#64;&#105;&#115;&#111;&#112;&#104;&#97;&#115;&#101;&#45;&#99;&#111;&#109;&#112;&#117;&#116;&#105;&#110;&#103;&#46;&#99;&#97;">&#106;&#101;&#102;&#102;&#64;&#105;&#115;&#111;&#112;&#104;&#97;&#115;&#101;&#45;&#99;&#111;&#109;&#112;&#117;&#116;&#105;&#110;&#103;&#46;&#99;&#97;</a>, <a href="https://github.com/isophase">https://github.com/isophase</a>), with edits
+ by myself.)</em></p>
+<p>Converts an unsigned binary number to the corresponding Reflected Binary
+ <a href="https://en.wikipedia.org/wiki/Gray_code">Gray Code</a>.</p>
+<p>A Reflected Binary Gray Code starts from a simple 1-bit sequence 0,1 and
+ can be constructed recursively for larger bit widths N. The sequence for
+ N bits is build as follows:</p>
+<ul>
+<li>The sequence of N-1 bits with 0 prepended to each element, concatenated with</li>
+<li>the sequence of N-1 bits <em>reversed</em> with 1 prepended to each element</li>
+</ul>
+<p>For example:</p>
+<ul>
+<li>N=1 bit: 0, 1</li>
+<li>N=2 bits: 00, 01, 11, 10 </li>
+<li>N=3 bits: 000, 001, 011, 010, 110, 111, 101, 100</li>
+</ul>
+<p>The resulting Reflected Binary Gray Code has two useful properties:</p>
+<ul>
+<li>It is cyclic with length 2<sup>N</sup>, so it can represent or index the
+ same number of items as a binary coded number of the same length.</li>
+<li>Each Gray code word differs by exactly 1 bit from the previous and the
+ next code in sequence, which makes it behave nicely if a word may be read
+ inaccurately from a mechanical indicator or a Clock Domain Crossing.
+ Missing the changed bit means you are off by 1 step, not some variable
+ number of steps as with a binary code.</li>
+</ul>
+<p>The <a href="./Gray_to_Binary_Reflected.html">reverse function</a> also exists.</p>
+
+<pre>
+`default_nettype none
+
+module Binary_to_Gray_Reflected
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input  wire [WORD_WIDTH-1:0]  binary_in,
+    output reg  [WORD_WIDTH-1:0]  gray_out
+);
+
+    localparam ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        gray_out = ZERO;
+    end
+
+    function [WORD_WIDTH-1:0] binary_to_gray
+    (
+        input [WORD_WIDTH-1:0] binary
+    );
+        integer i;
+        reg [WORD_WIDTH-1:0] gray;
+
+        for(i=0; i < WORD_WIDTH-1; i=i+1) begin
+            gray[i] = binary[i] ^ binary[i+1];
+        end
+
+        gray[WORD_WIDTH-1] = binary[WORD_WIDTH-1];
+
+        binary_to_gray = gray;
+    endfunction
+    
+    always@(*) begin
+        gray_out = binary_to_gray(binary_in);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
