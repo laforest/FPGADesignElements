@@ -27,7 +27,7 @@ module Counter_Binary
 (
     input   wire                        clock,
     input   wire                        clear,
-    input   wire                        up_down,
+    input   wire                        up_down, // 0/1 --> up/down
     input   wire                        run,
     input   wire                        load,
     input   wire    [WORD_WIDTH-1:0]    load_count,
