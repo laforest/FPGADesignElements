@@ -1,0 +1,80 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Width Adjuster</title>
+</head>
+<body>
+
+<p><a href="./Width_Adjuster.v">Source</a></p>
+
+<h1>Width Adjuster</h1>
+<p>Takes in a vector of a given input width, a flag denoting if it is
+ a signed/unsigned value, and an output width. Outputs the same vector
+ extended or truncated to the output width, with signed/unsigned extension.
+ <strong>There is no guard against truncating so much you lose significant bits.</strong></p>
+<p>You would use this to normalize binary integers to the same <em>constant</em>
+ width before doing arithmetic or Boolean operations upon them.  The <a href="./max_function.html">max
+ function</a> is handy for this when you don't know the
+ widths ahead of time (e.g.: when they depend on another module parameter).</p>
+
+<pre>
+`default_nettype none
+
+module Width_Adjuster
+#(
+    parameter WORD_WIDTH_IN     = 0,
+    parameter SIGNED            = 0,
+    parameter WORD_WIDTH_OUT    = 0
+)
+(
+    // It's possible some input bits are truncated away
+    // verilator lint_off UNUSED
+    input   wire    [WORD_WIDTH_IN-1:0]     original_input,
+    // verilator lint_on  UNUSED
+    output  reg     [WORD_WIDTH_OUT-1:0]    adjusted_output
+);
+</pre>
+
+<p>Calculate the width difference and handle each possible case:</p>
+<ul>
+<li>Zero: we wire the input to the output</li>
+<li>Larger: we sign-extend the input with a pad</li>
+<li>Smaller: we truncate the input</li>
+</ul>
+
+<pre>
+    localparam PAD_WIDTH = WORD_WIDTH_OUT - WORD_WIDTH_IN;
+
+    generate
+        if (PAD_WIDTH == 0) begin: zero
+            always @(*) begin
+                adjusted_output = original_input;
+            end
+        end
+
+        if (PAD_WIDTH > 0) begin: sign_extend
+            localparam PAD_ZERO = {PAD_WIDTH{1'b0}};
+            localparam PAD_ONES = {PAD_WIDTH{1'b1}};
+            always @(*) begin
+                adjusted_output = ((SIGNED != 0) && (original_input[WORD_WIDTH_IN-1] == 1'b1)) ? {PAD_ONES, original_input} : {PAD_ZERO, original_input};
+            end
+        end
+
+        if (PAD_WIDTH < 0) begin: truncate
+            always @(*) begin
+                adjusted_output = original_input [WORD_WIDTH_OUT-1:0];
+            end
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

@@ -1,0 +1,51 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>max function</title>
+</head>
+<body>
+
+<p><a href="./max_function.vh">Source</a></p>
+
+<h1>Max of two signed integers</h1>
+<p>Takes two signed integers and returns the most positive of the two, or
+ <code>in_A</code> if equal. For example:</p>
+<ul>
+<li>max(5,5) returns 5</li>
+<li>max(5,6) returns 6</li>
+<li>max(6,5) returns 6</li>
+<li>max(-6,5) returns 5</li>
+<li>max(-6,-7) returns -6</li>
+</ul>
+<p>Bring in the function at the start of the body of your module like so:</p>
+<pre><code>`include "max_function.vh"
+</code></pre>
+<p>Pass the function a value which, at elaboration time, is either a constant
+ or an expression which evaluates to a constant. Then use that value as an
+ integer for a localparam, genvar, etc...</p>
+<p>This function is handy when you have words of different parameterized widths
+ and you want to scale then all to the width of the largest word (see: <a href="./Width_Adjuster.html">Width
+ Adjuster</a>).</p>
+
+<pre>
+function integer max;
+    input integer in_A;
+    input integer in_B;
+    begin
+        if (in_A >= in_B) begin
+            max = in_A;
+        end else begin
+            max = in_B;
+        end
+    end
+endfunction
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
