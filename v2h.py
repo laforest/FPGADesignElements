@@ -42,8 +42,8 @@ footer = """<hr>
 """
 
 def base_filename(filename):
-    """Strip Verilog filename extension"""
-    return filename.rstrip(".vh")
+    """Strip Verilog filename extensions"""
+    return filename.replace(".vh", "").replace(".v", "")
 
 def output_filename(filename):
     """Convert input Verilog filename to output HTML filename"""
