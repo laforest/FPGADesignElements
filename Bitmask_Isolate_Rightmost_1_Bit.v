@@ -6,8 +6,9 @@
 // Use the following formula to isolate the rightmost 1-bit, producing 0 if
 // none (e.g., 01011000 -> 00001000)
 
-// This function can trivially implement a priority arbiter, with the highest
-// priority given to the least-significant bit.
+// This function can trivially implement a [Priority
+// Arbiter](./Priority_Arbiter.html), with the highest priority given to the
+// least-significant bit.
 
 `default_nettype none
 
