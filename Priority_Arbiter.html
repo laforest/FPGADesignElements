@@ -36,7 +36,7 @@ module Priority_Arbiter
 )
 (
     input   wire    [WORD_WIDTH-1:0]    requests,
-    output  reg     [WORD_WIDTH-1:0]    grant
+    output  wire    [WORD_WIDTH-1:0]    grant
 );
 
     Bitmask_Isolate_Rightmost_1_Bit
