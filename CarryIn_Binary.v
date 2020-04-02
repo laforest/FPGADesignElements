@@ -28,7 +28,7 @@ module CarryIn_Binary
 );
 
     initial begin
-        carryin = 1'b0;
+        carryin = {WORD_WIDTH{1'b0}};
     end
 
 // Re-add the two integers without carries, which is merely XOR, then compare
