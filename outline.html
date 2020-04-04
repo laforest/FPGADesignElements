@@ -23,6 +23,19 @@ and gradually increase in complexity up to complete interfaces and
 special-purpose engines built using a common design form which heavily re-use
 other design elements.</p>
 
+<div class="bordered">
+
+<p><b>IMPORTANT:</b> The module definitions are, by design, not usable as-is.
+Unless the design requires some minimum or constant value, all module
+parameters have a default value of 0 or an empty string. This is intentional,
+so when a user forgets to set a parameter when instantiating a module,
+synthesis will (almost always) fail, and linting also. Putting usable default
+values in the module definitions might not get noticed and cause bugs. This
+means the modules are not synthesizable as defined, but must be instantiated
+separately to set the parameters, which is what one normally does anyway.
+
+</div>
+
 <p>Each entry web page is <a href="./tools.html">generated directly</a> from
 the design element Verilog source, and you can find a link to the source at the
 top of each page.  Comments form the text body, while the code is placed in

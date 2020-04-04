@@ -16,6 +16,15 @@ then access [index.html](./index.html) from your favourite browser.
 All files are in one directory, so you can use it as a library in your CAD
 tools by simply importing all Verilog files.
 
+**IMPORTANT:** The module definitions are, by design, not usable as-is.
+Unless the design requires some minimum or constant value, all module
+parameters have a default value of 0 or an empty string. This is intentional,
+so when a user forgets to set a parameter when instantiating a module,
+synthesis will (almost always) fail, and linting also. Putting usable default
+values in the module definitions might not get noticed and cause bugs. This
+means the modules are not synthesizable as defined, but must be instantiated
+separately to set the parameters, which is what one normally does anyway.
+
 See [LICENSE](./LICENSE) for the details, but overall, you are free to use this
 book as you please.
 
