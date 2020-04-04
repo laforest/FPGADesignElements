@@ -349,7 +349,7 @@ variables all over a module, and all too often, as an amorphous large number of
 assigns to define logic followed by a single always block to register all the
 outputs. These coding styles make it hard to see the underlying design, and
 make the implementation hard to control for size and performance. There are
-exactly two cases where you must use assign:
+exactly three cases where you must use assign:
 
 <ol>
 
@@ -359,12 +359,11 @@ OBUFT, etc...).
 
 <p><em>Inferring a tri-state I/O like this may fail if the module is not at the
 top-level of the design. I have been bitten by this in Vivado, where it created
-an AND gate instead of a tri-state buffer. Thus, unless you can't for some
-reason, implement the I/O blocks directly using the CAD vendor modules, which
-will instantiate correctly regardless of location in the design hierarchy. This
-is also a reason why FPGA-specific I/O ports <a
-href="./system.html#adapter">should be instantiated in their own enclosing
-Adapter module</a>.</em>
+an AND gate instead of a tri-state buffer. Thus, if possible, implement the I/O
+blocks directly using the CAD vendor modules, which will instantiate correctly
+regardless of location in the design hierarchy. This is also a reason why
+FPGA-specific I/O ports <a href="./system.html#adapter">should be instantiated
+in their own enclosing Adapter module</a>.</em>
 
 <pre>
 localparam WORD_WIDTH       = 36;
@@ -380,14 +379,28 @@ assign tristate_bus = (output_enable == 1'b1) ? data_out : WORD_TRISTATE;
 <li>When connecting two wires whose generation you do not control (else you
 could create only one wire for the connection). This is a rare case which
 usually happens when a module in a <code>generate</code> block is not
-conditionally instantiated, and you must connect the dangling wires. Using
-<code>assign</code> is also discouraged since it affects Verilog event queueing
-in simulation, which can cause impossible behaviour if the two wires are clock
-lines and the associated data lasts only a single cycle, causing some data
-transitions to be missed.
+conditionally instantiated, and you must connect the dangling wires. 
 
-<p>(<i>If this behaviour shows up in vendor IP, an ugly workaround is to delay
-the data into the IP by #1. I'm working on a more general solution.</i>)
+<li>When a combinational procedural block contains only constant values on the
+right hand side. For example:
+
+<pre>
+reg foo;
+always @(*) begin
+    foo = 1'b0;
+end
+</pre>
+
+<p>Since there can be no clock edge event or value change event of a right hand
+side value to trigger the procedural block, it is possible that the assignment
+never happens, depending on the interpretation of the CAD tool. This example is
+contrived, but such a situation will occur if you have a module output port
+which is both a register and outputs a constant. Since you cannot initialize a
+register in a port definition, you would have to use a combinational always
+block as shown above, with the consequent ambiguity in meaning. Thus, change
+the output port to a wire and assign the constant value to it.  <em>(This
+corner case was pointed out (and fixed!) by <a
+href="http://www.linkedin.com/in/rodrigoalejandromelo">Rodrigo Melo</a>.)</em>
 
 </ol>
 
