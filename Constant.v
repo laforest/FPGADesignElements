@@ -6,6 +6,9 @@
 // such as Xilinx's IPI (IP Integrator), where you may need to feed an IP
 // block a constant value.
 
+// This is also a [rare corner case where `assign` must be
+// used](./verilog.html#assign).
+
 `default_nettype none
 
 module Constant
