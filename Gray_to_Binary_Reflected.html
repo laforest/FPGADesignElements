@@ -46,13 +46,15 @@ module Gray_to_Binary_Reflected
         integer i;
         reg [WORD_WIDTH-1:0] binary;
 
-        binary[WORD_WIDTH-1] = gray[WORD_WIDTH-1];
+        begin
+            binary[WORD_WIDTH-1] = gray[WORD_WIDTH-1];
 
-        for(i=WORD_WIDTH-2; i >= 0; i=i-1) begin
-            binary[i] = binary[i+1] ^ gray[i];
+            for(i=WORD_WIDTH-2; i >= 0; i=i-1) begin
+                binary[i] = binary[i+1] ^ gray[i];
+            end
+
+            gray_to_binary = binary;
         end
-
-        gray_to_binary = binary;
     endfunction
 
     always@(*) begin
