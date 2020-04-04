@@ -14,16 +14,10 @@ module Constant
     parameter VALUE         = 0
 )
 (
-    output  reg     [WORD_WIDTH-1:0]    constant_out
+    output wire [WORD_WIDTH-1:0] constant_out
 );
 
-    initial begin
-        constant_out = VALUE;
-    end
-
-    always @(*) begin
-        constant_out = VALUE;
-    end
+    assign constant_out = VALUE;
 
 endmodule
 
