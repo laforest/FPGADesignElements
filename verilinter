@@ -1,11 +1,19 @@
 #! /bin/bash
 
 # Lint files as Verilog-2001, finding submodules as needed in the current directory
+# We check with both Verilator and Icarus Verilog since they catch different things.
 
 ALL_FILES=$@
 
 for FILE in ${ALL_FILES}
 do
-    verilator -Wall +1364-2001ext+v -y . --lint-only ${FILE}
+    echo
+    echo "*** VERILATOR LINT ***"
+    verilator -Wall +1364-2001ext+v -y . --lint-only  ${FILE}
+    echo
+    echo
+    echo "*** ICARUS VERILOG LINT ***"
+    iverilog  -Wall -g2001          -y . -o /dev/null ${FILE}
+    echo
 done
 
