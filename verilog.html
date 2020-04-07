@@ -111,9 +111,13 @@ provided source file:
 
 <h3>Initialization and Logic Values</h3>
 
+<a name="init"></a>
+
 <p>Use only <code>reg</code> and <code>wire</code> types. All signals are
 registers except where a wire is mandatory: module input ports, connecting
-module ports together, and inferring tri-state I/O.
+module ports together, inferring tri-state I/O, and some rare constant
+assignments.  <em>(See <a href="#assign">Assign Statements</a> for
+details.)</em>
 
 <p>Only use <code>0,1,X,Z</code> values, and avoid X and Z if at all possible.
 All registers must be initialized (and reset, if necessary) with a value which
@@ -121,8 +125,19 @@ does not contain X or Z, either at definition or using an <code>initial</code>
 block. Do not assign X to registers or wires, as X propagation will make
 testing difficult, and isn't supported in 2-state simulators (e.g.: Verilator).
 Instead, have a default catch-all or fall-through logic expression which takes
-effect when all others don't. The same idea applies to Boolean tests. Z is
-only used to define tri-state I/O.
+effect when all others don't. The same idea applies to Boolean tests. Z is only
+used to define tri-state I/O, and only if the CAD vendor does not provide
+tri-state I/O primitives, as the inference is unreliable.
+
+<p><em>Never assign a value to wires</em>, either using an explicit <a
+href="#assign">assign</a> statement or an implicit initial assignment (e.g.:
+<code>wire foo = bar;</code>). Assigning a wire an initial value can cause
+problem if you then mistakenly connect that wire to a module port output,
+leading to multiple drivers on the wire and surprise X's in your simulation.
+This situation easily happens if you convert a <code>reg</code> to a
+<code>wire</code>, because the signal source is now in a module, and you forget
+to remove the initial assignment on the <code>reg</code> (usually a zero).
+
 
 <h3>Parameterization</h3>
 
@@ -344,12 +359,14 @@ both VHDL and Verilog for naming ports, variables, etc...
 <h3>Assign Statements</h3>
 
 <p>Avoid the use of <code>assign</code> statements, except where demanded by
-Verilog, as it favours poor coding style. I have seen assigns used as global
-variables all over a module, and all too often, as an amorphous large number of
-assigns to define logic followed by a single always block to register all the
-outputs. These coding styles make it hard to see the underlying design, and
-make the implementation hard to control for size and performance. There are
-exactly three cases where you must use assign:
+Verilog, as their use makes it hard to see the underlying design, and make the
+implementation hard to control for size and performance. I have seen assigns
+used as global variables all over a module, and all too often, as an amorphous
+large number of assigns to describe the logic followed by a single always block
+to register all the outputs. <em>(See also <a href="#init">Initialization and
+Logic Values</a> for other assignment cases to avoid.)</em>
+
+<p>There are exactly three cases where you must use assign:
 
 <ol>
 
@@ -400,7 +417,7 @@ register in a port definition, you would have to use a combinational always
 block as shown above, with the consequent ambiguity in meaning. Thus, change
 the output port to a wire and assign the constant value to it.  <em>(This
 corner case was pointed out (and fixed!) by <a
-href="http://www.linkedin.com/in/rodrigoalejandromelo">Rodrigo Melo</a>.)</em>
+href="https://twitter.com/rodrigomelo9ok">Rodrigo Melo</a>.)</em>
 
 </ol>
 
