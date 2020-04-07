@@ -13,7 +13,7 @@ do
     echo
     echo
     echo "*** ICARUS VERILOG LINT ***"
-    iverilog  -Wall -g2001          -y . -o /dev/null ${FILE}
+    iverilog  -Wall -Wno-sensitivity-entire-vector -Wno-sensitivity-entire-array -g2001 -y . -o /dev/null ${FILE}
     echo
 done
 
