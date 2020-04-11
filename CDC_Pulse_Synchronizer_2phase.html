@@ -1,0 +1,221 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CDC Pulse Synchronizer 2phase</title>
+</head>
+<body>
+
+<p><a href="./CDC_Pulse_Synchronizer_2phase.v">Source</a></p>
+
+<h1>Clock Domain Crossing (CDC) Pulse Synchronizer (2-phase handshake)</h1>
+<p>Reliably passes a synchronous posedge pulse from one clock domain to
+ another when we don't know anything about the relative clock frequencies or
+ the pulse duration. <em>Uses a 2-phase asychronous handshake.</em></p>
+<p>The recommended input is a single-cycle pulse in the sending clock domain.
+ Adjust the output pulse length (in receiving clock cycles) with the
+ RECV_PULSE_LENGTH parameter.</p>
+<div class="bordered">
+
+<p>For comparison, have a look at the <a href="./CDC_Pulse_Synchronizer_4phase.html">4-phase handshake Pulse
+ Synchronizer</a>. It has slightly
+ simpler hardware, but a more complex handshake leading to double the
+ latency across clock domains, so it can only accept input pulses at half
+ the maximum rate of this 2-phase implementation. </p>
+</div>
+
+<h2>Theory of Operation</h2>
+<p>We can't simply use a <a href="./CDC_Synchronizer.html">CDC Synchronizer</a> to pass
+ a pulse of unknown duration between clock domains of unknown relation, as
+ the receiving clock may not be able to sample the pulse correctly. So, we
+ solve this by:</p>
+<ul>
+<li>first using the incoming pulse to toggle a register and disable
+ further toggles,</li>
+<li>synchronizing the output of that toggle register into the receiving clock domain,</li>
+<li>using that synchronized toggle signal to generate a pulse (on any toggle
+ edge) in the receiving clock domain,</li>
+<li>synchronizing that toggle signal back into the sending clock domain,</li>
+<li>using that synchronized toggle signal to re-enable the toggle register</li>
+</ul>
+<p>Once the initial signal and its response both reach the same value, the
+ system is back into one of its two rest states, ready to receive another
+ input pulse. This process of toggling a signal, then waiting for the
+ response to also toggle into the same state, is a 2-phase asynchronous
+ handshake. It does not depend on the timing of the signals, only their
+ sequence.</p>
+<h2>Input Pulse Frequency Limit</h2>
+<p>The time taken for the 2-phase handshake to complete puts an upper limit on
+ the input pulse rate, that also depends on the receiving clock frequency.
+ If we exceed this rate, input pulses will be lost, as the input toggle
+ register will have not been re-enabled yet.</p>
+<p>At the upper limit, when the receiving clock frequency is fast enough to be
+ "infinite" from the point of view of the sending clock (i.e.: the handshake
+ response arrives soon enough within a single cycle of the sending clock to
+ meet setup timing), then we only need to sum up the latencies on the sending
+ clock side:</p>
+<ol>
+<li>Toggling the input register (and disabling it): 1 cycle</li>
+<li>CDC into the receving clock domain: 0 cycles</li>
+<li>CDC back into the sending clock domain: 3 cycles (worst case)</li>
+<li>The input toggle register is now re-enabled and can receive a new input
+ pulse..</li>
+</ol>
+<p>Since re-enabling the toggle register and receiving an input pulse can
+ happen in the same cycle, there must be <em>at an absolute minimum</em> 3 idle
+ sending clock cycles between input pulses, or one input pulse every 4th
+ sending clock cycle.  Fortunately, we don't have to compute inter-pulse
+ delays for every possible sending to receiving clock frequency ratio
+ a system will encounter. The toggle register enabling logic also acts as
+ a <code>ready</code> output on the sending side by noting when both the initial
+ sending level and the returned response are at the same value, denoting
+ a system at rest ready for the next 2-phase handshake.</p>
+
+<pre>
+`default_nettype none
+
+module CDC_Pulse_Synchronizer_2phase
+#(
+    parameter RECV_PULSE_LENGTH = 1, // 1 or greater
+    parameter CDC_EXTRA_DEPTH   = 0
+)
+(
+    input   wire    sending_clock,
+    input   wire    sending_clear,
+    input   wire    sending_pulse_in,
+    output  reg     sending_ready,
+
+    input   wire    receiving_clock,
+    input   wire    receiving_clear,
+    output  wire    receiving_pulse_out
+);
+</pre>
+
+<p>Cleanup the input pulse to a single cycle pulse, so we cannot have
+ a situation where the 2-phase handshake has completed and a long input pulse
+ is still high, causing a second toggle and thus a second pulse in the
+ receiving clock domain.</p>
+<p>NOTE: It's possible to replace the Pulse_Generator with a a couple of AND
+ and NOT gates, but this saves no logic (only a register), and makes this
+ part of the design much harder to understand.</p>
+
+<pre>
+    wire cleaned_pulse_in;
+
+    Pulse_Generator
+    #(
+        .PULSE_LENGTH   (1),
+        .EDGE_TYPE      ("POS")
+    )
+    pulse_cleaner
+    (
+        .clock          (sending_clock),
+        .clock_enable   (1'b1),
+        .clear          (sending_clear),
+        .level_in       (sending_pulse_in),
+        .pulse_out      (cleaned_pulse_in)
+    );
+</pre>
+
+<p>Now use that single-cycle pulse to toggle a register, signalling the start
+ of a 2-phase asynchronous handshake. We feed the output back to the input
+ to keep the register output static when not toggling.</p>
+<p>NOTE: <code>clear</code> cannot be used here: if the toggle register happens to have
+ a high output, and we clear it, this will start a spurious 2-phase
+ handshake and generate a spurious pulse in the receiving clock domain. Even
+ if we could guarantee that the logic in both the sending and receiving
+ clock domains would be cleared together, we can't be sure when each clear
+ will take effect, and so the spurious pulse could have side-effects.</p>
+
+<pre>
+    wire toggle_response;
+    reg  enable_toggle = 1'b0;
+    wire sending_toggle;
+
+    Register_Toggle
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    start_handshake
+    (
+        .clock          (sending_clock),
+        .clock_enable   (enable_toggle),
+        .clear          (1'b0),
+        .toggle         (cleaned_pulse_in),
+        .data_in        (sending_toggle),
+        .data_out       (sending_toggle)
+    );
+</pre>
+
+<p>When the toggle and its response have the same value, the 2-phase handshake
+ is complete and we are ready to toggle again.</p>
+
+<pre>
+    always @(*) begin
+        enable_toggle = (sending_toggle == toggle_response);
+        sending_ready = enable_toggle;
+    end
+</pre>
+
+<p>Pass the toggle signal to the receiving clock domain</p>
+
+<pre>
+    wire receiving_toggle;
+
+    CDC_Synchronizer
+    #(
+        .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
+    )
+    to_receiving
+    (
+        .receiving_clock    (receiving_clock),
+        .bit_in             (sending_toggle),
+        .bit_out            (receiving_toggle)
+    );
+</pre>
+
+<p>Now pass the synchronized toggle signal back to the sending clock domain to
+ signal that the CDC is complete and to re-enable the toggle register.</p>
+
+<pre>
+    CDC_Synchronizer
+    #(
+        .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
+    )
+    to_sending
+    (
+        .receiving_clock    (sending_clock),
+        .bit_in             (receiving_toggle),
+        .bit_out            (toggle_response)
+    );
+</pre>
+
+<p>Finally, convert the receiving toggle to a pulse in the receiving clock domain.
+ We generate an output pulse on either of the toggle transitions.</p>
+
+<pre>
+    Pulse_Generator
+    #(
+        .PULSE_LENGTH   (RECV_PULSE_LENGTH),
+        .EDGE_TYPE      ("ANY")
+    )
+    receiving_toggle_to_pulse
+    (
+        .clock          (receiving_clock),
+        .clock_enable   (1'b1),
+        .clear          (receiving_clear),
+        .level_in       (receiving_toggle),
+        .pulse_out      (receiving_pulse_out)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
