@@ -75,7 +75,7 @@
 <pre>
 `default_nettype none
 
-module CDC_Pulse_Synchronizer_2phase
+module <a href="./CDC_Pulse_Synchronizer_2phase.html">CDC_Pulse_Synchronizer_2phase</a>
 #(
     parameter RECV_PULSE_LENGTH = 1, // 1 or greater
     parameter CDC_EXTRA_DEPTH   = 0
@@ -103,7 +103,7 @@ module CDC_Pulse_Synchronizer_2phase
 <pre>
     wire cleaned_pulse_in;
 
-    Pulse_Generator
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
     #(
         .PULSE_LENGTH   (1),
         .EDGE_TYPE      ("POS")
@@ -133,7 +133,7 @@ module CDC_Pulse_Synchronizer_2phase
     reg  enable_toggle = 1'b0;
     wire sending_toggle;
 
-    Register_Toggle
+    <a href="./Register_Toggle.html">Register_Toggle</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -164,7 +164,7 @@ module CDC_Pulse_Synchronizer_2phase
 <pre>
     wire receiving_toggle;
 
-    CDC_Synchronizer
+    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -180,7 +180,7 @@ module CDC_Pulse_Synchronizer_2phase
  signal that the CDC is complete and to re-enable the toggle register.</p>
 
 <pre>
-    CDC_Synchronizer
+    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -196,7 +196,7 @@ module CDC_Pulse_Synchronizer_2phase
  We generate an output pulse on either of the toggle transitions.</p>
 
 <pre>
-    Pulse_Generator
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
     #(
         .PULSE_LENGTH   (RECV_PULSE_LENGTH),
         .EDGE_TYPE      ("ANY")

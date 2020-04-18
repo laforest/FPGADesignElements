@@ -38,7 +38,7 @@
  should notice...</p>
 
 <pre>
-module Demultiplexer_Binary
+module <a href="./Demultiplexer_Binary.html">Demultiplexer_Binary</a>
 #(
     parameter       BROADCAST           = 0,
     parameter       WORD_WIDTH          = 0,
@@ -63,7 +63,7 @@ module Demultiplexer_Binary
 <pre>
     wire [OUTPUT_COUNT-1:0] selector_one_hot;
 
-    Binary_to_One_Hot
+    <a href="./Binary_to_One_Hot.html">Binary_to_One_Hot</a>
     #(
         .BINARY_WIDTH   (ADDR_WIDTH),
         .OUTPUT_WIDTH   (OUTPUT_COUNT)
@@ -78,7 +78,7 @@ module Demultiplexer_Binary
 <p>Then use that one-hot selector to steer the input to a particular output.</p>
 
 <pre>
-    Demultiplexer_One_Hot
+    <a href="./Demultiplexer_One_Hot.html">Demultiplexer_One_Hot</a>
     #(
         .BROADCAST      (BROADCAST),
         .WORD_WIDTH     (WORD_WIDTH),

@@ -32,7 +32,7 @@
 <pre>
 `default_nettype none
 
-module Priority_Encoder
+module <a href="./Priority_Encoder.html">Priority_Encoder</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -54,7 +54,7 @@ module Priority_Encoder
 <pre>
     wire [WORD_WIDTH-1:0] lsb_1;
 
-    Bitmask_Isolate_Rightmost_1_Bit
+    <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -71,7 +71,7 @@ module Priority_Encoder
 <pre>
     wire logarithm_undefined;
 
-    Logarithm_of_Powers_of_Two
+    <a href="./Logarithm_of_Powers_of_Two.html">Logarithm_of_Powers_of_Two</a>
     #(
         .WORD_WIDTH             (WORD_WIDTH)
     )

@@ -76,7 +76,7 @@ data  --&gt;|             |--&gt; data
 <pre>
 `default_nettype none
 
-module Pipeline_Skid_Buffer
+module <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -112,7 +112,7 @@ module Pipeline_Skid_Buffer
     reg                     data_buffer_wren = 1'b0; // EMPTY at start, so don't load.
     wire [WORD_WIDTH-1:0]   data_buffer_out;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (WORD_ZERO)
@@ -134,7 +134,7 @@ module Pipeline_Skid_Buffer
         selected_data = (use_buffered_data == 1'b1) ? data_buffer_out : input_data;
     end
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (WORD_ZERO)
@@ -244,7 +244,7 @@ module Pipeline_Skid_Buffer
 <p>Compute <code>ready</code> for the input interface</p>
 
 <pre>
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b1) // EMPTY at start, so accept data
@@ -262,7 +262,7 @@ module Pipeline_Skid_Buffer
 <p>Compute <code>valid</code> for the output interface</p>
 
 <pre>
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -326,7 +326,7 @@ module Pipeline_Skid_Buffer
         state_next = (unload == 1'b1) ? EMPTY : state_next;
     end
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (STATE_BITS),
         .RESET_VALUE    (EMPTY)         // Initial state

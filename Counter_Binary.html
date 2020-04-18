@@ -26,7 +26,7 @@
 <pre>
 `default_nettype none
 
-module Counter_Binary
+module <a href="./Counter_Binary.html">Counter_Binary</a>
 #(
     parameter                   WORD_WIDTH      = 0,
     parameter [WORD_WIDTH-1:0]  INCREMENT       = 0,
@@ -56,7 +56,7 @@ module Counter_Binary
 <pre>
     wire [WORD_WIDTH-1:0] incremented_count;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -86,7 +86,7 @@ module Counter_Binary
 <p>Finally, store the next count value, using a <a href="./Register.html">Register</a>.</p>
 
 <pre>
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (INITIAL_COUNT)

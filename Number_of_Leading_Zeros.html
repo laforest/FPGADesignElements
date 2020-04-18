@@ -33,7 +33,7 @@
 <pre>
 `default_nettype none
 
-module Number_of_Leading_Zeros
+module <a href="./Number_of_Leading_Zeros.html">Number_of_Leading_Zeros</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -44,7 +44,7 @@ module Number_of_Leading_Zeros
 
     wire [WORD_WIDTH-1:0] word_in_reversed;
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (1),
         .WORD_COUNT (WORD_WIDTH)
@@ -55,7 +55,7 @@ module Number_of_Leading_Zeros
         .words_out  (word_in_reversed)
     );
 
-    Number_of_Trailing_Zeros
+    <a href="./Number_of_Trailing_Zeros.html">Number_of_Trailing_Zeros</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )

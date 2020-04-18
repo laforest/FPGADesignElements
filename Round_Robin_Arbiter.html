@@ -41,7 +41,7 @@
 <pre>
 `default_nettype none
 
-module Round_Robin_Arbiter
+module <a href="./Round_Robin_Arbiter.html">Round_Robin_Arbiter</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -60,7 +60,7 @@ module Round_Robin_Arbiter
 <pre>
     wire [WORD_WIDTH-1:0] grant_raw;
 
-    Priority_Arbiter
+    <a href="./Priority_Arbiter.html">Priority_Arbiter</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -77,7 +77,7 @@ module Round_Robin_Arbiter
 <pre>
     wire [WORD_WIDTH-1:0] mask;
 
-    Bitmask_Thermometer_to_Rightmost_1_Bit
+    <a href="./Bitmask_Thermometer_to_Rightmost_1_Bit.html">Bitmask_Thermometer_to_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -100,7 +100,7 @@ module Round_Robin_Arbiter
 <pre>
     wire [WORD_WIDTH-1:0] grant_masked;
 
-    Priority_Arbiter
+    <a href="./Priority_Arbiter.html">Priority_Arbiter</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -122,7 +122,7 @@ module Round_Robin_Arbiter
         grant_next = (grant_masked == ZERO) ? grant_raw : grant_masked; 
     end
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (ZERO)

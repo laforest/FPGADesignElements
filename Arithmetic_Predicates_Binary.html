@@ -20,7 +20,7 @@
  a (2's-complement) subtraction <code>A-B</code>.</p>
 
 <pre>
-module Arithmetic_Predicates_Binary
+module <a href="./Arithmetic_Predicates_Binary.html">Arithmetic_Predicates_Binary</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -62,7 +62,7 @@ module Arithmetic_Predicates_Binary
     wire [WORD_WIDTH-1:0]   difference;
     wire                    carry_out;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -83,7 +83,7 @@ module Arithmetic_Predicates_Binary
 <pre>
     wire final_carry_in;
 
-    CarryIn_Binary
+    <a href="./CarryIn_Binary.html">CarryIn_Binary</a>
     #(
         .WORD_WIDTH (1)
     )

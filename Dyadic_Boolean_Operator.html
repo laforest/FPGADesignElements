@@ -31,7 +31,7 @@
 
 `default_nettype none
 
-module Dyadic_Boolean_Operator
+module <a href="./Dyadic_Boolean_Operator.html">Dyadic_Boolean_Operator</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -45,7 +45,7 @@ module Dyadic_Boolean_Operator
     generate
         genvar i;
         for(i = 0; i < WORD_WIDTH; i = i+1) begin: per_bit
-            Multiplexer_Binary_Behavioural
+            <a href="./Multiplexer_Binary_Behavioural.html">Multiplexer_Binary_Behavioural</a>
             #(
                 .WORD_WIDTH     (1),
                 .ADDR_WIDTH     (`DYADIC_SELECTOR_WIDTH),

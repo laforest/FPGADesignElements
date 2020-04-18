@@ -21,7 +21,7 @@
 <pre>
 `default_nettype none
 
-module Multiplexer_Bitwise_2to1
+module <a href="./Multiplexer_Bitwise_2to1.html">Multiplexer_Bitwise_2to1</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -35,7 +35,7 @@ module Multiplexer_Bitwise_2to1
     generate
         genvar j;
         for(j = 0; j < WORD_WIDTH; j = j+1) begin: per_bit
-            Multiplexer_Binary_Behavioural
+            <a href="./Multiplexer_Binary_Behavioural.html">Multiplexer_Binary_Behavioural</a>
             #(
                 .WORD_WIDTH     (1),
                 .ADDR_WIDTH     (1),

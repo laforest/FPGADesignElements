@@ -26,7 +26,7 @@
 <pre>
 `default_nettype none
 
-module Binary_to_One_Hot
+module <a href="./Binary_to_One_Hot.html">Binary_to_One_Hot</a>
 #(
     parameter       BINARY_WIDTH        = 0,
     parameter       OUTPUT_WIDTH        = 0 
@@ -45,7 +45,7 @@ module Binary_to_One_Hot
     generate
         genvar i;
         for (i=0; i < OUTPUT_WIDTH; i=i+1) begin : per_output
-            Address_Decoder_Behavioural
+            <a href="./Address_Decoder_Behavioural.html">Address_Decoder_Behavioural</a>
             #(
                 .ADDR_WIDTH (BINARY_WIDTH)
             )

@@ -37,7 +37,7 @@
  should notice...</p>
 
 <pre>
-module Demultiplexer_One_Hot
+module <a href="./Demultiplexer_One_Hot.html">Demultiplexer_One_Hot</a>
 #(
     parameter       BROADCAST           = 0,
     parameter       WORD_WIDTH          = 0,
@@ -84,7 +84,7 @@ module Demultiplexer_One_Hot
 
             genvar i;
             for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
-                Annuller
+                <a href="./Annuller.html">Annuller</a>
                 #(
                     .WORD_WIDTH     (WORD_WIDTH),
                     .IMPLEMENTATION (IMPLEMENTATION)

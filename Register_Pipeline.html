@@ -44,7 +44,7 @@
 <pre>
 `default_nettype none
 
-module Register_Pipeline
+module <a href="./Register_Pipeline.html">Register_Pipeline</a>
 #(
     parameter                   WORD_WIDTH      = 0,
     parameter                   PIPE_DEPTH      = 0,
@@ -91,7 +91,7 @@ module Register_Pipeline
  rather than the output of a previous register.</p>
 
 <pre>
-    Multiplexer_Binary_Behavioural
+    <a href="./Multiplexer_Binary_Behavioural.html">Multiplexer_Binary_Behavioural</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .ADDR_WIDTH     (1),
@@ -104,7 +104,7 @@ module Register_Pipeline
         .word_out       (pipe_stage_in[0])
     );
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (RESET_VALUES[0 +: WORD_WIDTH])
@@ -137,7 +137,7 @@ module Register_Pipeline
             (* multstyle = "logic" *) // Quartus
             (* use_dsp   = "no" *)    // Vivado
 
-            Multiplexer_Binary_Behavioural
+            <a href="./Multiplexer_Binary_Behavioural.html">Multiplexer_Binary_Behavioural</a>
             #(
                 .WORD_WIDTH     (WORD_WIDTH),
                 .ADDR_WIDTH     (1),
@@ -151,7 +151,7 @@ module Register_Pipeline
             );
 
 
-            Register
+            <a href="./Register.html">Register</a>
             #(
                 .WORD_WIDTH     (WORD_WIDTH),
                 .RESET_VALUE    (RESET_VALUES[WORD_WIDTH*i +: WORD_WIDTH])

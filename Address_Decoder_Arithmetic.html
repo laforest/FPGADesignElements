@@ -34,7 +34,7 @@
 <pre>
 `default_nettype none
 
-module Address_Decoder_Arithmetic
+module <a href="./Address_Decoder_Arithmetic.html">Address_Decoder_Arithmetic</a>
 #(
     parameter       ADDR_WIDTH          = 0
 )
@@ -52,7 +52,7 @@ module Address_Decoder_Arithmetic
     wire base_or_higher;
     wire bound_or_lower;
 
-    Arithmetic_Predicates_Binary
+    <a href="./Arithmetic_Predicates_Binary.html">Arithmetic_Predicates_Binary</a>
     #(
         .WORD_WIDTH         (ADDR_WIDTH)
     )
@@ -76,7 +76,7 @@ module Address_Decoder_Arithmetic
         // verilator lint_on PINCONNECTEMPTY
     );
 
-    Arithmetic_Predicates_Binary
+    <a href="./Arithmetic_Predicates_Binary.html">Arithmetic_Predicates_Binary</a>
     #(
         .WORD_WIDTH         (ADDR_WIDTH)
     )

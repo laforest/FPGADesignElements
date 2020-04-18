@@ -17,7 +17,7 @@
 <pre>
 `default_nettype none
 
-module Hamming_Distance
+module <a href="./Hamming_Distance.html">Hamming_Distance</a>
 #(
     parameter WORD_WIDTH    = 0
 )
@@ -29,7 +29,7 @@ module Hamming_Distance
 
     wire [WORD_WIDTH-1:0] different_bits;
 
-    Word_Reducer
+    <a href="./Word_Reducer.html">Word_Reducer</a>
     #(
         .OPERATION  ("XOR"),
         .WORD_WIDTH (WORD_WIDTH),
@@ -41,7 +41,7 @@ module Hamming_Distance
         .word_out   (different_bits)
     );
 
-    Population_Count
+    <a href="./Population_Count.html">Population_Count</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )

@@ -32,7 +32,7 @@
 <pre>
 `default_nettype none
 
-module Accumulator_Binary
+module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
 #(
     parameter                   WORD_WIDTH      = 0,
     parameter [WORD_WIDTH-1:0]  INITIAL_VALUE   = 0,
@@ -62,7 +62,7 @@ module Accumulator_Binary
 <pre>
     wire [WORD_WIDTH-1:0] incremented_value;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -86,7 +86,7 @@ module Accumulator_Binary
 <pre>
     wire final_carry_in;
 
-    CarryIn_Binary
+    <a href="./CarryIn_Binary.html">CarryIn_Binary</a>
     #(
         .WORD_WIDTH (1)
     )
@@ -147,7 +147,7 @@ module Accumulator_Binary
 <p>Finally, the accumulator and signed_overflow registers.</p>
 
 <pre>
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (INITIAL_VALUE)
@@ -161,7 +161,7 @@ module Accumulator_Binary
         .data_out       (accumulated_value)
     );
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)

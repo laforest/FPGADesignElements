@@ -27,7 +27,7 @@
 <pre>
 `default_nettype none
 
-module Multiplexer_One_Hot
+module <a href="./Multiplexer_One_Hot.html">Multiplexer_One_Hot</a>
 #(
     parameter       WORD_WIDTH          = 0,
     parameter       WORD_COUNT          = 0,
@@ -55,7 +55,7 @@ module Multiplexer_One_Hot
 
         for (i=0; i < WORD_COUNT; i=i+1) begin : per_word
 
-            Annuller
+            <a href="./Annuller.html">Annuller</a>
             #(
                 .WORD_WIDTH     (WORD_WIDTH),
                 .IMPLEMENTATION (IMPLEMENTATION)
@@ -76,7 +76,7 @@ module Multiplexer_One_Hot
  computation done in the process, depending on the selected <code>OPERATION</code>.</p>
 
 <pre>
-    Word_Reducer
+    <a href="./Word_Reducer.html">Word_Reducer</a>
     #(
         .OPERATION  (OPERATION),
         .WORD_WIDTH (WORD_WIDTH),

@@ -28,7 +28,7 @@
 <pre>
 `default_nettype none
 
-module Pulse_Generator
+module <a href="./Pulse_Generator.html">Pulse_Generator</a>
 #(
     parameter PULSE_LENGTH  = 0, // Minimum 1, or greater
     parameter EDGE_TYPE     = "" // POS, NEG, ANY
@@ -54,7 +54,7 @@ module Pulse_Generator
 <pre>
     wire level_in_delayed;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (1),
         .PIPE_DEPTH     (PULSE_LENGTH),

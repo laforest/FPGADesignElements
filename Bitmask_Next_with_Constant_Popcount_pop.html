@@ -38,7 +38,7 @@
 <pre>
 `default_nettype none
 
-module Bitmask_Next_with_Constant_Popcount_pop
+module <a href="./Bitmask_Next_with_Constant_Popcount_pop.html">Bitmask_Next_with_Constant_Popcount_pop</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -67,7 +67,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
 <pre>
     wire [WORD_WIDTH-1:0] smallest;
 
-    Bitmask_Isolate_Rightmost_1_Bit
+    <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -89,7 +89,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
     wire [WORD_WIDTH-1:0]   ripple;
     wire                    ripple_carry_out;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -112,7 +112,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
 <pre>
     wire [WORD_WIDTH-1:0] changed_bits;
 
-    Hamming_Distance
+    <a href="./Hamming_Distance.html">Hamming_Distance</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH)
     )
@@ -157,7 +157,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
 <pre>
     wire [WORD_WIDTH-1:0] adjusted_distance;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -180,7 +180,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
 <pre>
     wire [WORD_WIDTH-1:0] shifted_one;
 
-    Bit_Shifter
+    <a href="./Bit_Shifter.html">Bit_Shifter</a>
     #(
         .WORD_WIDTH         (WORD_WIDTH)
     )
@@ -210,7 +210,7 @@ module Bitmask_Next_with_Constant_Popcount_pop
 <pre>
     wire [WORD_WIDTH-1:0] lost_ones;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )

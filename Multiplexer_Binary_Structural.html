@@ -27,7 +27,7 @@
 <pre>
 `default_nettype none
 
-module Multiplexer_Binary_Structural
+module <a href="./Multiplexer_Binary_Structural.html">Multiplexer_Binary_Structural</a>
 #(
     parameter   WORD_WIDTH      = 0,
     parameter   ADDR_WIDTH      = 0,
@@ -50,7 +50,7 @@ module Multiplexer_Binary_Structural
 <pre>
     wire [INPUT_COUNT-1:0] selector_one_hot;
 
-    Binary_to_One_Hot
+    <a href="./Binary_to_One_Hot.html">Binary_to_One_Hot</a>
     #(
         .BINARY_WIDTH   (ADDR_WIDTH),
         .OUTPUT_WIDTH   (INPUT_COUNT) 
@@ -67,7 +67,7 @@ module Multiplexer_Binary_Structural
  operation.</p>
 
 <pre>
-    Multiplexer_One_Hot
+    <a href="./Multiplexer_One_Hot.html">Multiplexer_One_Hot</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .WORD_COUNT     (INPUT_COUNT),

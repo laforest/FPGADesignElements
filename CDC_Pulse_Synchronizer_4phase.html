@@ -73,7 +73,7 @@
 <pre>
 `default_nettype none
 
-module CDC_Pulse_Synchronizer_4phase
+module <a href="./CDC_Pulse_Synchronizer_4phase.html">CDC_Pulse_Synchronizer_4phase</a>
 #(
     parameter RECV_PULSE_LENGTH = 1, // 1 or greater
     parameter CDC_EXTRA_DEPTH   = 0  // 0 or greater, if necessary
@@ -111,7 +111,7 @@ module CDC_Pulse_Synchronizer_4phase
         clear_sending = (clear_sending  == 1'b1) || (sending_clear    == 1'b1);
     end
 
-    Pulse_Latch
+    <a href="./Pulse_Latch.html">Pulse_Latch</a>
     #(
         .RESET_VALUE (1'b0)
     )
@@ -129,7 +129,7 @@ module CDC_Pulse_Synchronizer_4phase
 <pre>
     wire receiving_level;
 
-    CDC_Synchronizer
+    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -145,7 +145,7 @@ module CDC_Pulse_Synchronizer_4phase
  signal that the CDC is complete and to clear the latch.</p>
 
 <pre>
-    CDC_Synchronizer
+    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -171,7 +171,7 @@ module CDC_Pulse_Synchronizer_4phase
 <p>Finally, convert the receiving level to a pulse in the receiving clock domain</p>
 
 <pre>
-    Pulse_Generator
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
     #(
         .PULSE_LENGTH   (RECV_PULSE_LENGTH),
         .EDGE_TYPE      ("POS")

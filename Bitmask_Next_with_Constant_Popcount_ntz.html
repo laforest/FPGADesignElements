@@ -54,7 +54,7 @@
 <pre>
 `default_nettype none
 
-module Bitmask_Next_with_Constant_Popcount_ntz
+module <a href="./Bitmask_Next_with_Constant_Popcount_ntz.html">Bitmask_Next_with_Constant_Popcount_ntz</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -81,7 +81,7 @@ module Bitmask_Next_with_Constant_Popcount_ntz
 <pre>
     wire [WORD_WIDTH-1:0] smallest;
 
-    Bitmask_Isolate_Rightmost_1_Bit
+    <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -104,7 +104,7 @@ module Bitmask_Next_with_Constant_Popcount_ntz
     wire [WORD_WIDTH-1:0]   ripple;
     wire                    ripple_carry_out;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
@@ -156,7 +156,7 @@ module Bitmask_Next_with_Constant_Popcount_ntz
 <pre>
     wire [WORD_WIDTH-1:0] final_shift_amount;
 
-    Logarithm_of_Powers_of_Two
+    <a href="./Logarithm_of_Powers_of_Two.html">Logarithm_of_Powers_of_Two</a>
     #(
         .WORD_WIDTH             (WORD_WIDTH)
     )
@@ -177,7 +177,7 @@ module Bitmask_Next_with_Constant_Popcount_ntz
 <pre>
     wire [WORD_WIDTH-1:0] changed_bits_shifted; 
 
-    Bit_Shifter
+    <a href="./Bit_Shifter.html">Bit_Shifter</a>
     #(
         .WORD_WIDTH         (WORD_WIDTH)
     )
