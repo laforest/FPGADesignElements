@@ -36,7 +36,7 @@
  enough input clock cycles to be seen by at least three consecutive
  receiving clock edges.</p>
 <p>If you cannot guarantee the duration of a pulse and/or have no knowledge of
- the relative clock domain frequencies, use a <a href="CDC_Pulse_Synchronizer.html">Pulse
+ the relative clock domain frequencies, use a <a href="./CDC_Pulse_Synchronizer_2phase.html">Pulse
  Synchronizer</a>.</p>
 <h2>Single-Bit Synchronization Only</h2>
 <p>Also, for reasons explained in <a href="./cdc.html">A Primer on Clock Domain Crossing
@@ -65,11 +65,11 @@
 <h2>Not Usable as I/O Registers</h2>
 <p>On an FPGA, you should not use an I/O register as one of the stages of
  a synchronizer: they are too far from the main logic fabric, and
- synchronizer registers must be as close together as possible (see <a href="./cdc.html">Basic
- Clock Domain Crossing Theory</a>). Thus, your input or output must
- connect to a dedicated I/O register synchronous to the I/O clock, which in
- turn connects to a CDC synchronizer driven by the internal clock. <strong>This
- extra I/O register also filters out any input glitches, as outlined
+ synchronizer registers must be as close together as possible (see <a href="./cdc.html">A Primer
+ on Clock Domain Crossing Theory</a>). Thus, your input or output
+ must connect to a dedicated I/O register synchronous to the I/O clock,
+ which in turn connects to a CDC synchronizer driven by the internal clock.
+ <strong>This extra I/O register also filters out any input glitches, as outlined
  above.</strong></p>
 
 <pre>
