@@ -42,6 +42,8 @@
 // to form a basic incrementing counter without using an adder, and so you can
 // place logic between each counter bit to modulate it.
 
+`default_nettype none
+
 module Register_Toggle
 #(
     parameter WORD_WIDTH  = 0,
