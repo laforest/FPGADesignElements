@@ -3,7 +3,7 @@
 
 // Reliably passes a synchronous posedge pulse from one clock domain to
 // another when we don't know anything about the relative clock frequencies or
-// the pulse duration. *Uses a 4-phase asychronous handshake.*
+// the pulse duration. *Uses a 4-phase asynchronous handshake.*
 
 // The recommended input is a single-cycle pulse in the sending clock domain.
 // Adjust the output pulse length (in receiving clock cycles) with the
