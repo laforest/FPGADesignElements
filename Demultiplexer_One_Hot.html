@@ -3,19 +3,18 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Demultiplexer Binary</title>
+<title>Demultiplexer One Hot</title>
 </head>
 <body>
 
-<p><a href="./Demultiplexer_Binary.v">Source</a></p>
+<p><a href="./Demultiplexer_One_Hot.v">Source</a></p>
 
-<h1>Binary Demultiplexer</h1>
+<h1>One-Hot Demultiplexer</h1>
 <p>Connects the <code>word_in</code> input port to one of the words in the <code>words_out</code>
- output port, as selected by the <code>selector</code> binary address, and raises the
- corresponding valid bit in the <code>valids_out</code> output port.  <em>If the
- <code>selector</code> value is greater than the number of output words specified by
- the <code>OUTPUT_COUNT</code> parameter, then none of the <code>valids_out</code> bits will be
- set.</em></p>
+ output port, as selected by the <code>selectors</code> one-hot vector, and raises the
+ corresponding valid bit in the <code>valids_out</code> output port.  <em>If more than one
+ bit is set in the <code>selectors</code> input, then all the corresponding output
+ words will get the input word value.</em></p>
 <h2>Implementation Options</h2>
 <p>Set the <code>BROADCAST</code> parameter to 1 to simply replicate and connect
  <code>word_in</code> to each word in <code>words_out</code>, without any logic. The valid bit
@@ -38,11 +37,10 @@
  should notice...</p>
 
 <pre>
-module Demultiplexer_Binary
+module Demultiplexer_One_Hot
 #(
     parameter       BROADCAST           = 0,
     parameter       WORD_WIDTH          = 0,
-    parameter       ADDR_WIDTH          = 0,
     parameter       OUTPUT_COUNT        = 0,
     parameter       IMPLEMENTATION      = "AND",
 
@@ -50,48 +48,66 @@ module Demultiplexer_Binary
     parameter   TOTAL_WIDTH = WORD_WIDTH * OUTPUT_COUNT
 )
 (
-    input   wire    [ADDR_WIDTH-1:0]    selector,
+    input   wire    [OUTPUT_COUNT-1:0]  selectors,
     input   wire    [WORD_WIDTH-1:0]    word_in,
-    output  wire    [TOTAL_WIDTH-1:0]   words_out,
-    output  wire    [OUTPUT_COUNT-1:0]  valids_out
+    output  reg     [TOTAL_WIDTH-1:0]   words_out,
+    output  reg     [OUTPUT_COUNT-1:0]  valids_out
 );
+
+    localparam OUTPUT_ZERO = {OUTPUT_COUNT{1'b0}};
+    localparam TOTAL_ZERO  = {TOTAL_WIDTH{1'b0}};
+
+    initial begin
+        words_out  = TOTAL_ZERO;
+        valids_out = OUTPUT_ZERO;
+    end
 </pre>
 
-<p>Convert the binary <code>selector</code> to a single one-hot bit vector
- which signals which output port will receive the input word.</p>
+<p>Pass along the selector to the downstream logic, so we know which output
+ word is the selected one.</p>
 
 <pre>
-    wire [OUTPUT_COUNT-1:0] selector_one_hot;
-
-    Binary_to_One_Hot
-    #(
-        .BINARY_WIDTH   (ADDR_WIDTH),
-        .OUTPUT_WIDTH   (OUTPUT_COUNT)
-    )
-    valid_out
-    (
-        .binary_in      (selector),
-        .one_hot_out    (selector_one_hot)
-    );
+    always @(*) begin
+        valids_out = selectors;
+    end
 </pre>
 
-<p>Then use that one-hot selector to steer the input to a particular output.</p>
+<p>If we are <em>not</em> broadcasting, then for each output word, annul the output
+ if its selector bit is not set.  Thus, only the selected output word will
+ have the <code>word_in</code> data. All others will stay at zero.  Otherwise, simply
+ replicate and connect the input to all outputs. </p>
 
 <pre>
-    Demultiplexer_One_Hot
-    #(
-        .BROADCAST      (BROADCAST),
-        .WORD_WIDTH     (WORD_WIDTH),
-        .OUTPUT_COUNT   (OUTPUT_COUNT),
-        .IMPLEMENTATION (IMPLEMENTATION)
-    )
-    word_in_demux
-    (
-        .selectors      (selector_one_hot),
-        .word_in        (word_in),
-        .words_out      (words_out),
-        .valids_out     (valids_out)
-    );
+    generate
+        if (BROADCAST == 0) begin
+            wire [TOTAL_WIDTH-1:0] words_out_internal;
+
+            genvar i;
+            for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
+                Annuller
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH),
+                    .IMPLEMENTATION (IMPLEMENTATION)
+                )
+                output_gate
+                (
+                    .annul          (selectors[i] == 1'b0),
+                    .data_in        (word_in),
+                    .data_out       (words_out_internal[WORD_WIDTH*i +: WORD_WIDTH])
+                );
+            end
+
+            always @(*) begin
+                words_out = words_out_internal;
+            end
+        end
+        else
+        if (BROADCAST == 1) begin
+            always @(*) begin
+                words_out = {OUTPUT_COUNT{word_in}};
+            end
+        end
+    endgenerate
 
 endmodule
 </pre>

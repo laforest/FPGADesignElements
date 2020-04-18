@@ -2,11 +2,11 @@
 //# Binary Demultiplexer
 
 // Connects the `word_in` input port to one of the words in the `words_out`
-// output port, as selected by the `output_port_selector` binary address, and
-// raises the corresponding valid bit in the `valids_out` output port.  If the
-// `output_port_selector` value is greater than the number of output words
-// specified by the `OUTPUT_COUNT` parameter, then none of the `valids_out`
-// bits will be set.
+// output port, as selected by the `selector` binary address, and raises the
+// corresponding valid bit in the `valids_out` output port.  *If the
+// `selector` value is greater than the number of output words specified by
+// the `OUTPUT_COUNT` parameter, then none of the `valids_out` bits will be
+// set.*
 
 //## Implementation Options
 
@@ -26,6 +26,9 @@
 // security and robustness since unselected downstream logic cannot snoop or
 // accidentally receive other data.
 
+// If necessary, select the Annuller `IMPLEMENTATION` which yields the best
+// logic synthesis. Usually, this does not matter, and can be set to "AND".
+
 // Setting `BROADCAST` to any value other than 1 or 0 will disconnect
 // `word_in` from `words_out`, raise some critical warnings in your CAD tool,
 // and generally cause a lot of downstream logic to optimize away, so you
@@ -37,19 +40,22 @@ module Demultiplexer_Binary
     parameter       WORD_WIDTH          = 0,
     parameter       ADDR_WIDTH          = 0,
     parameter       OUTPUT_COUNT        = 0,
+    parameter       IMPLEMENTATION      = "AND",
 
     // Do not set at instantiation
     parameter   TOTAL_WIDTH = WORD_WIDTH * OUTPUT_COUNT
 )
 (
-    input   wire    [ADDR_WIDTH-1:0]    output_port_selector,
+    input   wire    [ADDR_WIDTH-1:0]    selector,
     input   wire    [WORD_WIDTH-1:0]    word_in,
     output  wire    [TOTAL_WIDTH-1:0]   words_out,
     output  wire    [OUTPUT_COUNT-1:0]  valids_out
 );
 
-// Convert the binary `output_port_selector` to a single one-hot bit vector
+// Convert the binary `selector` to a single one-hot bit vector
 // which signals which output port will receive the input word.
+
+    wire [OUTPUT_COUNT-1:0] selector_one_hot;
 
     Binary_to_One_Hot
     #(
@@ -58,39 +64,26 @@ module Demultiplexer_Binary
     )
     valid_out
     (
-        .binary_in      (output_port_selector),
-        .one_hot_out    (valids_out)
+        .binary_in      (selector),
+        .one_hot_out    (selector_one_hot)
     );
 
-// If we are *not* broadcasting, then for each output port, annul the output
-// if its valid bit is not set.  Thus, only the selected output port will have
-// the `word_in` data. All others will stay at zero.  Otherwise, simply
-// replicate and connect the input to all outputs. [This is one of the very
-// rare cases where you must use the `assign`
-// statement.](./verilog.html#assign)
+// Then use that one-hot selector to steer the input to a particular output.
 
-    generate
-        if (BROADCAST == 0) begin
-            genvar i;
-            for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
-                Annuller
-                #(
-                    .WORD_WIDTH     (WORD_WIDTH),
-                    .IMPLEMENTATION ("AND")
-                )
-                output_gate
-                (
-                    .annul          ((valids_out[i] == 1'b0)),
-                    .data_in        (word_in),
-                    .data_out       (words_out[WORD_WIDTH*i +: WORD_WIDTH])
-                );
-            end
-        end
-        else
-        if (BROADCAST == 1) begin
-            assign words_out = {OUTPUT_COUNT{word_in}};
-        end
-    endgenerate
+    Demultiplexer_One_Hot
+    #(
+        .BROADCAST      (BROADCAST),
+        .WORD_WIDTH     (WORD_WIDTH),
+        .OUTPUT_COUNT   (OUTPUT_COUNT),
+        .IMPLEMENTATION (IMPLEMENTATION)
+    )
+    word_in_demux
+    (
+        .selectors      (selector_one_hot),
+        .word_in        (word_in),
+        .words_out      (words_out),
+        .valids_out     (valids_out)
+    );
 
 endmodule
 
