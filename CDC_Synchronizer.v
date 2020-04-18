@@ -45,7 +45,10 @@
 // Synchronizers in parallel is **not deterministic** as there is no guarantee
 // they will all have the same latency.  If you need to pass multiple signals
 // (e.g.: a bus), synchronize one signal in each direction as a ready/valid
-// handshake.
+// handshake, and capture the other signals (held steady during
+// synchronization) directly in the receiving clock domain once the one signal
+// has synchronized. Remember to constrain and check the delay on the other
+// signals.
 
 //## Avoid Logic Glitches
 
@@ -58,6 +61,8 @@
 // a synchronizer's unrelated and asynchronous receiving clock may just happen
 // to sample the input when a glitch occurs, transforming that glitch into
 // a real, and completely wrong, logic pulse in the receiving clock domain!
+// Alternately, a high signal may glitch early to low and be missed by the
+// receiving clock.
 
 //## Not Usable as I/O Registers
 
