@@ -3,7 +3,7 @@
 
 // *This text is mostly lifted from the [Simulated Clock
 // Generation](./verilog.html#clock) section of my Verilog Coding Standard.
-// Credit goes to Clifford Wolf ([@oe1cxw](https://twitter.com/oe1cxw)) for
+// Credit goes to Claire Wolf ([@oe1cxw](https://twitter.com/oe1cxw)) for
 // teaching me this finer point of Verilog simulation.*
 
 // **NOTE: This code cannot work in Verilator, which can only simulate

@@ -458,7 +458,7 @@ of the simulation cycle, so depending on the order in which the simulator
 evaluates clocked always blocks, there could be race conditions giving
 different results between simulation runs, or between simulation and synthesis.
 If you want the deep reasons why, read the IEEE Standard 1364-2001, Section 5,
-"Scheduling Semantics". (Thanks go to Clifford Wolf (<a
+"Scheduling Semantics". (Thanks go to Claire Wolf (<a
 href="https://twitter.com/oe1cxw">@oe1cxw</a>) for enlightening me.).
 
 </ol>
@@ -887,7 +887,7 @@ to VHDL</a>.
 href="https://twitter.com/oe1cxw/status/1040917788762812416">this twitter
 thread</a> which discusses a subtlety of "last assignment wins" which explains
 a subtlety of non-blocking assignments and ternary operators. Credit to
-Clifford Wolf (<a href="https://twitter.com/oe1cxw">@oe1cxw</a>).
+Claire Wolf (<a href="https://twitter.com/oe1cxw">@oe1cxw</a>).
 
 <h4>Combining Asynchronous Reset and Clock Enable</h4>
 
@@ -991,7 +991,7 @@ end
 clock)</code> in internal logic, but the same race condition will happen if the
 simulation clock happens to be initialized to 1'b1.
 
-<p>Instead, the following clock generation idiom (credit: Clifford Wolf (<a
+<p>Instead, the following clock generation idiom (credit: Claire Wolf (<a
 href="https://twitter.com/oe1cxw">@oe1cxw</a>)) avoids the race condition by
 making use of undefined values and the identity operator (<code>===</code>)
 instead of the equality (<code>==</code>) operator:
