@@ -38,7 +38,7 @@
 
 //## Single-Bit Synchronization Only
 
-// Also, for reasons explained in [Basic Clock Domain Crossing
+// Also, for reasons explained in [A Primer on Clock Domain Crossing
 // Theory](./cdc.html), the latency of a CDC Synchronizer can vary between
 // 2 and 3 cycles, depending on metastability events, and so **only one signal
 // may be synchronized at each clock domain crossing**. Using multiple CDC

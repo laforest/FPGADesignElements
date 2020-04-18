@@ -1,0 +1,156 @@
+<html>
+<head>
+<link rel="shortcut icon" href="http://fpgacpu.ca/favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Primer on Clock Domain Crossing (CDC) Theory</title>
+</head>
+<body>
+
+<h1>A Primer on Clock Domain Crossing (CDC) Theory</h1>
+
+<p>from <a href="./index.html">FPGA Design Elements</a> by Charles Eric LaForest, PhD., <a href="../gateforge/index.html">GateForge Consulting Ltd.</a>
+
+<p>You can design plain synchronous logic driven by a single clock and be
+certain it'll work (and you'd be right)...or you can design Clock Domain
+Crossing (CDC) logic, and always be full of doubt.  CDC logic is a
+well-understood, but subtle design problem.  There are many ways to get it
+slightly wrong, causing intermittent failures, or ending up with a design that
+complicates things and reduces performance.
+
+<h2>Defining Metastability</h2>
+
+<p>Normally, digital logic works in a bistable mode: it's either in a high
+state or low state, glossing over the fact that it takes time to move from one
+state to the other.  But so long as we sample states (e.g.: latch a signal) far
+from those transitions, the assumption holds and everything remains bistable.
+
+<p>A <em>metastable</em> state is simply any state that is neither high nor
+low, but in between, like during a transition. And the closer to the mid-point
+between states a metastable state is, the longer it takes to resolve to a valid
+state and the less certainty there is which valid state that will be.  So the
+next logic output may remain metastable or resolve too late, a flip-flop may
+sample the wrong state, and so on... and your system falls apart.
+
+<p>Metastability can happen at clock domain crossings since the sending clock
+and receiving clock are (usually) asynchronous to eachother, or at least is is
+a lot simpler and robust to assume they are independent that way. Thus the
+receiving clock might sample a signal from the sending clock domain too close
+to its transitions, causing metastability.
+
+<p><i>(And it's impossible to design metastability-free circuits. That would
+imply instantaneous state transitions, which isn't physically possible.)</i>
+
+<h2>The CDC Basic Building Block</h2>
+
+<p>A <a href="./CDC_Synchronizer.html">CDC Synchronizer</a> forms the core of
+any CDC solution: a chain of two (or more) closely placed registers, with no
+logic between them, and clocked by the receiving clock.  The input register
+receives a bit synchronized to a sending clock, and the output register sends a
+version of that bit synchronized to the receiving clock. The duration between
+bit transitions at the output may be of a different length than the original
+bit, with a new duration of some multiple of the receiving clock period.
+
+<h2>Latency</h2>
+
+<p>Despite having two registers, a synchronizer has an unpredictable latency
+from the point of view of the sending clock. A few different cases may happen,
+which will also explain why a synchronizer is necessary:
+
+<ol>
+
+<li>The receiving clock captures the incoming bit properly, which then exits
+the synchronizer on the next cycle. Latency: 2 cycles.
+
+<li>The receiving clock captures the incoming bit just before a transition, so
+that transition will pass through after two more cycles. Latency: 3 cycles.
+
+<li>The receiving clock captures the incoming bit as it transitions, causing
+the first register output to go metastable, which then settles into the correct
+post-transition state and exits in the following cycle. Latency: 2 cycles.
+
+<li>The receiving clock captures the incoming bit as it transitions, causing
+the first register output to go metastable, which then settles into the
+incorrect pre-transition state (no change). The post-transition bit is properly
+captured in the next cycle, and exits in the cycle after that. Latency: 3
+cycles.
+
+<li>The receiving clock captures the incoming bit as it transitions, causing
+the first register output to go metastable, which then settles into either the
+pre-transition or post-transition state, <em>but takes too long</em>. The input
+of the second register thus samples a metastable bit, causing one of the
+previous two cases (3,4) to happen, or this case (5) again, at its own output.
+However, this second metastability is <em>exponentially</em> less likely than
+the first, and should in practice "never" happen (meaning, once every many,
+many years on average, swamped by other failure modes).
+
+</ol>
+
+<p>Thus, depending on the alignment of the sending clock relative to the
+receiving clock at that particular point in time, the output high and low
+phases of a toggling bit may have different lengths, though the total period
+remains the same.  Also, the synchronizer prevents metastable state from
+propagating into the rest of the logic, possibly causing an incorrect bit value
+to be created.
+
+<p>The variable latency of a synchronizer implies an important design rule of
+CDC: <b>only one bit at a time may ever be synchronized across a given clock
+domain crossing.</b>  If you tried to synchronize two bits in parallel, or the same
+bit twice in parallel, there would be no guarantee that both bits would always
+see the same latency through the synchronizer. With only a single bit, the
+worst case is that its transition is missed, and will get captured in the next
+receiving clock cycle.  This delay causes no errors in itself, and only alters
+the received bit duration by one receiving clock cycle.
+
+<h2>Performance</h2>
+
+<p>How fast can we pass a bit through a synchronizer? The input bit needs to
+remain stable long enough for the receiving clock to be always able to properly
+capture the bit between two of its transitions (a cycle), else we could miss a
+pulse. We can guarantee a proper capture if the minimum time between bit
+transitions is equal or greater to 3 edges of the receiving clock, regardless
+of clock alignment:
+
+<ol>
+
+<li>The 3 receiving clock edges are positive-negative-positive. Thus, if the
+first posedge misses the first bit transition or goes metastable (see above),
+the second one will capture the bit properly before the second transition.
+
+<li>The 3 receiving clock edges are negative-positive-negative. Since the
+posedge is squarely in the middle between the bit transitions, the bit is
+properly sampled.
+
+</ol>
+
+<p>So, in the worst case of a bit which toggles each sending clock cycle, the
+receiving clock must run at least 1.5x faster to provide 3 edges between bit
+transitions. 
+
+<p>This 1/3 sending/receiving ratio is another way to express the worst case
+synchronizer latency of 3 cycles explained earlier: 3 receiving clock edges per
+incoming bit transition means 6 edges total over a cycle (two transitions),
+which necessarily contain 3 positive edges.
+
+<p>This 1/3 ratio is a stiff penalty, but peripherals clocks are usually slower
+than core logic clocks, and the penalty can be spread out over multiple bits by
+receiving multiple bits in one clock domain and then passing the resulting
+whole word across clock domains (directly, without synchronization!), with a
+single "valid" bit being synchronized across clock domains and acting as a
+latch trigger in the receiving clock domain.
+
+<h2>Further Issues and Reading</h2>
+
+<p>This article only scratches the surface of CDC, and glosses over accounting
+for propagation delay, setup, and hold times when determining the maximum data
+rate, or CAD tool issues regarding placement, timing analysis, and MTBF (Mean
+Time Between Failure) calculations. Designing even simple CDC circuits requires
+sweating a lot of details!
+
+<p>See Clifford E. Cummings' excellent paper 
+<a href="http://www.sunburst-design.com/papers/CummingsSNUG2008Boston_CDC.pdf">Clock Domain Crossing (CDC) Design &amp; Verification
+Techniques Using SystemVerilog</a> for a larger and deeper overview of CDC.
+
+<hr><a href="http://fpgacpu.ca/">fpgacpu.ca</a>
+</body>
+</html>
