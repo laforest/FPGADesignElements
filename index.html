@@ -26,6 +26,40 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 <li> <a href="./legal.html">Licence and Disclaimer</a>
 </ul>
 
+<h2>Tools</h2>
+
+<a name="tools"></a>
+
+<ul>
+
+<li><a href="./v2h.py">v2h.py</a>, which converts commented Verilog files into
+HTML files. Line comments (no block comments!) are processed as Markdown.
+Thus, the web page doesn't get stale as the code evolves.
+
+<li><a href="./verilinter">verilinter</a>, which is a small script using <a
+href="https://www.veripool.org/wiki/verilator">Verilator</a> and <a
+href="http://iverilog.icarus.com/">Icarus Verilog</a> to lint Verilog-2001
+files. This little tool catches a lot of simple and not so simple Verilog
+mistakes and corner cases.
+
+<li><a href="./generate_file_skeleton.py">generate_file_skeleton.py</a>, which
+outputs a skeleton Verilog file in the style used in this book. Takes no
+arguments. Simply pipe the output to a new file or your text editor window.
+
+<li><a href="./generate_instance.py">generate_instance.py</a>, which generates
+a quick-and-dirty module instance when given a filename containing a module
+definition as a parameter. When code is highly modular, writing module
+instances takes a large fraction of your writing time. This automates most of
+the grunt work. Pipe the output to your text editor window. <b>This is a quick
+hack made to work only with the modules in this book.</b>
+
+<li><a href="https://www.intel.com/content/www/us/en/software/programmable/quartus-prime/download.html">Intel Quartus Prime</a>.
+The CAD tool suite for Intel (ex-Altera) FPGAs. It's smaller and easier to run
+than Xilinx Vivado, and produces excellent RTL-level and post-synthesis
+diagrams, which are very useful for checking and debugging designs.
+
+</ul>
+
 <h2>Simulation, Test Bench, and Other Miscellany</h2>
 
 <ul>
@@ -71,6 +105,7 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 <li> <a href="./Multiplexer_One_Hot.html">Multiplexer (One-Hot)</a>
 <li> <a href="./Multiplexer_Bitwise_2to1.html">Multiplexer (Bitwise, 2:1)</a>
 <li> <a href="./Demultiplexer_Binary.html">Demultiplexer (Binary)</a>
+<li> <a href="./Demultiplexer_One_Hot.html">Demultiplexer (One-Hot)</a>
 <li> <a href="./Address_Decoder_Static.html">Address Decoder (Static)</a>
 <li> <a href="./Address_Decoder_Behavioural.html">Address Decoder (Behavioural)</a>
 <li> <a href="./Address_Decoder_Arithmetic.html">Address Decoder (Arithmetic)</a>
@@ -105,6 +140,7 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 
 <ul>
 <li> <a href="./Register.html">Register</a>
+<li> <a href="./Register_Toggle.html">Register (with toggle input)</a>
 <li> <a href="./Register_areset.html">Register (with asynchronous reset)</a>
 <li> <a href="./Register_Pipeline.html">Register Pipeline</a>
 <li> Memory
@@ -122,9 +158,11 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
     <ul>
     <li> <a href="./Pulse_Latch.html">Pulse Latch</a>
     <li> <a href="./Pulse_Generator.html">Pulse Generator</a>
-<!--    <li> <a href="./Pulse_Divider.html">Pulse Divider</a>
+<!--
+    <li> <a href="./Pulse_Divider.html">Pulse Divider</a>
     <li> <a href="./Pulse_Multiplier.html">Pulse Multiplier</a>
-    <li> <a href="./Pulse_Accumulator.html">Pulse Accumulator</a> -->
+    <li> <a href="./Pulse_Accumulator.html">Pulse Accumulator</a> 
+-->
     </ul>
 <li> Serial to Parallel Converter
 <li> Parallel to Serial Converter
@@ -182,7 +220,7 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 <li> Scaler
 <li> Accumulators
     <ul>
-    <li>Sum
+    <li><a href="./Accumulator_Binary.html">Accumulator (Binary)</a>
     <li>Min
     <li>Max
     <li>Mean
@@ -218,12 +256,14 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 <li> Matrix Arbiter
 </ul>
 
-<h2>Clock Domain Crossing</h2>
+<h2>Clock Domain Crossing (CDC)</h2>
 
 <ul>
-<li> CDC Synchronizer
-<li> CDC Synchronizer (optimized for slow clock)
-<li> CDC Pulse Synchronizer (Fast to Slow)
+<li> <a href="./cdc.html">A Primer on  CDC Theory</a>
+<li> <a href="./CDC_Synchronizer.html">CDC Synchronizer</a>
+<li> <a href="./CDC_Pulse_Synchronizer_4phase.html">CDC Pulse Synchronizer (4-phase)</a>
+<li> <a href="./CDC_Pulse_Synchronizer_2phase.html">CDC Pulse Synchronizer (2-phase)</a>
+<li> Weinstein Flancter
 <li> CDC FIFO
 </ul>
 
@@ -276,7 +316,6 @@ href="https://twitter.com/elaforest">@elaforest</a> or join the <a href="https:/
 <li> <a href="./system.html">System Design Standard</a>
 <li> <a href="./links.html">Useful Links</a>
 <li> <a href="./books.html">Useful Books</a>
-<li> <a href="./tools.html">Tools Used To Write This Book</a>
 <li> <a href="./debian.html">Using <s>Altera's</s> Intel's USB-Blaster on Debian Linux</a>
 </ul>
 
