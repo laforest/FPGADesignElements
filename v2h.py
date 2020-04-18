@@ -5,7 +5,9 @@ This program converts Verilog code to a basic webpage: lines that *begin*
 with a line comment ("// ..."), or groups of such lines separated by blank
 lines, get put together as a block of text and processed as Markdown text. The
 remaining non-blank, non-line-comment lines are code, which gets wrapped in a <pre>
-block.
+block, and any module name where a converted Verilog to HTML file exists gets
+transformed into a link. This depends on the convention of one module per file
+where the filename matches the module name.
 
 Thus you can keep the Verilog code, its documentation, and its presentation in sync.
 
@@ -17,6 +19,7 @@ License: https://opensource.org/licenses/MIT
 
 import markdown
 import sys
+from os.path import isfile
 
 # Web page header and footer, with a placeholder for the page title.
 
@@ -79,6 +82,20 @@ def process_comments(line, processed_contents, f):
     processed_contents += html + "\n\n"
     return line, processed_contents
 
+def add_file_links(line):
+    """Checks each word in a line. 
+       If an HTML file exists with that word as a name, replace it with a link.
+       This will transform module instance names to links.
+       This depends on the convention of one module per file
+       where the filename matches the module name."""
+    split_line = line.strip().split()
+    for word in split_line:
+        filename = "./" + word + ".html"
+        link = """<a href="{0}">{1}</a>""".format(filename, word)
+        if isfile(filename):
+            line = line.replace(word, link)
+    return line
+
 def process_code(line, processed_contents, f):
     """Take in code lines until a line is a comment.
        Then remove the previous line if it's blank.
@@ -91,6 +108,7 @@ def process_code(line, processed_contents, f):
         code_block.pop()
     processed_contents += "<pre>\n"
     for code_line in code_block:
+        code_line = add_file_links(code_line)
         processed_contents += code_line
     processed_contents += "</pre>\n\n"
     return line, processed_contents
