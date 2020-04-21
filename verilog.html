@@ -201,7 +201,7 @@ reg [SINK_WIDTH-1:0]   sink   = SINK_ZERO;
 // Zero extension
 
 always @(*) begin
-    sink <= {SOURCE_ZERO, source};
+    sink = {SOURCE_ZERO, source};
 end
 
 // Signed extension
@@ -333,7 +333,7 @@ pipeline register stage.
 // Port must be a reg type instead of wire, which denotes a special case to the reader,
 // and must be initial'ized for proper simulation.
 always @(*) begin
-    port_name <= internal_name;
+    port_name = internal_name;
 end
 </pre>
 
@@ -537,12 +537,12 @@ returns 1 bit, rather than the bitwise negation (<code>~</code>) of all bits.
 <pre>
 // Rather than this
 always @(*) begin
-    C <= A & ~B;
+    C = A & ~B;
 end
 
 // Do this
 always @(*) begin
-    C <= (A == 1'b1) && (B == 1'b0);
+    C = (A == 1'b1) && (B == 1'b0);
 end
 </pre>
 
@@ -575,16 +575,16 @@ reg [1:0] bar = 2'b00;
 // Here, in simulation, foo takes on 2'b10, not 2'bXX
 always @(*) begin
     if (foo == 1b'1) begin
-        bar <= 2'b01;
+        bar = 2'b01;
     end
     else begin
-        bar <= 2'b10;
+        bar = 2'b10;
     end
 end
 
 // Here, in simulation, foo takes 2'bXX
 always @(*) begin
-    bar <= (foo == 1'b1) ? 2'b01 : 2'b10;
+    bar = (foo == 1'b1) ? 2'b01 : 2'b10;
 end
 </pre>
 
@@ -609,7 +609,7 @@ programming pattern for FSMs and other complex logic.
 <pre>
 // Rather than this...
 always @(*) begin
-    result <= (foo == 1'b1) ? ((bar == 1'b1) ? A : B) : C;
+    result = (foo == 1'b1) ? ((bar == 1'b1) ? A : B) : C;
 end
 
 // ...do this!
@@ -977,7 +977,7 @@ reg foo   = 1'b0; // Also does X -> 0 at time zero.
 
 // Simulate the clock
 always begin
-    #`HALF_PERIOD clock <= ~clock;
+    #`HALF_PERIOD clock = ~clock;
 end
 
 // It is unclear if the clock edge or the "foo" initialization will happen first,
@@ -1000,7 +1000,7 @@ instead of the equality (<code>==</code>) operator:
 // NOTE: clock is left uninitialized, and thus X in most simulators, and will
 // not trigger a (X -> 0) edge until after the simulated clock half-period delay.
 always begin
-    #`HALF_PERIOD clock <= (clock === 1'b0);
+    #`HALF_PERIOD clock = (clock === 1'b0);
 end
 </pre>
 
