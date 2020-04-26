@@ -100,7 +100,15 @@ module CDC_Synchronizer
 // into the input register of a DSP or BRAM) and to mark them as composing
 // a synchronizer (and so be placed close together).
 
+// In both cases, we also specify that the registers must not be placed in I/O
+// register locations.
+
+    // Vivado
+    (* IOB = "false" *)
     (* ASYNC_REG = "TRUE" *)
+
+    // Quartus
+    (* useioff = 0 *)
     (* PRESERVE *)
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION \"FORCED IF ASYNCHRONOUS\"" *)
 
