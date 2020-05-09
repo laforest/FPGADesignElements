@@ -160,8 +160,13 @@ if __name__ == "__main__":
     raw_file.close()
 
     # Convert tabs to spaces and print
+    # Except for blank lines (just delete the tabs instead)
+    # There are no "\n" at this point (it's a list of strings)
     # FIXME: we could do some work here to line things up dynamically.
     for line in instance:
-        line = line.expandtabs(tabstop)
+        if line.lstrip("\t") == "":
+            line = ""
+        else:
+            line = line.expandtabs(tabstop)
         print(line)
 
