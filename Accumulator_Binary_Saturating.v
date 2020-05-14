@@ -1,33 +1,24 @@
-<html>
-<head>
-<link rel="shortcut icon" href="./favicon.ico">
-<link rel="stylesheet" type="text/css" href="./style.css">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Accumulator Binary</title>
-</head>
-<body>
 
-<p><a href="./Accumulator_Binary.v">Source</a></p>
+//# Binary Accumulator, Signed, with Saturation
 
-<h1>Signed Binary Accumulator</h1>
-<p>Adds the signed <code>increment</code> to the signed <code>accumulated_value</code> every cycle
- <code>increment_valid</code> is high. <code>load_valid</code> overrides <code>increment_valid</code> and
- instead loads the accumulator with <code>load_value</code>. <code>clear</code> overrides both
- <code>increment_valid</code> and <code>load_valid</code> and puts the accumulator back at
- <code>INITIAL_VALUE</code>.</p>
-<p>If the accmulator increments past the max or min signed integer value it
- can hold, the accumulator will roll-over and set the <code>signed_overflow</code> bit.
- The overflow bit is cleared at the next non-overflowing increment, or if
- the accumulator is cleared or loaded.</p>
-<p>When chaining accumulators, which may happen if you are incrementing in
- unusual bases where each digit has its own accumulator, AND the <code>carry_out</code>
- of the previous accumulator with the signal fed to the <code>increment_valid</code>
- input of the next accumulator. The <code>carry_in</code> is kept for generality.</p>
+// Adds the signed `increment` to the signed `accumulated_value` every cycle
+// `increment_valid` is high. `load_valid` overrides `increment_valid` and
+// instead loads the accumulator with `load_value`. `clear` overrides both
+// `increment_valid` and `load_valid` and puts the accumulator back at
+// `INITIAL_VALUE`.
 
-<pre>
+// If the increment would cause the accumulator to go past the signed minimum
+// or maximum limits, the accumulator will saturate at the nearest limit value
+// and also raise `signed_overflow` until the next operation.
+
+// When chaining accumulators, which may happen if you are incrementing in
+// unusual bases where each digit has its own accumulator, AND the `carry_out`
+// of the previous accumulator with the signal fed to the `increment_valid`
+// input of the next accumulator. The `carry_in` is kept for generality.
+
 `default_nettype none
 
-module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
+module Accumulator_Binary_Saturating
 #(
     parameter                   WORD_WIDTH      = 0,
     parameter [WORD_WIDTH-1:0]  INITIAL_VALUE   = 0
@@ -35,6 +26,8 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
 (
     input   wire                        clock,
     input   wire                        clear,
+    input   wire    [WORD_WIDTH-1:0]    max_limit,
+    input   wire    [WORD_WIDTH-1:0]    min_limit,
     input   wire    [WORD_WIDTH-1:0]    increment,
     input   wire                        increment_valid,
     input   wire    [WORD_WIDTH-1:0]    load_value,
@@ -46,19 +39,19 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
 );
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
-</pre>
 
-<p>Apply the increment to the current accumulator value.</p>
+// Apply the increment to the current accumulator value, with saturation.
 
-<pre>
     wire [WORD_WIDTH-1:0] incremented_value;
 
-    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
+    Adder_Subtractor_Binary_Saturating
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
     add_increment
     (
+        .max_limit  (max_limit),
+        .min_limit  (min_limit),
         .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (carry_in),
         .A_in       (accumulated_value),
@@ -66,18 +59,16 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
         .sum_out    (incremented_value),
         .carry_out  (carry_out)
     );
-</pre>
 
-<p>Then, let's <a href="./CarryIn_Binary.html">reconstruct the carry-in</a> into the last
- (most-significant) bit position of the result. If it differs from the
- carry_out, then a signed overflow/underflow happened, where we either added
- past the largest positive value or subtracted past the smallest negative
- value.</p>
+// Then, let's [reconstruct the carry-in](./CarryIn_Binary.html) into the last
+// (most-significant) bit position of the result. If it differs from the
+// carry_out, then a signed overflow/underflow happened, where we either added
+// past the largest positive value or subtracted past the smallest negative
+// value (regardless of saturation).
 
-<pre>
     wire final_carry_in;
 
-    <a href="./CarryIn_Binary.html">CarryIn_Binary</a>
+    CarryIn_Binary
     #(
         .WORD_WIDTH (1)
     )
@@ -94,13 +85,11 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
     always @(*) begin
         signed_overflow_internal = (carry_out != final_carry_in);
     end
-</pre>
 
-<p>Update the accumulator if load or increment is valid. 
- <em>Load overrides increment.</em> 
- Clear the overflow if loading.</p>
+// Update the accumulator if load or increment is valid. 
+// *Load overrides increment.* 
+// Clear the overflow if loading.
 
-<pre>
     reg [WORD_WIDTH-1:0]    next_value              = WORD_ZERO;
     reg                     enable_accumulator      = 1'b0;
     reg                     enable_overflow         = 1'b0;
@@ -112,12 +101,10 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
         enable_overflow     = (increment_valid == 1'b1);
         clear_overflow      = (load_valid      == 1'b1) || (clear      == 1'b1);
     end
-</pre>
 
-<p>Finally, the accumulator and signed_overflow registers.</p>
+// Finally, the accumulator and signed_overflow registers.
 
-<pre>
-    <a href="./Register.html">Register</a>
+    Register
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (INITIAL_VALUE)
@@ -131,7 +118,7 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
         .data_out       (accumulated_value)
     );
 
-    <a href="./Register.html">Register</a>
+    Register
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -146,11 +133,4 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
     );
 
 endmodule
-</pre>
-
-<hr>
-<p><a href="./index.html">back to FPGA Design Elements</a>
-<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
-</body>
-</html>
 

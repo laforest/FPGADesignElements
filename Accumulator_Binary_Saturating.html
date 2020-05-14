@@ -3,22 +3,21 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Accumulator Binary</title>
+<title>Accumulator Binary Saturating</title>
 </head>
 <body>
 
-<p><a href="./Accumulator_Binary.v">Source</a></p>
+<p><a href="./Accumulator_Binary_Saturating.v">Source</a></p>
 
-<h1>Signed Binary Accumulator</h1>
+<h1>Binary Accumulator, Signed, with Saturation</h1>
 <p>Adds the signed <code>increment</code> to the signed <code>accumulated_value</code> every cycle
  <code>increment_valid</code> is high. <code>load_valid</code> overrides <code>increment_valid</code> and
  instead loads the accumulator with <code>load_value</code>. <code>clear</code> overrides both
  <code>increment_valid</code> and <code>load_valid</code> and puts the accumulator back at
  <code>INITIAL_VALUE</code>.</p>
-<p>If the accmulator increments past the max or min signed integer value it
- can hold, the accumulator will roll-over and set the <code>signed_overflow</code> bit.
- The overflow bit is cleared at the next non-overflowing increment, or if
- the accumulator is cleared or loaded.</p>
+<p>If the increment would cause the accumulator to go past the signed minimum
+ or maximum limits, the accumulator will saturate at the nearest limit value
+ and also raise <code>signed_overflow</code> until the next operation.</p>
 <p>When chaining accumulators, which may happen if you are incrementing in
  unusual bases where each digit has its own accumulator, AND the <code>carry_out</code>
  of the previous accumulator with the signal fed to the <code>increment_valid</code>
@@ -27,7 +26,7 @@
 <pre>
 `default_nettype none
 
-module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
+module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturating</a>
 #(
     parameter                   WORD_WIDTH      = 0,
     parameter [WORD_WIDTH-1:0]  INITIAL_VALUE   = 0
@@ -35,6 +34,8 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
 (
     input   wire                        clock,
     input   wire                        clear,
+    input   wire    [WORD_WIDTH-1:0]    max_limit,
+    input   wire    [WORD_WIDTH-1:0]    min_limit,
     input   wire    [WORD_WIDTH-1:0]    increment,
     input   wire                        increment_valid,
     input   wire    [WORD_WIDTH-1:0]    load_value,
@@ -48,17 +49,19 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 </pre>
 
-<p>Apply the increment to the current accumulator value.</p>
+<p>Apply the increment to the current accumulator value, with saturation.</p>
 
 <pre>
     wire [WORD_WIDTH-1:0] incremented_value;
 
-    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
+    <a href="./Adder_Subtractor_Binary_Saturating.html">Adder_Subtractor_Binary_Saturating</a>
     #(
         .WORD_WIDTH (WORD_WIDTH)
     )
     add_increment
     (
+        .max_limit  (max_limit),
+        .min_limit  (min_limit),
         .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (carry_in),
         .A_in       (accumulated_value),
@@ -72,7 +75,7 @@ module <a href="./Accumulator_Binary.html">Accumulator_Binary</a>
  (most-significant) bit position of the result. If it differs from the
  carry_out, then a signed overflow/underflow happened, where we either added
  past the largest positive value or subtracted past the smallest negative
- value.</p>
+ value (regardless of saturation).</p>
 
 <pre>
     wire final_carry_in;
