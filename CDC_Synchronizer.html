@@ -99,9 +99,16 @@ module <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
 <p>For Quartus, specify that these register must not be optimized (e.g. moved
  into the input register of a DSP or BRAM) and to mark them as composing
  a synchronizer (and so be placed close together).</p>
+<p>In both cases, we also specify that the registers must not be placed in I/O
+ register locations.</p>
 
 <pre>
+    // Vivado
+    (* IOB = "false" *)
     (* ASYNC_REG = "TRUE" *)
+
+    // Quartus
+    (* useioff = 0 *)
     (* PRESERVE *)
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION \"FORCED IF ASYNCHRONOUS\"" *)
 
