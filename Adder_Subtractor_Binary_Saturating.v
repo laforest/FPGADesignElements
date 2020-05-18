@@ -55,7 +55,7 @@ module Adder_Subtractor_Binary_Saturating
 
     wire [WORD_WIDTH_EXTENDED-1:0] A_in_extended;
 
-    Width_Extender
+    Width_Adjuster
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -64,12 +64,12 @@ module Adder_Subtractor_Binary_Saturating
     extend_A
     (
         .original_input     (A_in),
-        .extended_output    (A_in_extended)
+        .adjusted_output    (A_in_extended)
     );
 
     wire [WORD_WIDTH_EXTENDED-1:0] B_in_extended;
 
-    Width_Extender
+    Width_Adjuster
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -78,14 +78,14 @@ module Adder_Subtractor_Binary_Saturating
     extend_B
     (
         .original_input     (B_in),
-        .extended_output    (B_in_extended)
+        .adjusted_output    (B_in_extended)
     );
 
 // Extend the limits in the same way, as if signed integers. 
 
     wire [WORD_WIDTH_EXTENDED-1:0] max_limit_extended;
 
-    Width_Extender
+    Width_Adjuster
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -94,12 +94,12 @@ module Adder_Subtractor_Binary_Saturating
     extend_max_limit
     (
         .original_input     (max_limit),
-        .extended_output    (max_limit_extended)
+        .adjusted_output    (max_limit_extended)
     );
 
     wire [WORD_WIDTH_EXTENDED-1:0] min_limit_extended;
 
-    Width_Extender
+    Width_Adjuster
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -108,7 +108,7 @@ module Adder_Subtractor_Binary_Saturating
     extend_min_limit
     (
         .original_input     (min_limit),
-        .extended_output    (min_limit_extended)
+        .adjusted_output    (min_limit_extended)
     );
 
 // Then select and perform the addition or subtraction in the usual way. 

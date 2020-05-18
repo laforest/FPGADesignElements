@@ -45,7 +45,7 @@ module Adder_Subtractor_Binary
 
     wire [WORD_WIDTH-1:0] carry_in_extended;
 
-    Width_Extender
+    Width_Adjuster
     #(
         .WORD_WIDTH_IN  (1),
         .SIGNED         (0),
@@ -54,7 +54,7 @@ module Adder_Subtractor_Binary
     extend_carry_in
     (
         .original_input     (carry_in),
-        .extended_output    (carry_in_extended)
+        .adjusted_output    (carry_in_extended)
     );
 
 // Then perform and select the operation in the usual way. On FPGAs, the CAD
