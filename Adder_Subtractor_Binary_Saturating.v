@@ -6,23 +6,37 @@
 // an add (A+B), and to 1 for a subtract (A-B). This assignment matches the
 // convention of sign bits, which may end up being convenient.
 
+//## Saturation
+
 // If the result of the addition/subtraction falls outside of the inclusive
 // minimum or maximum limits, the result is clipped (saturated) to the nearest
 // exceeded limit. **The maximum limit must be greater or equal than the
 // minimum limit.** If the limits are reversed, such that max_limit
 // < min_limit, the result will be meaningless.
 
-// Internally, we perform the addition/subtraction on WORD_WIDTH + 1 bits so
-// an overflow cannot happen, and thus the saturation logic is a pair of
-// simple signed comparisons in the larger range. This is also likely optimal,
-// as the delay from one extra bit of carry is less than that of any extra
-// logic to handle overflows.
+// Internally, we perform the addition/subtraction on WORD_WIDTH + 1 bits.
+// Since the limits must be within the range of WORD_WIDTH-wide numbers, there
+// can never be an overflow or underflow. Instead, we signal if we have
+// reached or would have exceeded the limits at the last incrementation.  The
+// saturation logic is a pair of simple signed comparisons in the larger
+// range. This is also likely optimal, as the delay from one extra bit of
+// carry is less than that of any extra logic to handle overflows.
 
 // Also, we internally perform the addition/subtraction as unsigned so we can
 // easily handle the carry_in bit. The signed comparisons are done in
 // a separate module which implements signed/unsigned comparisons as raw
 // logic, to avoid having to make sure all compared values are declared
 // signed, else the comparison silently defaults to unsigned!
+
+//## Maintaining high operating frequency
+
+// You will very likely need to pipeline the *inputs* (for better retiming) of
+// this module inside the enclosing module since we are chaining
+// adder/subtractors together (there is a subtraction inside the
+// Arithmetic_Predicates_Binary modules), so the total carry-chain is twice as
+// long as expected, plus 2 more bits to avoid overflow. Most of the time,
+// this will take longer than your clock cycle since the carry-chain of
+// arithmetic logic is often a limiting factor in timing closure.
 
 `default_nettype none
 
@@ -38,7 +52,11 @@ module Adder_Subtractor_Binary_Saturating
     input   wire    [WORD_WIDTH-1:0]    A_in,
     input   wire    [WORD_WIDTH-1:0]    B_in,
     output  reg     [WORD_WIDTH-1:0]    sum_out,
-    output  reg                         carry_out
+    output  wire                        carry_out,
+    output  wire                        at_max_limit,
+    output  wire                        over_max_limit,
+    output  wire                        at_min_limit,
+    output  wire                        under_min_limit
 );
 
     localparam WORD_ZERO            = {WORD_WIDTH{1'b0}};
@@ -47,7 +65,6 @@ module Adder_Subtractor_Binary_Saturating
 
     initial begin
         sum_out     = WORD_ZERO;
-        carry_out   = 1'b0;
     end
 
 // Extend the inputs to prevent overflow over their original range. We extend
@@ -111,9 +128,10 @@ module Adder_Subtractor_Binary_Saturating
         .adjusted_output    (min_limit_extended)
     );
 
-// Then select and perform the addition or subtraction in the usual way. 
+// Then select and perform the addition or subtraction in the usual way.
 // NOTE: we don't capture the extended carry_out, as it will never be set
-// since the inputs are too small. We compute the carry_out later.
+// properly since the inputs are too small. We compute the real carry_out
+// separately.
 
     wire [WORD_WIDTH_EXTENDED-1:0] sum_out_extended;
 
@@ -133,12 +151,25 @@ module Adder_Subtractor_Binary_Saturating
         // verilator lint_on  PINCONNECTEMPTY
     );
 
+// Since we extended the width by one bit, the original carry_out is now the
+// carry_in of that extra bit. Let's reconstruct it.
+
+    CarryIn_Binary
+    #(
+        .WORD_WIDTH (1)
+    )
+    reconstruct_carry_out
+    (
+        .A          (A_in_extended      [WORD_WIDTH_EXTENDED-1]),
+        .B          (B_in_extended      [WORD_WIDTH_EXTENDED-1]),
+        .sum        (sum_out_extended   [WORD_WIDTH_EXTENDED-1]),
+        .carryin    (carry_out)
+    );
+
 // Check if the sum_out_extended is past the min/max limits.  Using these
 // arithmetic predicate modules removes the need to get all the signed
 // declarations correct, else we accidentally and silently fall back to
 // unsigned comparisons!
-
-    wire over_max_limit;
 
     Arithmetic_Predicates_Binary
     #(
@@ -150,7 +181,7 @@ module Adder_Subtractor_Binary_Saturating
         .B                  (max_limit_extended),
         
         // verilator lint_off PINCONNECTEMPTY
-        .A_eq_B             (),
+        .A_eq_B             (at_max_limit),
         
         .A_lt_B_unsigned    (),
         .A_lte_B_unsigned   (),
@@ -164,8 +195,6 @@ module Adder_Subtractor_Binary_Saturating
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-    wire under_min_limit;
-
     Arithmetic_Predicates_Binary
     #(
         .WORD_WIDTH (WORD_WIDTH_EXTENDED)
@@ -176,7 +205,7 @@ module Adder_Subtractor_Binary_Saturating
         .B                  (min_limit_extended),
         
         // verilator lint_off PINCONNECTEMPTY
-        .A_eq_B             (),
+        .A_eq_B             (at_min_limit),
         
         .A_lt_B_unsigned    (),
         .A_lte_B_unsigned   (),
@@ -192,11 +221,8 @@ module Adder_Subtractor_Binary_Saturating
 
 // After, clip the sum to the limits. This must be done as a signed comparison
 // so we can place the limits anywhere in the positive or negative integers,
-// so long as max_limit >= min_limit, as signed integers.
-
-// And finally, truncate the output back to the input WORD_WIDTH, and set the
-// carry_out to the MSB of the extended sum, which is the carry_out for the
-// sum/difference of the original inputs.
+// so long as max_limit >= min_limit, as signed integers.  And finally,
+// truncate the output back to the input WORD_WIDTH.
 
     reg [WORD_WIDTH_EXTENDED-1:0] sum_out_extended_clipped = WORD_ZERO_EXTENDED;
 
@@ -204,7 +230,6 @@ module Adder_Subtractor_Binary_Saturating
         sum_out_extended_clipped    = (over_max_limit  == 1'b1) ? max_limit_extended : sum_out_extended;
         sum_out_extended_clipped    = (under_min_limit == 1'b1) ? min_limit_extended : sum_out_extended_clipped;
         sum_out                     = sum_out_extended_clipped [WORD_WIDTH-1:0];
-        carry_out                   = sum_out_extended [WORD_WIDTH_EXTENDED-1];
     end
 
 endmodule
