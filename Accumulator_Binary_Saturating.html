@@ -9,27 +9,48 @@
 
 <p><a href="./Accumulator_Binary_Saturating.v">Source</a></p>
 
-<h1>Binary Accumulator, Signed, with Saturation</h1>
-<p>Adds the signed <code>increment</code> to the signed <code>accumulated_value</code> every cycle
- <code>increment_valid</code> is high. <code>load_valid</code> overrides <code>increment_valid</code> and
- instead loads the accumulator with <code>load_value</code>. <code>clear</code> overrides both
- <code>increment_valid</code> and <code>load_valid</code> and puts the accumulator back at
+<h1>Signed Binary Accumulator, with Saturation</h1>
+<p>Adds the signed <code>increment</code> to the signed <code>accumulated_value</code> when
+ <code>increment_valid</code> is pulsed high <em>for one cycle</em>. <code>load_valid</code> (also pulsed
+ high for one cycle) overrides <code>increment_valid</code> and instead loads the
+ accumulator with <code>load_value</code>. <code>clear</code> overrides both <code>increment_valid</code> and
+ <code>load_valid</code> <em>immediately</em> and puts the accumulator back at
  <code>INITIAL_VALUE</code>.</p>
-<p>If the increment would cause the accumulator to go past the signed minimum
- or maximum limits, the accumulator will saturate at the nearest limit value
- and also raise <code>signed_overflow</code> until the next operation.</p>
 <p>When chaining accumulators, which may happen if you are incrementing in
  unusual bases where each digit has its own accumulator, AND the <code>carry_out</code>
  of the previous accumulator with the signal fed to the <code>increment_valid</code>
  input of the next accumulator. The <code>carry_in</code> is kept for generality.</p>
+<h2>Saturation</h2>
+<p>If the increment <strong>or the load</strong> would cause the accumulator to go past the
+ signed minimum or maximum limits, the accumulator will saturate at the
+ nearest limit value and also raise one or more of the min/max limit signals
+ until the next operation. <strong>The maximum limit must be greater or equal than
+ the minimum limit.</strong> If the limits are reversed, such that max_limit
+ &lt; min_limit, the result will be meaningless.</p>
+<h2>Pipelining for high operating frequency</h2>
+<p>This module is pipelined since we are chaining adder/subtractors together
+ inside the
+ <a href="./Adder_Subtractor_Binary_Saturating.html">Adder_Subtractor_Binary_Saturating</a>
+ module, so the total carry-chain is twice as long as expected, plus 2 more
+ bits to avoid overflow. Most of the time, this will take longer than your
+ clock cycle since the carry-chain of arithmetic logic is often a limiting
+ factor in timing closure.</p>
+<p>We can't retime a pipeline from outside since there is a loop, so we
+ pipeline inside the loop here, and let that retime across the carry-chains.
+ The price to pay is a latency of EXTRA_PIPE_STAGES+1 cycles between
+ declaring an increment or load valid and having it update the
+ accumulated_value.  This is why the input valid signals (increment and
+ load) must be asserted for only one cycle when EXTRA_PIPE_STAGES is greater
+ than zero, then wait until the output has updated before pulsing again.</p>
 
 <pre>
 `default_nettype none
 
 module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturating</a>
 #(
-    parameter                   WORD_WIDTH      = 0,
-    parameter [WORD_WIDTH-1:0]  INITIAL_VALUE   = 0
+    parameter                   EXTRA_PIPE_STAGES   = -1,
+    parameter                   WORD_WIDTH          =  0,
+    parameter [WORD_WIDTH-1:0]  INITIAL_VALUE       =  0
 )
 (
     input   wire                        clock,
@@ -43,83 +64,145 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     input   wire                        carry_in,
     output  wire                        carry_out,
     output  wire    [WORD_WIDTH-1:0]    accumulated_value,
-    output  wire                        signed_overflow
+    output  wire                        accumulated_value_updated,
+    output  wire                        at_max_limit,
+    output  wire                        over_max_limit,
+    output  wire                        at_min_limit,
+    output  wire                        under_min_limit
 );
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 </pre>
 
-<p>Apply the increment to the current accumulator value, with saturation.</p>
+<p>Here, we pipeline the inputs so that all signals further down are in sync,
+ and to place the register pipeline inside the loop formed by the
+ Adder_Subtractor_Binary_Saturating and the output register, so we can have
+ forward retiming move it into the Adder_Subtractor_Binary_Saturating logic.
+ (Backwards retiming is more difficult, and not supported by Vivado
+ post-synth optimizations)</p>
 
 <pre>
-    wire [WORD_WIDTH-1:0] incremented_value;
+    wire [WORD_WIDTH-1:0]   max_limit_pipelined;
+    wire [WORD_WIDTH-1:0]   min_limit_pipelined;
+    wire                    increment_valid_pipelined;
+    wire [WORD_WIDTH-1:0]   increment_pipelined;
+    wire                    load_valid_pipelined;
+    wire [WORD_WIDTH-1:0]   load_value_pipelined;
+    wire                    carry_in_pipelined;
+    wire [WORD_WIDTH-1:0]   accumulated_value_pipelined;
+
+    generate
+        if (EXTRA_PIPE_STAGES == 0) begin: no_pipe
+            assign max_limit_pipelined          = max_limit;
+            assign min_limit_pipelined          = min_limit;
+            assign increment_valid_pipelined    = increment_valid;
+            assign increment_pipelined          = increment;
+            assign load_valid_pipelined         = load_valid;
+            assign load_value_pipelined         = load_value;
+            assign carry_in_pipelined           = carry_in;
+            assign accumulated_value_pipelined  = accumulated_value;
+        end
+        else if (EXTRA_PIPE_STAGES > 0) begin: extra_pipe
+
+            localparam PIPELINE_WIDTH       = (WORD_WIDTH * 5) + 3;
+            localparam PIPELINE_WORD_ZERO   = {PIPELINE_WIDTH{1'b0}};
+            localparam PIPELINE_ZERO        = {EXTRA_PIPE_STAGES{PIPELINE_WORD_ZERO}};
+
+            <a href="./Register_Pipeline.html">Register_Pipeline</a>
+            #(
+                .WORD_WIDTH     (PIPELINE_WIDTH),
+                .PIPE_DEPTH     (EXTRA_PIPE_STAGES),
+                // concatenation of each stage initial/reset value
+                .RESET_VALUES   (PIPELINE_ZERO)
+            )
+            accumulator_pipeline
+            (
+                .clock          (clock),
+                .clock_enable   (1'b1),
+                .clear          (clear),
+                .parallel_load  (1'b0),
+                .parallel_in    (PIPELINE_ZERO),
+                // verilator lint_off PINCONNECTEMPTY
+                .parallel_out   (),
+                // verilator lint_on  PINCONNECTEMPTY
+                .pipe_in        ({max_limit,           min_limit,           increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value}),
+                .pipe_out       ({max_limit_pipelined, min_limit_pipelined, increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined})
+            );
+        end
+    endgenerate
+</pre>
+
+<p><strong>After this point, only use the pipelined inputs.</strong></p>
+<p>If we are loading, then substitute the <code>accumulated_value</code> with zero, and
+ the <code>increment</code> with the <code>load_value</code>. Converting a load to an addition to
+ zero prevents us from loading a value outside the given limits, which could
+ really upset things in the enclosing logic, and will set the output status
+ bits correctly.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] accumulated_value_gated;
+
+    <a href="./Annuller.html">Annuller</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .IMPLEMENTATION ("AND")
+    )
+    gate_accumulated_value
+    (
+        .annul          (load_valid_pipelined == 1'b1),
+        .data_in        (accumulated_value_pipelined),
+        .data_out       (accumulated_value_gated)
+    );
+
+    reg [WORD_WIDTH-1:0] increment_selected = WORD_ZERO;
+
+    always @(*) begin
+        increment_selected = (load_valid_pipelined == 1'b1) ? load_value_pipelined : increment_pipelined;
+    end
+</pre>
+
+<p>Apply the increment to the current accumulator value, or the load value to
+ an accumulator value of zero, both with saturation.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0]   incremented_value_internal;
+    wire                    carry_out_internal;
+    wire                    at_max_limit_internal;
+    wire                    over_max_limit_internal;
+    wire                    at_min_limit_internal;
+    wire                    under_min_limit_internal;
 
     <a href="./Adder_Subtractor_Binary_Saturating.html">Adder_Subtractor_Binary_Saturating</a>
     #(
-        .WORD_WIDTH (WORD_WIDTH)
+        .WORD_WIDTH     (WORD_WIDTH)
     )
     add_increment
     (
-        .max_limit  (max_limit),
-        .min_limit  (min_limit),
-        .add_sub    (1'b0), // 0/1 -> A+B/A-B
-        .carry_in   (carry_in),
-        .A_in       (accumulated_value),
-        .B_in       (increment),
-        .sum_out    (incremented_value),
-        .carry_out  (carry_out)
+        .max_limit      (max_limit_pipelined),
+        .min_limit      (min_limit_pipelined),
+        .add_sub        (1'b0),                     // 0/1 -> A+B/A-B
+        .carry_in       (carry_in_pipelined),
+        .A_in           (accumulated_value_gated),
+        .B_in           (increment_selected),
+        .sum_out        (incremented_value_internal),
+        .carry_out      (carry_out_internal),
+        .at_max_limit   (at_max_limit_internal),
+        .over_max_limit (over_max_limit_internal),
+        .at_min_limit   (at_min_limit_internal),
+        .under_min_limit (under_min_limit_internal)
     );
 </pre>
 
-<p>Then, let's <a href="./CarryIn_Binary.html">reconstruct the carry-in</a> into the last
- (most-significant) bit position of the result. If it differs from the
- carry_out, then a signed overflow/underflow happened, where we either added
- past the largest positive value or subtracted past the smallest negative
- value (regardless of saturation).</p>
+<p>Finally, update the accumulator register and other outputs sychronized to
+ it.  Update the registers if load or increment is valid. </p>
 
 <pre>
-    wire final_carry_in;
-
-    <a href="./CarryIn_Binary.html">CarryIn_Binary</a>
-    #(
-        .WORD_WIDTH (1)
-    )
-    calc_final_carry_in
-    (
-        .A          (accumulated_value  [WORD_WIDTH-1]),
-        .B          (increment          [WORD_WIDTH-1]),
-        .sum        (incremented_value  [WORD_WIDTH-1]),
-        .carryin    (final_carry_in)
-    );
-
-    reg signed_overflow_internal = 1'b0;
+    reg enable_output  = 1'b0;
 
     always @(*) begin
-        signed_overflow_internal = (carry_out != final_carry_in);
+        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1);
     end
-</pre>
 
-<p>Update the accumulator if load or increment is valid. 
- <em>Load overrides increment.</em> 
- Clear the overflow if loading.</p>
-
-<pre>
-    reg [WORD_WIDTH-1:0]    next_value              = WORD_ZERO;
-    reg                     enable_accumulator      = 1'b0;
-    reg                     enable_overflow         = 1'b0;
-    reg                     clear_overflow          = 1'b0;
-
-    always @(*) begin
-        next_value          = (load_valid == 1'b1) ? load_value : incremented_value;
-        enable_accumulator  = (increment_valid == 1'b1) || (load_valid == 1'b1);
-        enable_overflow     = (increment_valid == 1'b1);
-        clear_overflow      = (load_valid      == 1'b1) || (clear      == 1'b1);
-    end
-</pre>
-
-<p>Finally, the accumulator and signed_overflow registers.</p>
-
-<pre>
     <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
@@ -128,9 +211,9 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     accumulator
     (
         .clock          (clock),
-        .clock_enable   (enable_accumulator),
+        .clock_enable   (enable_output),
         .clear          (clear),
-        .data_in        (next_value),
+        .data_in        (incremented_value_internal),
         .data_out       (accumulated_value)
     );
 
@@ -139,13 +222,30 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
     )
-    overflow
+    updated_output
     (
         .clock          (clock),
-        .clock_enable   (enable_overflow),
-        .clear          (clear_overflow),
-        .data_in        (signed_overflow_internal),
-        .data_out       (signed_overflow)
+        .clock_enable   (1'b1),
+        .clear          (clear),
+        .data_in        (enable_output),
+        .data_out       (accumulated_value_updated)
+    );
+
+    localparam STATUS_BITS_COUNT = 5;
+    localparam STATUS_BITS_ZERO  = {STATUS_BITS_COUNT{1'b0}};
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (STATUS_BITS_COUNT),
+        .RESET_VALUE    (STATUS_BITS_ZERO)
+    )
+    status_bits
+    (
+        .clock          (clock),
+        .clock_enable   (enable_output),
+        .clear          (clear),
+        .data_in        ({carry_out_internal,  at_max_limit_internal,  over_max_limit_internal,  at_min_limit_internal,  under_min_limit_internal}),
+        .data_out       ({carry_out,           at_max_limit,           over_max_limit,           at_min_limit,           under_min_limit})
     );
 
 endmodule
