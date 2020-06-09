@@ -115,9 +115,8 @@ provided source file:
 
 <p>Use only <code>reg</code> and <code>wire</code> types. All signals are
 registers except where a wire is mandatory: module input ports, connecting
-module ports together, inferring tri-state I/O, and some rare constant
-assignments.  <em>(See <a href="#assign">Assign Statements</a> for
-details.)</em>
+module ports together, and inferring tri-state I/O.  <em>(See <a
+href="#assign">Assign Statements</a> for details.)</em>
 
 <p>Only use <code>0,1,X,Z</code> values, and avoid X and Z if at all possible.
 All registers must be initialized (and reset, if necessary) with a value which
@@ -129,7 +128,7 @@ effect when all others don't. The same idea applies to Boolean tests. Z is only
 used to define tri-state I/O, and only if the CAD vendor does not provide
 tri-state I/O primitives, as the inference is unreliable.
 
-<p><em>Never assign a value to wires</em>, either using an explicit <a
+<p><em>Never assign an initial value to wires</em>, either using an explicit <a
 href="#assign">assign</a> statement or an implicit initial assignment (e.g.:
 <code>wire foo = bar;</code>). Assigning a wire an initial value can cause
 problem if you then mistakenly connect that wire to a module port output,
@@ -137,7 +136,6 @@ leading to multiple drivers on the wire and surprise X's in your simulation.
 This situation easily happens if you convert a <code>reg</code> to a
 <code>wire</code>, because the signal source is now in a module, and you forget
 to remove the initial assignment on the <code>reg</code> (usually a zero).
-
 
 <h3>Parameterization</h3>
 
@@ -366,7 +364,7 @@ large number of assigns to describe the logic followed by a single always block
 to register all the outputs. <em>(See also <a href="#init">Initialization and
 Logic Values</a> for other assignment cases to avoid.)</em>
 
-<p>There are exactly three cases where you must use assign:
+<p>There are exactly two cases where you must use assign:
 
 <ol>
 
@@ -393,31 +391,10 @@ wire [WORD_WIDTH-1:0]   tristate_bus;
 assign tristate_bus = (output_enable == 1'b1) ? data_out : WORD_TRISTATE;
 </pre>
 
-<li>When connecting two wires whose generation you do not control (else you
-could create only one wire for the connection). This is a rare case which
-usually happens when a module in a <code>generate</code> block is not
-conditionally instantiated, and you must connect the dangling wires. 
-
-<li>When a combinational procedural block contains only constant values on the
-right hand side. For example:
-
-<pre>
-reg foo;
-always @(*) begin
-    foo = 1'b0;
-end
-</pre>
-
-<p>Since there can be no clock edge event or value change event of a right hand
-side value to trigger the procedural block, it is possible that the assignment
-never happens, depending on the interpretation of the CAD tool. This example is
-contrived, but such a situation will occur if you have a module output port
-which is both a register and outputs a constant. Since you cannot initialize a
-register in a port definition, you would have to use a combinational always
-block as shown above, with the consequent ambiguity in meaning. Thus, change
-the output port to a wire and assign the constant value to it.  <em>(This
-corner case was pointed out (and fixed!) by <a
-href="https://twitter.com/rodrigomelo9ok">Rodrigo Melo</a>.)</em>
+<li>When dealing with dangling wires. This is a rare case which usually happens
+when a module in a <code>generate</code> block is conditionally instantiated,
+and you must connect the dangling wires from the rest of the system to
+something when it is not instantiated. 
 
 </ol>
 
@@ -1003,6 +980,29 @@ always begin
     #`HALF_PERIOD clock = (clock === 1'b0);
 end
 </pre>
+
+<h3>Constant Values</h3>
+
+<p>When a combinational procedural block contains only constant values on the
+right hand side, your linter and/or simulator may raise warnings. For example:
+
+<pre>
+reg foo;
+always @(*) begin
+    foo = 1'b0;
+end
+</pre>
+
+<p>Since there can be no clock edge event or value change event of a right hand
+side value to trigger the procedural block, it is possible that the assignment
+never happens, depending on the interpretation of the CAD tool. This example is
+contrived, but such a situation will occur if you have a module output port
+which is both a register and outputs a constant. Since you cannot initialize a
+register in a port definition, you must instead set the constant value in an
+<code>initial</code> block, or at an extreme, change the <code>reg</code> port
+to a <code>wire</code> and <code>assign</code> it a constant value. (But this
+is strongly discouraged.) <em>(This corner case was pointed out (and fixed!) by
+<a href="https://twitter.com/rodrigomelo9ok">Rodrigo Melo</a>.)</em>
 
 <hr>
 
