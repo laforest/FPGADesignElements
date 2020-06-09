@@ -15,5 +15,9 @@ do
     echo "*** ICARUS VERILOG LINT ***"
     iverilog  -Wall -Wno-sensitivity-entire-vector -Wno-sensitivity-entire-array -g2001 -y . -o /dev/null ${FILE}
     echo
+    echo
+    echo "*** EXTRA CHECKS ***"
+    echo
+    grep -H -n "wire.*=" ${FILE} && echo "Found an initialization assignment to a wire. This can create multiple drivers."
 done
 
