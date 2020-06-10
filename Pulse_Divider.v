@@ -67,7 +67,6 @@ module Pulse_Divider
 
     reg                     run         = 1'b0;
     reg                     load        = 1'b0;
-    reg  [WORD_WIDTH-1:0]   load_count  = WORD_ZERO;
     wire [WORD_WIDTH-1:0]   count;
 
     Counter_Binary
@@ -83,34 +82,12 @@ module Pulse_Divider
         .up_down        (1'b1), // down
         .run            (run),
         .load           (load),
-        .load_count     (load_count),
+        .load_count     (divisor),
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
         // verilator lint_on PINCONNECTEMPTY
         .count          (count)
-    );
-
-// When an input pulse arrives at the same time as the output pulse, when the
-// counter reloads, we have to count that input pulse. So we instead reload
-// the counter with `divisor` minus 1. We generate that value here.
-
-    wire [WORD_WIDTH-1:0] divisor_minus_one;
-
-    Adder_Subtractor_Binary
-    #(
-        .WORD_WIDTH (WORD_WIDTH)
-    )
-    subtract_one
-    (
-        .add_sub    (1'b1),    // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A_in       (divisor),
-        .B_in       (WORD_ONE),
-        .sum_out    (divisor_minus_one),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
-        // verilator lint_on  PINCONNECTEMPTY
     );
 
 // Finally, we implement the control logic for the above modules: decrement
@@ -123,10 +100,9 @@ module Pulse_Divider
 
     always @(*) begin
         run             = (pulses_in     == 1'b1);
-        division_done   = (count         == WORD_ZERO);
+        division_done   = (count         == WORD_ONE) && (run     == 1'b1);
+        load            = (division_done == 1'b1)     || (restart == 1'b1);
         pulse_out       = (division_done == 1'b1);
-        load            = (division_done == 1'b1) || (restart      == 1'b1);
-        load_count      = ((load         == 1'b1) && (run          == 1'b1)) ? divisor_minus_one : divisor;
     end
 
 endmodule
