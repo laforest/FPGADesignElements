@@ -113,33 +113,6 @@ module Pulse_Divider
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-// In a previous version of this pulse divider the divisor was a constant
-// parameter, so the counter could use it as an initial value and start
-// counting the input pulses right away. However, with `divisor` as
-// a changeable input, we can't use it as an initial value for the counter
-// anymore. So instead we initialize the counter to zero, which makes
-// `pulse_out` high by default, but this is an error as we have not yet
-// received any input pulses. So we gate `pulse_out` with the output from
-// a pulse latch that will get set (and stay set forever) once `pulse_out` is
-// brought back low by the counter reload that happens when it reaches zero.
-// The case of receiving an input pulse at the same time is dealt as
-// previously described.
-
-    reg  open_gate = 1'b0;
-    wire allow_output;
-
-    Pulse_Latch
-    #(
-        .RESET_VALUE (1'b0)
-    )
-    initial_gate
-    (
-        .clock      (clock),
-        .clear      (1'b0),
-        .pulse_in   (open_gate),
-        .level_out  (allow_output)
-    );
-
 // Finally, we implement the control logic for the above modules: decrement
 // the counter one step for each cycle `pulses_in` is high, send out a pulse
 // when the counter reaches zero (except for the initial one), reload the
@@ -151,8 +124,7 @@ module Pulse_Divider
     always @(*) begin
         run             = (pulses_in     == 1'b1);
         division_done   = (count         == WORD_ZERO);
-        open_gate       = (division_done == 1'b1);
-        pulse_out       = (division_done == 1'b1) && (allow_output == 1'b1);
+        pulse_out       = (division_done == 1'b1);
         load            = (division_done == 1'b1) || (restart      == 1'b1);
         load_count      = ((load         == 1'b1) && (run          == 1'b1)) ? divisor_minus_one : divisor;
     end
