@@ -35,7 +35,8 @@
 
 module Pulse_Divider
 #(
-    parameter WORD_WIDTH = 0
+    parameter                   WORD_WIDTH      = 16,
+    parameter [WORD_WIDTH-1:0]  INITIAL_DIVISOR = 3
 )
 (
     input  wire                     clock,
@@ -73,7 +74,7 @@ module Pulse_Divider
     #(
         .WORD_WIDTH     (WORD_WIDTH),
         .INCREMENT      (WORD_ONE),
-        .INITIAL_COUNT  (WORD_ZERO)
+        .INITIAL_COUNT  (INITIAL_DIVISOR)
     )
     pulse_counter
     (
@@ -128,6 +129,9 @@ module Pulse_Divider
     wire allow_output;
 
     Pulse_Latch
+    #(
+        .RESET_VALUE (1'b0)
+    )
     initial_gate
     (
         .clock      (clock),
