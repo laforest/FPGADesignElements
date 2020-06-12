@@ -1,0 +1,139 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Divider</title>
+</head>
+<body>
+
+<p><a href="./Pulse_Divider.v">Source</a></p>
+
+<h1>Pulse Divider</h1>
+<p>Outputs a single-cycle high pulse when <code>divisor</code> input pulses have been
+ received, thus dividing their number. For example, if <code>divisor</code> is 3,
+ then:</p>
+<ul>
+<li>9 input pulses will produce 3 output pulses</li>
+<li>5 input pulses will produce 1 output pulse</li>
+<li>7 input pulses will produce 2 output pulses</li>
+</ul>
+<p>Pulses do not have to be distinct: holding the input high for a number of
+ clock cycles will have the same effect as the same number of separate,
+ single-cycle pulses.</p>
+<p>The output pulse occurs in the same cycle as the input pulse, which means
+ there is a combinational path from <code>pulses_in</code> to <code>pulse_out</code>. This is
+ necessary to avoid a cycle of latency between an input pulse arriving and
+ signalling that it is a multiple of <code>divisor</code>. (e.g. signalling that the
+ current load fills the last empty space in a buffer).</p>
+<p>The <code>divisor</code> is reloaded automatically after each output pulse. Any
+ changes to the <code>divisor</code> input before then do not affect the current pulse
+ division. However, asserting <code>restart</code> for one cycle will force the
+ <code>divisor</code> to reload and the pulse division to restart. Holding <code>restart</code>
+ high will halt the pulse divider.</p>
+<p><em>Loading a <code>divisor</code> of zero will halt the divider and raise <code>div_by_zero</code>
+ until a non-zero <code>divisor</code> is loaded.</em> A <code>restart</code> pulse is not required
+ after startup if <code>INITIAL_DIVISOR</code> is set to a non-zero value, else the
+ divider remains halted (and <code>div_by_zero</code> raised) until <code>restart</code>. </p>
+<h2>Uses</h2>
+<ul>
+<li>Signal when a number of events have happened (e.g.: counting loads into
+ a pipeline or buffer)</li>
+<li>Generate a periodic enable pulse derived from your main clock. (tie
+ <code>pulses_in</code> to 1)</li>
+<li>Perform integer division: the number of output pulses after your input
+ pulses are done is the quotient, the number of input pulses you have to then
+ provide to get one more output pulse is the remainder if less than
+ <code>divisor</code>, else it's zero (i.e.: it's the remainder modulo <code>divisor</code>).</li>
+</ul>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pulse_Divider.html">Pulse_Divider</a>
+#(
+    parameter                   WORD_WIDTH      = 16,
+    parameter [WORD_WIDTH-1:0]  INITIAL_DIVISOR = 3
+)
+(
+    input  wire                     clock,
+    input  wire                     restart,
+    input  wire [WORD_WIDTH-1:0]    divisor,
+    input  wire                     pulses_in,
+    output reg                      pulse_out,
+    output reg                      div_by_zero
+);
+
+    initial begin
+        pulse_out   = 1'b0;
+        div_by_zero = 1'b0;
+    end
+</pre>
+
+<p>These are the two counter values which are important: WORD_ONE signifies we
+ have received <code>divisor</code> or <code>INITIAL_DIVISOR</code> pulses, and WORD_ZERO is never
+ reached unless a division by zero is attempted by loading or initializing
+ with a value of zero.</p>
+
+<pre>
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+    localparam WORD_ONE  = {{WORD_WIDTH-1{1'b0}}, 1'b1};
+</pre>
+
+<p>The core of the pulse divider is a simple down counter whose value is
+ interpreted as "input pulses remaining before an output pulse". So a loaded
+ <code>divisor</code> of 3 would accept 3 input pulses to count "3, 2, 1", at which
+ point <code>pulse_out</code> goes high on the third <code>pulses_in</code> while the counter is
+ at <code>1</code>, the counter reloads the divisor, and everything returns to
+ start conditions at the next clock edge. <em>The count of zero is never
+ reached by counting.</em></p>
+
+<pre>
+    reg                     run     = 1'b0;
+    reg                     load    = 1'b0;
+    wire [WORD_WIDTH-1:0]   count;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .INCREMENT      (WORD_ONE),
+        .INITIAL_COUNT  (INITIAL_DIVISOR)
+    )
+    pulse_counter
+    (
+        .clock          (clock),
+        .clear          (1'b0),
+        .up_down        (1'b1), // down
+        .run            (run),
+        .load           (load),
+        .load_count     (divisor),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        // verilator lint_on PINCONNECTEMPTY
+        .count          (count)
+    );
+</pre>
+
+<p>Finally, we implement the control logic. </p>
+
+<pre>
+    reg division_done = 1'b0;
+
+    always @(*) begin
+        run             = (pulses_in     == 1'b1)     && (count     != WORD_ZERO);
+        division_done   = (count         == WORD_ONE) && (pulses_in == 1'b1);
+        load            = (division_done == 1'b1)     || (restart   == 1'b1);
+        pulse_out       = (division_done == 1'b1)     && (restart   == 1'b0);
+        div_by_zero     = (count == WORD_ZERO);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

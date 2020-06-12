@@ -9,21 +9,31 @@
 // * 5 input pulses will produce 1 output pulse
 // * 7 input pulses will produce 2 output pulses
 
-// Pulses do not have to be distinct: holding the input high for the expected
-// number of clock cycles will have the same effect as the same number of
-// separate, spaced pulses.
+// Pulses do not have to be distinct: holding the input high for a number of
+// clock cycles will have the same effect as the same number of separate,
+// single-cycle pulses.
+
+// The output pulse occurs in the same cycle as the input pulse, which means
+// there is a combinational path from `pulses_in` to `pulse_out`. This is
+// necessary to avoid a cycle of latency between an input pulse arriving and
+// signalling that it is a multiple of `divisor`. (e.g. signalling that the
+// current load fills the last empty space in a buffer).
 
 // The `divisor` is reloaded automatically after each output pulse. Any
-// changes to the divisor before then do not affect the current pulse
+// changes to the `divisor` input before then do not affect the current pulse
 // division. However, asserting `restart` for one cycle will force the
-// `divisor` to reload and the pulse division to restart. Holding restart
-// `high` will halt the pulse divider. A `restart` pulse is not required after
-// startup (there is built-in initialization logic): you can send pulses in
-// right away.
+// `divisor` to reload and the pulse division to restart. Holding `restart`
+// high will halt the pulse divider.
+
+// *Loading a `divisor` of zero will halt the divider and raise `div_by_zero`
+// until a non-zero `divisor` is loaded.* A `restart` pulse is not required
+// after startup if `INITIAL_DIVISOR` is set to a non-zero value, else the
+// divider remains halted (and `div_by_zero` raised) until `restart`. 
 
 //## Uses
 
-// * Signal when a number of events have happened.
+// * Signal when a number of events have happened (e.g.: counting loads into
+// a pipeline or buffer)
 // * Generate a periodic enable pulse derived from your main clock. (tie
 // `pulses_in` to 1)
 // * Perform integer division: the number of output pulses after your input
@@ -43,30 +53,33 @@ module Pulse_Divider
     input  wire                     restart,
     input  wire [WORD_WIDTH-1:0]    divisor,
     input  wire                     pulses_in,
-    output reg                      pulse_out
+    output reg                      pulse_out,
+    output reg                      div_by_zero
 );
 
     initial begin
-        pulse_out = 1'b0;
+        pulse_out   = 1'b0;
+        div_by_zero = 1'b0;
     end
+
+// These are the two counter values which are important: WORD_ONE signifies we
+// have received `divisor` or `INITIAL_DIVISOR` pulses, and WORD_ZERO is never
+// reached unless a division by zero is attempted by loading or initializing
+// with a value of zero.
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
     localparam WORD_ONE  = {{WORD_WIDTH-1{1'b0}}, 1'b1};
 
-// The core of the pulse divider is a simple down counter: we count from
-// `divisor` down to zero, signal an output pulse, and reload the counter with
-// `divisor`. You can think of the counter value as "input pulses remaining
-// before an output pulse". So a loaded `divisor` of 3 would accept 3 input
-// pulses to count "2, 1, 0", at which point `pulse_out` goes high, the
-// counter sets-up to reload the `divisor`, and everything returns to start
-// conditions at the next clock edge.
+// The core of the pulse divider is a simple down counter whose value is
+// interpreted as "input pulses remaining before an output pulse". So a loaded
+// `divisor` of 3 would accept 3 input pulses to count "3, 2, 1", at which
+// point `pulse_out` goes high on the third `pulses_in` while the counter is
+// at `1`, the counter reloads the divisor, and everything returns to
+// start conditions at the next clock edge. *The count of zero is never
+// reached by counting.*
 
-// However, there are two corner cases: the initial start-up, and
-// when an input pulse is received during reload. These cases are dealt with
-// further down.
-
-    reg                     run         = 1'b0;
-    reg                     load        = 1'b0;
+    reg                     run     = 1'b0;
+    reg                     load    = 1'b0;
     wire [WORD_WIDTH-1:0]   count;
 
     Counter_Binary
@@ -90,19 +103,16 @@ module Pulse_Divider
         .count          (count)
     );
 
-// Finally, we implement the control logic for the above modules: decrement
-// the counter one step for each cycle `pulses_in` is high, send out a pulse
-// when the counter reaches zero (except for the initial one), reload the
-// counter at zero or when forced to restart, and if an input pulse arrives
-// while the counter reloads, count it by loading the `divisor` minus 1.
+// Finally, we implement the control logic. 
 
     reg division_done = 1'b0;
 
     always @(*) begin
-        run             = (pulses_in     == 1'b1);
-        division_done   = (count         == WORD_ONE) && (run     == 1'b1);
-        load            = (division_done == 1'b1)     || (restart == 1'b1);
-        pulse_out       = (division_done == 1'b1);
+        run             = (pulses_in     == 1'b1)     && (count     != WORD_ZERO);
+        division_done   = (count         == WORD_ONE) && (pulses_in == 1'b1);
+        load            = (division_done == 1'b1)     || (restart   == 1'b1);
+        pulse_out       = (division_done == 1'b1)     && (restart   == 1'b0);
+        div_by_zero     = (count == WORD_ZERO);
     end
 
 endmodule
