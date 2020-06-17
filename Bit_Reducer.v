@@ -59,8 +59,8 @@
 
 module Bit_Reducer
 #(
-    parameter OPERATION     = "XNOR",
-    parameter INPUT_COUNT   = 7
+    parameter OPERATION     = "",
+    parameter INPUT_COUNT   = 0
 )
 (
     input   wire    [INPUT_COUNT-1:0]   bits_in,
@@ -73,7 +73,18 @@ module Bit_Reducer
         bit_out = 1'b0;
     end
 
+// First, initialize the partial reduction storage. Each partial reduction
+// must be stored in its own storage, else we describe a broken combinational
+// loop.
+
+// To make the code clearer, `partial_reduction` is read and written in
+// different `always` blocks, so the linter is confused and sees a potential
+// combinational loop, which doesn't exist here because of the non-overlapping
+// indices. So we disable that warning here.
+
+    // verilator lint_off UNOPTFLAT
     reg [INPUT_COUNT-1:0] partial_reduction;
+    // verilator lint_on  UNOPTFLAT
 
     integer i;
 
@@ -83,17 +94,27 @@ module Bit_Reducer
         end
     end
 
+// Then prime the partial reductions with the first input, and read out the
+// result at the last partial reduction.
+
+    always @(*) begin
+        partial_reduction[0]    = bits_in[0];
+        bit_out                 = partial_reduction[INPUT_COUNT-1];
+    end
+
+// Finally, select the logic to instantiate based on the `OPERATION`
+// parameter. Each partial reduction is the combination of the previous
+// reduction and the current corresponding input bit.
+
     generate
 
         // verilator lint_off WIDTH
         if (OPERATION == "AND") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = partial_reduction[i-1] & bits_in[i];
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
         else
@@ -101,11 +122,9 @@ module Bit_Reducer
         if (OPERATION == "NAND") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = ~(partial_reduction[i-1] & bits_in[i]);
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
         else
@@ -113,11 +132,9 @@ module Bit_Reducer
         if (OPERATION == "OR") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = partial_reduction[i-1] | bits_in[i];
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
         else
@@ -125,11 +142,9 @@ module Bit_Reducer
         if (OPERATION == "NOR") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = ~(partial_reduction[i-1] | bits_in[i]);
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
         else
@@ -137,11 +152,9 @@ module Bit_Reducer
         if (OPERATION == "XOR") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = partial_reduction[i-1] ^ bits_in[i];
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
         else
@@ -149,11 +162,9 @@ module Bit_Reducer
         if (OPERATION == "XNOR") begin
         // verilator lint_on  WIDTH
             always @(*) begin
-                partial_reduction[0] = bits_in[0];
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
                     partial_reduction[i] = ~(partial_reduction[i-1] ^ bits_in[i]);
                 end
-                bit_out = partial_reduction[INPUT_COUNT-1];
             end
         end
 
