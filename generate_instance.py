@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # Module parameters
     # With special case to handle trailing comments (often used as notes)
     while not is_eof(line):
-        if ")" in line:
+        if line.strip().startswith(")"):
             break
         if is_comment(line) or is_blank(line):
             instance.append("\t\t{}".format(line.strip()))
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # Module ports
     # With special case to handle trailing comments (often used as notes)
     while not is_eof(line):
-        if ");" in line:
+        if line.strip().startswith(");"):
             break
         if is_comment(line) or is_blank(line):
             instance.append("\t\t{}".format(line.strip()))
