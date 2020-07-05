@@ -245,6 +245,8 @@ end
 
 <h2>Module Definition</h2>
 
+<p>FIXME: ADD NOTION OF "ENCLOSING MODULE" AS HIERARCHY DEFINER BY GROUPING RELATED SIGNALS. (I wrote that somewhere....in Core/Instance/Adapter/Shim?)
+
 <h3>Parameters</h3>
 
 <p>When defining a module, give all parameters a default value of zero or an
@@ -465,6 +467,8 @@ clear read.
 design idiom: to break-down complex logic into simpler expressions we can then
 think about sequentially and re-use as necessary.
 
+<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES AND SIMULATION/SYNTHESIS MISMATCH.
+
 <p>Thus, while simple logic can be correctly computed and assigned in a single
 line in a clocked always block, it's often clearer to implement more complex
 logic in a combinational block using blocking assignments and then register the
@@ -540,6 +544,8 @@ localparams and module parameters.
 <li>We can replace nested case/if/else statements with chained lines of ternary
 operators in blocking assignments, which make the code more compact and easier
 to follow.
+
+<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES AND SIMULATION/SYNTHESIS MISMATCH.
 
 <li>In simulation, Verilog if/else statements treat X and Z values as false, and so
 will fail to propagate these values and give unexpected results:
