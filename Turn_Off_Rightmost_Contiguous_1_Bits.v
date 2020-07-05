@@ -9,6 +9,8 @@
 // It can be used to determine if a nonnegative integer is of the form 2^j-2^k
 // for some j >= k >= 0: apply the formula followed by a 0-test on the result.
 
+`default_nettype none
+
 module Turn_Off_Rightmost_Contiguous_1_Bits
 #(
     parameter WORD_WIDTH = 0

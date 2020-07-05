@@ -33,6 +33,8 @@
 // and generally cause a lot of downstream logic to optimize away, so you
 // should notice...
 
+`default_nettype none
+
 module Demultiplexer_One_Hot
 #(
     parameter       BROADCAST           = 0,

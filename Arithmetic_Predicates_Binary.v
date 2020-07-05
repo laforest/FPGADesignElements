@@ -11,6 +11,8 @@
 // integer comparisons, based on the condition flags generated after
 // a (2's-complement) subtraction `A-B`.
 
+`default_nettype none
+
 module Arithmetic_Predicates_Binary
 #(
     parameter WORD_WIDTH = 0

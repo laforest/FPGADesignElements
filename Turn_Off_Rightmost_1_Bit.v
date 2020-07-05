@@ -9,6 +9,8 @@
 //This can be used to determine if an unsigned integer is a power of 2 or is
 //0: apply the formula followed by a 0-test on the result.
 
+`default_nettype none
+
 module Turn_Off_Rightmost_1_Bit
 #(
     parameter WORD_WIDTH = 0

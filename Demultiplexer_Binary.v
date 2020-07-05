@@ -34,6 +34,8 @@
 // and generally cause a lot of downstream logic to optimize away, so you
 // should notice...
 
+`default_nettype none
+
 module Demultiplexer_Binary
 #(
     parameter       BROADCAST           = 0,

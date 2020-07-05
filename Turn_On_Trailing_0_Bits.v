@@ -6,6 +6,8 @@
 // Use the following formula to turn on the trailing 0’s in a word, producing
 // the original input if none (e.g., 10101000 -> 10101111)
 
+`default_nettype none
+
 module Turn_On_Trailing_0_Bits
 #(
     parameter WORD_WIDTH = 0

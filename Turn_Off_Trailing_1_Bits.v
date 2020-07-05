@@ -10,6 +10,8 @@
 // (2^n)-1, 0, or all 1’s: apply the formula followed by a 0-test on the
 // result.
 
+`default_nettype none
+
 module Turn_Off_Trailing_1_Bits
 #(
     parameter WORD_WIDTH = 0

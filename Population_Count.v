@@ -45,6 +45,8 @@
 // a lot of bits being moved around between vectors, but this design choice
 // also makes the code easily parameterizable.
 
+`default_nettype none
+
 module Population_Count
 #(
     parameter WORD_WIDTH        = 0,

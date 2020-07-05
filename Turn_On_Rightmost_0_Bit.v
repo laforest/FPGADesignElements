@@ -6,6 +6,8 @@
 // Use the following formula to turn on the rightmost 0-bit in a word,
 // producing all 1’s if none (e.g., 10100111 -> 10101111)
 
+`default_nettype none
+
 module Turn_On_Rightmost_0_Bit
 #(
     parameter WORD_WIDTH = 0

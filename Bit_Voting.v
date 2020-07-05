@@ -20,6 +20,8 @@
 // bits for each voting outcome, with an extra check for tie to remove the
 // logic if the number of input bits is not even.
 
+`default_nettype none
+
 module Bit_Voting
 #(
     parameter INPUT_COUNT = 0
