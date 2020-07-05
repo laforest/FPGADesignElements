@@ -77,8 +77,7 @@ module Pulse_to_Pipeline
     end
 
 // The output ready/valid handshake starts when the connected module updates
-// its output data. We use "internal" signals, as the final Skid Buffer will
-// provide the output handshake to the enclosing module.
+// its output data.
 
     wire valid_out_latched;
 

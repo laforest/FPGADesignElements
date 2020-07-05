@@ -39,7 +39,7 @@
 <pre>
 `default_nettype none
 
-module Pulse_to_Pipeline
+module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
 #(
     parameter WORD_WIDTH = 0
 )
@@ -85,8 +85,7 @@ module Pulse_to_Pipeline
 </pre>
 
 <p>The output ready/valid handshake starts when the connected module updates
- its output data. We use "internal" signals, as the final Skid Buffer will
- provide the output handshake to the enclosing module.</p>
+ its output data.</p>
 
 <pre>
     wire valid_out_latched;
