@@ -23,12 +23,12 @@
 // changes to the `divisor` input before then do not affect the current pulse
 // division. However, asserting `restart` for one cycle will force the
 // `divisor` to reload and the pulse division to restart. Holding `restart`
-// high will halt the pulse divider.
+// high will halt the pulse divider. A `restart` pulse is not required after
+// startup.
 
-// *Loading a `divisor` of zero will halt the divider and raise `div_by_zero`
-// until a non-zero `divisor` is loaded.* A `restart` pulse is not required
-// after startup if `INITIAL_DIVISOR` is set to a non-zero value, else the
-// divider remains halted (and `div_by_zero` raised) until `restart`. 
+// *Loading a `divisor` of zero will disable the output pulses, raises
+// `div_by_zero`, and will load `divisor` every cycle until it becomes
+// non-zero.* 
 
 //## Uses
 
@@ -45,8 +45,8 @@
 
 module Pulse_Divider
 #(
-    parameter                   WORD_WIDTH      = 16,
-    parameter [WORD_WIDTH-1:0]  INITIAL_DIVISOR = 3
+    parameter                   WORD_WIDTH      = 0,
+    parameter [WORD_WIDTH-1:0]  INITIAL_DIVISOR = 0
 )
 (
     input  wire                     clock,
@@ -103,16 +103,23 @@ module Pulse_Divider
         .count          (count)
     );
 
-// Finally, we implement the control logic. 
+// Finally, we implement the control logic. We split out the calculation of
+// `div_by_zero` into a parallel procedural block, otherwise the linter could
+// see a false combinational loop between `div_by_zero` and `pulse_out` when
+// the divider is used in an enclosing module, since it cannot see into the
+// module hierarchy (I'm not certain of this).
+
+    always @(*) begin
+        div_by_zero = (count == WORD_ZERO);
+    end
 
     reg division_done = 1'b0;
 
     always @(*) begin
-        run             = (pulses_in     == 1'b1)     && (count     != WORD_ZERO);
-        division_done   = (count         == WORD_ONE) && (pulses_in == 1'b1);
-        load            = (division_done == 1'b1)     || (restart   == 1'b1);
-        pulse_out       = (division_done == 1'b1)     && (restart   == 1'b0);
-        div_by_zero     = (count == WORD_ZERO);
+        run             = (pulses_in     == 1'b1) && (count     != WORD_ZERO);
+        division_done   = (pulses_in     == 1'b1) && (count     == WORD_ONE);
+        load            = (division_done == 1'b1) || (restart   == 1'b1) || (div_by_zero == 1'b1);
+        pulse_out       = (division_done == 1'b1) && (restart   == 1'b0);
     end
 
 endmodule
