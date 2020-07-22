@@ -7,6 +7,7 @@ ALL_FILES=$@
 
 for FILE in ${ALL_FILES}
 do
+    echo -n "Checking file: ${FILE}"
     echo
     echo "*** VERILATOR LINT ***"
     verilator -Wall +1364-2001ext+v -y . --lint-only  ${FILE}
