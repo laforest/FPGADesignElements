@@ -467,7 +467,8 @@ clear read.
 design idiom: to break-down complex logic into simpler expressions we can then
 think about sequentially and re-use as necessary.
 
-<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES AND SIMULATION/SYNTHESIS MISMATCH.
+<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES CAUSING SIMULATION/SYNTHESIS MISMATCH.
+<p>FIXME: ADD NOTE RE: VERILATOR NOT LINTING SEQUENTIAL DEPENDENCIES WELL (false comb loop, must split always block, due to passing through modules?).
 
 <p>Thus, while simple logic can be correctly computed and assigned in a single
 line in a clocked always block, it's often clearer to implement more complex
