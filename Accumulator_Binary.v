@@ -4,9 +4,18 @@
 // Adds the signed `increment` to the signed `accumulated_value` when
 // `increment_valid` is pulsed high *for one cycle*. `load_valid` (also pulsed
 // high for one cycle) overrides `increment_valid` and instead loads the
-// accumulator with `load_value`.  `clear` overrides both `increment_valid`
-// and `load_valid` *immediately* and puts the accumulator back at
-// `INITIAL_VALUE`.
+// accumulator with `load_value`. The `accumulated_value_updated` output will
+// eventually pulse high once for each increment or load pulse, after the
+// pipeline delay.
+
+// `clear` overrides both `increment_valid` and `load_valid` and instead puts
+// the accumulator back at `INITIAL_VALUE` after the same pipeline delay, and
+// also pulses the `accumulated_value_updated` output only *once*, regardless
+// of the length of the `clear` pulse.
+
+// Deasserting `clock_enable` freezes the accumulator: increments, loads, and
+// clears are ignored, the internal pipeline (if any) holds steady, and all
+// outputs remain static.
 
 // When chaining accumulators, which may happen if you are incrementing in
 // unusual bases where each digit has its own accumulator, AND the `carry_out`
@@ -44,6 +53,7 @@ module Accumulator_Binary
 )
 (
     input   wire                        clock,
+    input   wire                        clock_enable,
     input   wire                        clear,
     input   wire    [WORD_WIDTH-1:0]    increment,
     input   wire                        increment_valid,
@@ -71,6 +81,7 @@ module Accumulator_Binary
     wire [WORD_WIDTH-1:0]   load_value_pipelined;
     wire                    carry_in_pipelined;
     wire [WORD_WIDTH-1:0]   accumulated_value_pipelined;
+    wire                    clear_pipelined;
 
     generate
         if (EXTRA_PIPE_STAGES == 0) begin: no_pipe
@@ -80,10 +91,11 @@ module Accumulator_Binary
             assign load_value_pipelined         = load_value;
             assign carry_in_pipelined           = carry_in;
             assign accumulated_value_pipelined  = accumulated_value;
+            assign clear_pipelined              = clear;
         end
         else if (EXTRA_PIPE_STAGES > 0) begin: extra_pipe
 
-            localparam PIPELINE_WIDTH       = (WORD_WIDTH * 3) + 3;
+            localparam PIPELINE_WIDTH       = (WORD_WIDTH * 3) + 4;
             localparam PIPELINE_WORD_ZERO   = {PIPELINE_WIDTH{1'b0}};
             localparam PIPELINE_ZERO        = {EXTRA_PIPE_STAGES{PIPELINE_WORD_ZERO}};
 
@@ -98,14 +110,14 @@ module Accumulator_Binary
             (
                 .clock          (clock),
                 .clock_enable   (1'b1),
-                .clear          (clear),
+                .clear          (1'b0),
                 .parallel_load  (1'b0),
                 .parallel_in    (PIPELINE_ZERO),
                 // verilator lint_off PINCONNECTEMPTY
                 .parallel_out   (),
                 // verilator lint_on  PINCONNECTEMPTY
-                .pipe_in        ({increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value}),
-                .pipe_out       ({increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined})
+                .pipe_in        ({increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value,           clear}),
+                .pipe_out       ({increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined, clear_pipelined})
             );
         end
     endgenerate
@@ -115,8 +127,17 @@ module Accumulator_Binary
 //
 
 // If we are loading, then substitute the `accumulated_value` with zero, and
-// the `increment` with the `load_value`. Converting a load to an addition to
-// zero will set the `carry_out` and `signed_overflow` bits correctly.
+// the `increment` with the `load_value`. 
+// If we are clearing, then substitute the `accumulated_value` with zero, and
+// the `increment` with the `INITIAL_VALUE`. 
+// Converting a load or clear to an addition to zero will set the `carry_out`
+// and `signed_overflow` bits correctly.
+
+    reg gate_accumulated_value = 1'b0;
+
+    always @(*) begin
+        gate_accumulated_value = (load_valid_pipelined == 1'b1) || (clear_pipelined == 1'b1);
+    end
 
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
 
@@ -125,9 +146,9 @@ module Accumulator_Binary
         .WORD_WIDTH     (WORD_WIDTH),
         .IMPLEMENTATION ("AND")
     )
-    gate_accumulated_value
+    gate_accumulated
     (
-        .annul          (load_valid_pipelined == 1'b1),
+        .annul          (gate_accumulated_value == 1'b1),
         .data_in        (accumulated_value_pipelined),
         .data_out       (accumulated_value_gated)
     );
@@ -136,10 +157,13 @@ module Accumulator_Binary
 
     always @(*) begin
         increment_selected = (load_valid_pipelined == 1'b1) ? load_value_pipelined : increment_pipelined;
+        increment_selected = (clear_pipelined      == 1'b1) ? INITIAL_VALUE        : increment_selected;
     end
 
+
 // Apply the increment to the current accumulator value, or the load value to
-// an accumulator value of zero.
+// an accumulator value of zero, or the initial value to an accumulator value
+// of zero.
 
     wire [WORD_WIDTH-1:0]   incremented_value_internal;
     wire                    carry_out_internal;
@@ -184,13 +208,36 @@ module Accumulator_Binary
         signed_overflow_internal = (carry_out_internal != final_carry_in);
     end
 
+// Convert `clear_pipelined` into a singe pulse, in case it is longer, since
+// it is guaranteed the output changes value only once to `INITIAL_VALUE`, as
+// opposed to loads and increments which can change the output value each
+// cycle they are high, based on input (if EXTRA_PIPE_STAGES is zero, they
+// can be high for multiple consecutive cycles).
+
+    wire clear_pulse;
+
+    Pulse_Generator
+    #(
+        .PULSE_LENGTH   (1),    // Minimum 1, or greater
+        .EDGE_TYPE      ("POS") // POS, NEG, ANY
+    )
+    clear_one_shot
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
+        .level_in       (clear_pipelined),
+        .pulse_out      (clear_pulse)
+    );
+
 // Finally, update the accumulator register and other outputs sychronized to
-// it.  Update the registers if load or increment is valid. 
+// it. Update the registers if load or increment or the clear pulse is valid. 
 
     reg enable_output = 1'b0;
 
     always @(*) begin
-        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1);
+        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1) || (clear_pulse == 1'b1);
+        enable_output  = (enable_output             == 1'b1) && (clock_enable         == 1'b1);
     end
 
     Register
@@ -202,7 +249,7 @@ module Accumulator_Binary
     (
         .clock          (clock),
         .clock_enable   (enable_output),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (incremented_value_internal),
         .data_out       (accumulated_value)
     );
@@ -215,8 +262,8 @@ module Accumulator_Binary
     updated_output
     (
         .clock          (clock),
-        .clock_enable   (1'b1),
-        .clear          (clear),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
         .data_in        (enable_output),
         .data_out       (accumulated_value_updated)
     );
@@ -230,7 +277,7 @@ module Accumulator_Binary
     (
         .clock          (clock),
         .clock_enable   (enable_output),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (signed_overflow_internal),
         .data_out       (signed_overflow)
     );
@@ -244,7 +291,7 @@ module Accumulator_Binary
     (
         .clock          (clock),
         .clock_enable   (enable_output),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (carry_out_internal),
         .data_out       (carry_out)
     );

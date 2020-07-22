@@ -13,9 +13,16 @@
 <p>Adds the signed <code>increment</code> to the signed <code>accumulated_value</code> when
  <code>increment_valid</code> is pulsed high <em>for one cycle</em>. <code>load_valid</code> (also pulsed
  high for one cycle) overrides <code>increment_valid</code> and instead loads the
- accumulator with <code>load_value</code>. <code>clear</code> overrides both <code>increment_valid</code> and
- <code>load_valid</code> <em>immediately</em> and puts the accumulator back at
- <code>INITIAL_VALUE</code>.</p>
+ accumulator with <code>load_value</code>. The <code>accumulated_value_updated</code> output will
+ eventually pulse high once for each increment or load pulse, after the
+ pipeline delay.</p>
+<p><code>clear</code> overrides both <code>increment_valid</code> and <code>load_valid</code> and instead puts
+ the accumulator back at <code>INITIAL_VALUE</code> after the same pipeline delay, and
+ also pulses the <code>accumulated_value_updated</code> output only <em>once</em>, regardless
+ of the length of the <code>clear</code> pulse.</p>
+<p>Deasserting <code>clock_enable</code> freezes the accumulator: increments, loads, and
+ clears are ignored, the internal pipeline (if any) holds steady, and all
+ outputs remain static.</p>
 <p>When chaining accumulators, which may happen if you are incrementing in
  unusual bases where each digit has its own accumulator, AND the <code>carry_out</code>
  of the previous accumulator with the signal fed to the <code>increment_valid</code>
@@ -38,7 +45,7 @@
 <p>We can't retime a pipeline from outside since there is a loop, so we
  pipeline inside the loop here, and let that retime across the carry-chains.
  The price to pay is a latency of EXTRA_PIPE_STAGES+1 cycles between
- declaring an increment or load valid and having it update the
+ declaring an increment or load (or clear) valid and having it update the
  accumulated_value.  This is why the input valid signals (increment and
  load) must be asserted for only one cycle when EXTRA_PIPE_STAGES is greater
  than zero, then wait until the output has updated before pulsing again.</p>
@@ -54,6 +61,7 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
 )
 (
     input   wire                        clock,
+    input   wire                        clock_enable,
     input   wire                        clear,
     input   wire    [WORD_WIDTH-1:0]    max_limit,
     input   wire    [WORD_WIDTH-1:0]    min_limit,
@@ -90,6 +98,7 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     wire [WORD_WIDTH-1:0]   load_value_pipelined;
     wire                    carry_in_pipelined;
     wire [WORD_WIDTH-1:0]   accumulated_value_pipelined;
+    wire                    clear_pipelined;
 
     generate
         if (EXTRA_PIPE_STAGES == 0) begin: no_pipe
@@ -101,10 +110,11 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
             assign load_value_pipelined         = load_value;
             assign carry_in_pipelined           = carry_in;
             assign accumulated_value_pipelined  = accumulated_value;
+            assign clear_pipelined              = clear;
         end
         else if (EXTRA_PIPE_STAGES > 0) begin: extra_pipe
 
-            localparam PIPELINE_WIDTH       = (WORD_WIDTH * 5) + 3;
+            localparam PIPELINE_WIDTH       = (WORD_WIDTH * 5) + 4;
             localparam PIPELINE_WORD_ZERO   = {PIPELINE_WIDTH{1'b0}};
             localparam PIPELINE_ZERO        = {EXTRA_PIPE_STAGES{PIPELINE_WORD_ZERO}};
 
@@ -118,28 +128,36 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
             accumulator_pipeline
             (
                 .clock          (clock),
-                .clock_enable   (1'b1),
-                .clear          (clear),
+                .clock_enable   (clock_enable),
+                .clear          (1'b0),
                 .parallel_load  (1'b0),
                 .parallel_in    (PIPELINE_ZERO),
                 // verilator lint_off PINCONNECTEMPTY
                 .parallel_out   (),
                 // verilator lint_on  PINCONNECTEMPTY
-                .pipe_in        ({max_limit,           min_limit,           increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value}),
-                .pipe_out       ({max_limit_pipelined, min_limit_pipelined, increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined})
+                .pipe_in        ({max_limit,           min_limit,           increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value,           clear}),
+                .pipe_out       ({max_limit_pipelined, min_limit_pipelined, increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined, clear_pipelined})
             );
         end
     endgenerate
 </pre>
 
 <p><strong>After this point, only use the pipelined inputs.</strong></p>
-<p>If we are loading, then substitute the <code>accumulated_value</code> with zero, and
- the <code>increment</code> with the <code>load_value</code>. Converting a load to an addition to
- zero prevents us from loading a value outside the given limits, which could
- really upset things in the enclosing logic, and will set the output status
- bits correctly.</p>
+<p>If we are <em>loading</em> then substitute the <code>accumulated_value</code> with
+ zero, and the <code>increment</code> with the <code>load_value</code>. 
+ If we are <em>clearing</em> then substitute the <code>accumulated_value</code> with
+ zero, and the <code>increment</code> with the <code>INITIAL_VALUE</code>. 
+ Converting a load or clear to an addition to zero prevents us from loading
+ a value outside the given limits, which could really upset things in the
+ enclosing logic, and will set the output status bits correctly.</p>
 
 <pre>
+    reg gate_accumulated_value = 1'b0;
+
+    always @(*) begin
+        gate_accumulated_value = (load_valid_pipelined == 1'b1) || (clear_pipelined == 1'b1);
+    end
+
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
 
     <a href="./Annuller.html">Annuller</a>
@@ -147,9 +165,9 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
         .WORD_WIDTH     (WORD_WIDTH),
         .IMPLEMENTATION ("AND")
     )
-    gate_accumulated_value
+    gate_accumulated
     (
-        .annul          (load_valid_pipelined == 1'b1),
+        .annul          (gate_accumulated_value == 1'b1),
         .data_in        (accumulated_value_pipelined),
         .data_out       (accumulated_value_gated)
     );
@@ -158,11 +176,13 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
 
     always @(*) begin
         increment_selected = (load_valid_pipelined == 1'b1) ? load_value_pipelined : increment_pipelined;
+        increment_selected = (clear_pipelined      == 1'b1) ? INITIAL_VALUE        : increment_selected;
     end
 </pre>
 
 <p>Apply the increment to the current accumulator value, or the load value to
- an accumulator value of zero, both with saturation.</p>
+ an accumulator value of zero, or the initial value to an accumulator value
+ of zero, all with saturation.</p>
 
 <pre>
     wire [WORD_WIDTH-1:0]   incremented_value_internal;
@@ -193,14 +213,39 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     );
 </pre>
 
+<p>Convert <code>clear_pipelined</code> into a singe pulse, in case it is longer, since
+ it is guaranteed the output changes value only once to <code>INITIAL_VALUE</code>, as
+ opposed to loads and increments which can change the output value each
+ cycle they are high, based on input (if EXTRA_PIPE_STAGES is zero, they
+ can be high for multiple consecutive cycles).</p>
+
+<pre>
+    wire clear_pulse;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    #(
+        .PULSE_LENGTH   (1),    // Minimum 1, or greater
+        .EDGE_TYPE      ("POS") // POS, NEG, ANY
+    )
+    clear_one_shot
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
+        .level_in       (clear_pipelined),
+        .pulse_out      (clear_pulse)
+    );
+</pre>
+
 <p>Finally, update the accumulator register and other outputs sychronized to
- it.  Update the registers if load or increment is valid. </p>
+ it. Update the registers if load or increment or the clear pulse is valid. </p>
 
 <pre>
     reg enable_output  = 1'b0;
 
     always @(*) begin
-        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1);
+        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1) || (clear_pulse == 1'b1);
+        enable_output  = (enable_output             == 1'b1) && (clock_enable         == 1'b1);
     end
 
     <a href="./Register.html">Register</a>
@@ -212,7 +257,7 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     (
         .clock          (clock),
         .clock_enable   (enable_output),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (incremented_value_internal),
         .data_out       (accumulated_value)
     );
@@ -225,8 +270,8 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     updated_output
     (
         .clock          (clock),
-        .clock_enable   (1'b1),
-        .clear          (clear),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
         .data_in        (enable_output),
         .data_out       (accumulated_value_updated)
     );
@@ -243,7 +288,7 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     (
         .clock          (clock),
         .clock_enable   (enable_output),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        ({carry_out_internal,  at_max_limit_internal,  over_max_limit_internal,  at_min_limit_internal,  under_min_limit_internal}),
         .data_out       ({carry_out,           at_max_limit,           over_max_limit,           at_min_limit,           under_min_limit})
     );
