@@ -229,10 +229,6 @@ diagrams, which are very useful for checking and debugging designs.
 <li> <a href="./Pipeline_to_Pulse.html">Pipeline to Pulse Interface</a>
 <li> <a href="./Pulse_to_Pipeline.html">Pulse to Pipeline Interface</a>
 <li> <a href="./Pulse_Divider.html">Pulse Divider</a>
-<!--
-    <li> <a href="./Pulse_Multiplier.html">Pulse Multiplier</a>
-    <li> <a href="./Pulse_Accumulator.html">Pulse Accumulator</a> 
--->
 </ul>
 
 <h2>Elastic Pipelines</h2>
@@ -240,12 +236,15 @@ diagrams, which are very useful for checking and debugging designs.
 <ul>
 <li> <a href="./Pipeline_Skid_Buffer.html">Pipeline Skid Buffer</a>
 <li> <a href="./Pipeline_Half_Buffer.html">Pipeline Half-Buffer</a>
-<li> FIFO
-<li> Ready/Valid Fork (Lazy)
-<li> Ready/Valid Fork (Eager)
-<li> Ready/Valid Join
-<li> Ready/Valid Branch
-<li> Ready/Valid Merge
+<li> Pipeline FIFO Buffer
+<li> <a href="./Pipeline_Fork_Lazy.html">Pipeline Fork (Lazy)</a>
+<li> <a href="./Pipeline_Fork_Eager.html">Pipeline Fork (Eager)</a>
+<li> <a href="./Pipeline_Join.html">Pipeline Join</a>
+<li> <a href="./Pipeline_Branch_One_Hot.html">Pipeline Branch (One-Hot)</a>
+<li> <a href="./Pipeline_Merge_One_Hot.html">Pipeline Merge (One-Hot)</a>
+<li> <a href="./Pipeline_Merge_Priority.html">Pipeline Merge (Priority)</a>
+<li> <a href="./Pipeline_Merge_Round_Robin.html">Pipeline Merge (Round-Robin)</a>
+<li> <a href="./Pipeline_Sink.html">Pipeline Sink</a>
 </ul>
 
 <h2>Arbitration and Synchronization</h2>
@@ -292,6 +291,14 @@ diagrams, which are very useful for checking and debugging designs.
 <li> Basic DAC (PMW and output to resistor ladder)
 <li> Basic ADC (SAR using PWM DAC and LVDS input)
 <li> Sound sample recorder (ADC + Memory)
+</ul>
+
+<h2>Hashing and Pattern Matching</h2>
+
+<ul>
+<li>Simple substring match
+<li>Hash Functions (misc. TBD)
+<li>Bloom or Cuckoo Filter
 </ul>
 
 <h2>Communications</h2>

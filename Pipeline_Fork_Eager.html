@@ -1,0 +1,97 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline Fork Eager</title>
+</head>
+<body>
+
+<p><a href="./Pipeline_Fork_Eager.v">Source</a></p>
+
+<h1>Pipeline Fork (Eager)</h1>
+<p>Takes in a ready/valid handshake with the associated data, and replicates
+ that transaction to multiple outputs. The input can proceed to the next
+ transaction once <strong>all</strong> outputs have finished their transactions.  <em>Each
+ output transaction can complete independently.</em></p>
+<p>The outputs are buffered, so each output transaction can complete
+ independently, in any order. This also breaks any long combinational path
+ or loops which might happen when using the <a href="./Pipeline_Fork_Lazy.html">Lazy Pipeline
+ Fork</a>.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Fork_Eager.html">Pipeline_Fork_Eager</a>
+#(
+    parameter WORD_WIDTH    = 0,
+    parameter OUTPUT_COUNT  = 0,
+
+    // Do not set at instantiation, except in IPI
+    parameter TOTAL_WIDTH   = WORD_WIDTH * OUTPUT_COUNT
+)
+(
+    input  wire                     clock,
+    input  wire                     clear,
+
+    input  wire                     input_valid,
+    output wire                     input_ready,
+    input  wire [WORD_WIDTH-1:0]    input_data,
+
+    output wire [OUTPUT_COUNT-1:0]  output_valid,
+    input  wire [OUTPUT_COUNT-1:0]  output_ready,
+    output wire [TOTAL_WIDTH-1:0]   output_data
+);
+
+    wire [OUTPUT_COUNT-1:0] output_valid_unbuffered;
+    wire [OUTPUT_COUNT-1:0] output_ready_unbuffered;
+    wire [TOTAL_WIDTH-1:0]  output_data_unbuffered;
+
+    <a href="./Pipeline_Fork_Lazy.html">Pipeline_Fork_Lazy</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .OUTPUT_COUNT   (OUTPUT_COUNT)
+    )
+    input_fork
+    (
+        .input_valid    (input_valid),
+        .input_ready    (input_ready),
+        .input_data     (input_data),
+
+        .output_valid   (output_valid_unbuffered),
+        .output_ready   (output_ready_unbuffered),
+        .output_data    (output_data_unbuffered)
+    );
+
+    generate
+        genvar i;
+        for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
+            <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
+            #(
+                .WORD_WIDTH     (WORD_WIDTH)
+            )
+            output_buffer
+            (
+                .clock           (clock),
+                .clear           (clear),
+
+                .input_valid     (output_valid_unbuffered [i]),
+                .input_ready     (output_ready_unbuffered [i]),
+                .input_data      (output_data_unbuffered  [WORD_WIDTH*i +: WORD_WIDTH]),
+
+                .output_valid    (output_valid [i]),
+                .output_ready    (output_ready [i]),
+                .output_data     (output_data  [WORD_WIDTH*i +: WORD_WIDTH])
+            );
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

@@ -1,0 +1,74 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline Fork Lazy</title>
+</head>
+<body>
+
+<p><a href="./Pipeline_Fork_Lazy.v">Source</a></p>
+
+<h1>Pipeline Fork (Lazy)</h1>
+<p>Takes in a ready/valid handshake along with the associated data, and
+ replicates that transaction to multiple outputs. The input can proceed to
+ the next transaction once <strong>all</strong> outputs have finished their transactions.
+ <em>All input and output transactions complete simultaneously.</em></p>
+<p>There is no buffering, so be careful of combinational paths. If you cannot
+ avoid a long combination path (or worse, a loop), then you must use the
+ <a href="./Pipeline_Fork_Eager.html">Eager Pipeline Fork</a>.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Fork_Lazy.html">Pipeline_Fork_Lazy</a>
+#(
+    parameter WORD_WIDTH    = 0,
+    parameter OUTPUT_COUNT  = 0,
+
+    // Do not set at instantiation, except in IPI
+    parameter TOTAL_WIDTH   = WORD_WIDTH * OUTPUT_COUNT
+)
+(
+    input  wire                     input_valid,
+    output reg                      input_ready,
+    input  wire [WORD_WIDTH-1:0]    input_data,
+
+    output reg  [OUTPUT_COUNT-1:0]  output_valid,
+    input  wire [OUTPUT_COUNT-1:0]  output_ready,
+    output reg  [TOTAL_WIDTH-1:0]   output_data
+);
+
+    localparam TOTAL_ZERO   = {TOTAL_WIDTH{1'b0}};
+    localparam OUTPUT_ONES  = {OUTPUT_COUNT{1'b1}};
+    localparam OUTPUT_ZERO  = {OUTPUT_COUNT{1'b0}};
+
+    initial begin
+        input_ready     = 1'b0;
+        output_valid    = OUTPUT_ZERO;
+        output_data     = TOTAL_ZERO;
+    end
+</pre>
+
+<p>If all outputs are ready, then signal ready to the input and pass the valid
+ signal through to all outputs, so all transaction complete together.</p>
+
+<pre>
+    reg output_valid_gated  = 1'b0;
+
+    always @(*) begin
+        input_ready         = (output_ready == OUTPUT_ONES);
+        output_valid_gated  = (input_valid == 1'b1) && (input_ready == 1'b1);
+        output_valid        = {OUTPUT_COUNT{output_valid_gated}};
+        output_data         = {OUTPUT_COUNT{input_data}};
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
