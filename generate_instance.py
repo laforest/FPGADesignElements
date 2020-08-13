@@ -82,44 +82,52 @@ if __name__ == "__main__":
         else:
             line = raw_file.readline()
             continue
-    
-    # Begin parameter block
-    instance.append("\t#(")
 
-    # Module parameters
-    # With special case to handle trailing comments (often used as notes)
-    while not is_eof(line):
-        if line.strip().startswith(")"):
-            break
-        if is_comment(line) or is_blank(line):
-            instance.append("\t\t{}".format(line.strip()))
-            line = raw_file.readline()
-            continue
-        if is_parameter(line):
-            line = line.strip().split()
-            comment_pos = 0
-            comment = ""
-            if "//" in line:
-                comment_pos = line.index("//")
-                comment = " ".join(line[comment_pos:])
-            equals_index = line.index("=")
-            parameter = line[equals_index-1]
-            # Does the parameter have a comma at the end?
-            if line[equals_index+1][-1] == ",":
-                parameter = "\t\t.{}\t(),".format(parameter)
+    # Skip the parameter template section if there are no parameters
+    # This assumes the parameters begin IMMEDIATELY with a "#(" line
+    # Else there must be NO text before the instance name
+
+    if line.strip().startswith("#("):
+        # Begin parameter block
+        instance.append("\t#(")
+
+        # Module parameters
+        # With special case to handle trailing comments (often used as notes)
+        while not is_eof(line):
+            if line.strip().startswith(")"):
+                break
+            if is_comment(line) or is_blank(line):
+                instance.append("\t\t{}".format(line.strip()))
+                line = raw_file.readline()
+                continue
+            if is_parameter(line):
+                line = line.strip().split()
+                comment_pos = 0
+                comment = ""
+                if "//" in line:
+                    comment_pos = line.index("//")
+                    comment = " ".join(line[comment_pos:])
+                equals_index = line.index("=")
+                parameter = line[equals_index-1]
+                # Does the parameter have a comma at the end?
+                if line[equals_index+1][-1] == ",":
+                    parameter = "\t\t.{}\t(),".format(parameter)
+                else:
+                    parameter = "\t\t.{}\t()".format(parameter)
+                if comment_pos != 0:
+                    parameter = parameter + "\t{}".format(comment)
+                instance.append(parameter)
+                line = raw_file.readline()
+                continue
             else:
-                parameter = "\t\t.{}\t()".format(parameter)
-            if comment_pos != 0:
-                parameter = parameter + "\t{}".format(comment)
-            instance.append(parameter)
-            line = raw_file.readline()
-            continue
-        else:
-            line = raw_file.readline()
-            continue
+                line = raw_file.readline()
+                continue
 
-    # End parameter block, put instance name placeholder, and start port block
-    instance.append("\t)\n\tinstance_name\n\t(")
+        # End parameter block
+        instance.append("\t)")
+
+    # Put instance name placeholder, and start port block
+    instance.append("\tinstance_name\n\t(")
 
     # Module ports
     # With special case to handle trailing comments (often used as notes)
