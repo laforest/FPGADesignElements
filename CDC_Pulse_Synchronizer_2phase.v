@@ -6,8 +6,7 @@
 // the pulse duration. *Uses a 2-phase asynchronous handshake.*
 
 // The recommended input is a single-cycle pulse in the sending clock domain.
-// Adjust the output pulse length (in receiving clock cycles) with the
-// RECV_PULSE_LENGTH parameter.
+// The output pulse is a single-cycle pulse in the receiving clock domain.
 
 // <div class="bordered">
 
@@ -74,17 +73,14 @@
 
 module CDC_Pulse_Synchronizer_2phase
 #(
-    parameter RECV_PULSE_LENGTH = 1, // 1 or greater
     parameter CDC_EXTRA_DEPTH   = 0
 )
 (
     input   wire    sending_clock,
-    input   wire    sending_clear,
     input   wire    sending_pulse_in,
     output  reg     sending_ready,
 
     input   wire    receiving_clock,
-    input   wire    receiving_clear,
     output  wire    receiving_pulse_out
 );
 
@@ -99,18 +95,17 @@ module CDC_Pulse_Synchronizer_2phase
 
     wire cleaned_pulse_in;
 
+
     Pulse_Generator
-    #(
-        .PULSE_LENGTH   (1),
-        .EDGE_TYPE      ("POS")
-    )
     pulse_cleaner
     (
-        .clock          (sending_clock),
-        .clock_enable   (1'b1),
-        .clear          (sending_clear),
-        .level_in       (sending_pulse_in),
-        .pulse_out      (cleaned_pulse_in)
+        .clock              (sending_clock),
+        .level_in           (sending_pulse_in),
+        .pulse_posedge_out  (cleaned_pulse_in),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
     );
 
 // Now use that single-cycle pulse to toggle a register, signalling the start
@@ -184,17 +179,15 @@ module CDC_Pulse_Synchronizer_2phase
 // We generate an output pulse on either of the toggle transitions.
 
     Pulse_Generator
-    #(
-        .PULSE_LENGTH   (RECV_PULSE_LENGTH),
-        .EDGE_TYPE      ("ANY")
-    )
     receiving_toggle_to_pulse
     (
-        .clock          (receiving_clock),
-        .clock_enable   (1'b1),
-        .clear          (receiving_clear),
-        .level_in       (receiving_toggle),
-        .pulse_out      (receiving_pulse_out)
+        .clock              (receiving_clock),
+        .level_in           (receiving_toggle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_posedge_out  (),
+        .pulse_negedge_out  (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pulse_anyedge_out  (receiving_pulse_out)
     );
 
 endmodule

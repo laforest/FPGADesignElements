@@ -216,17 +216,15 @@ module Accumulator_Binary_Saturating
     wire clear_pulse;
 
     Pulse_Generator
-    #(
-        .PULSE_LENGTH   (1),    // Minimum 1, or greater
-        .EDGE_TYPE      ("POS") // POS, NEG, ANY
-    )
     clear_one_shot
     (
-        .clock          (clock),
-        .clock_enable   (clock_enable),
-        .clear          (1'b0),
-        .level_in       (clear_pipelined),
-        .pulse_out      (clear_pulse)
+        .clock              (clock),
+        .level_in           (clear_pipelined),
+        .pulse_posedge_out  (clear_pulse),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
     );
 
 // Finally, update the accumulator register and other outputs sychronized to

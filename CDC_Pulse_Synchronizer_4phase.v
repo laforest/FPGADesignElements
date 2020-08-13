@@ -6,8 +6,7 @@
 // the pulse duration. *Uses a 4-phase asynchronous handshake.*
 
 // The recommended input is a single-cycle pulse in the sending clock domain.
-// Adjust the output pulse length (in receiving clock cycles) with the
-// RECV_PULSE_LENGTH parameter.
+// The output is a single-cycle pulse in the receiving clock domain.
 
 // <div class="bordered">
 
@@ -72,17 +71,14 @@
 
 module CDC_Pulse_Synchronizer_4phase
 #(
-    parameter RECV_PULSE_LENGTH = 1, // 1 or greater
     parameter CDC_EXTRA_DEPTH   = 0  // 0 or greater, if necessary
 )
 (
     input   wire    sending_clock,
-    input   wire    sending_clear,
     input   wire    sending_pulse_in,
     output  reg     sending_ready,
 
     input   wire    receiving_clock,
-    input   wire    receiving_clear,
     output  wire    receiving_pulse_out
 );
 
@@ -95,7 +91,7 @@ module CDC_Pulse_Synchronizer_4phase
 // sending pulse has ended*. This gating prevents a cycle of latch set/reset
 // if the sending pulse is longer than the round-trip latency of level signal
 // to and back from the receiving clock domain, causing a train of pulses in
-// the receiving clock domain. A local clear overrides all this.
+// the receiving clock domain. 
 
     wire sending_level;
     reg  clear_sending = 1'b0;
@@ -103,7 +99,6 @@ module CDC_Pulse_Synchronizer_4phase
 
     always @(*) begin
         clear_sending = (level_response == 1'b1) && (sending_pulse_in == 1'b0);
-        clear_sending = (clear_sending  == 1'b1) || (sending_clear    == 1'b1);
     end
 
     Pulse_Latch
@@ -158,18 +153,17 @@ module CDC_Pulse_Synchronizer_4phase
 
 // Finally, convert the receiving level to a pulse in the receiving clock domain
 
+
     Pulse_Generator
-    #(
-        .PULSE_LENGTH   (RECV_PULSE_LENGTH),
-        .EDGE_TYPE      ("POS")
-    )
     receiving_level_to_pulse
     (
-        .clock          (receiving_clock),
-        .clock_enable   (1'b1),
-        .clear          (receiving_clear),
-        .level_in       (receiving_level),
-        .pulse_out      (receiving_pulse_out)
+        .clock              (receiving_clock),
+        .level_in           (receiving_level),
+        .pulse_posedge_out  (receiving_pulse_out),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
     );
 
 endmodule
