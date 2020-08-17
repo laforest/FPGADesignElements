@@ -1,7 +1,7 @@
 
 //# Turn Off Rightmost 1 Bit
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 //Use the following formula to turn off the rightmost 1-bit in a word,
 //producing 0 if none (e.g., 01011000 -> 01010000)

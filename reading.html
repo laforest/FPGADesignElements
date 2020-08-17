@@ -1,0 +1,71 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>References and Reading List</title>
+</head>
+<body>
+
+<h1>References and Reading List</h1>
+
+<p>Here are the sources I've used while writing this book, organized by topic.
+
+<a name="digital"</a> 
+<h2>Digital Design</h2>
+
+<ul>
+
+<li> <a name="Warren2013"></a><a
+href="https://web.archive.org/web/20190916060535/http://hackersdelight.org/">Hacker's
+Delight</a>, 2nd ed., 2013, Henry S. Warren, Jr. This book covers algorithms
+related to bit manipulation, arithmetic, branch-free code, and other deep
+topics. A must-have for hardware designers. The website, which has extra
+material and errata, has since gone down, so this is an Archive.org link.
+
+<li>Ken Chapman's <a
+href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
+Smart About Reset: Think Local, Not Global</a> discusses why, on FPGAs, it's
+important to minimize the number of registers receiving a reset signal, and to
+instead use the built-in register initialization at configuration or to
+architect the system to eventually get to a consistent state after a minimal
+reset.
+
+</ul>
+
+<a name="elastic"</a> 
+<h2>Elastic Pipelines</h2>
+
+<p>The following papers are mainly useful for background and for implementation
+guides to pipeline branches, joins, forks, etc... Note however that in the
+academic literature, elastic pipelines are often expressed as valid/stop
+handshakes, rather than valid/ready handshakes, where "stop" is the inverse of
+"ready".  This means parts of the diagrams have inverted logic from what it
+would be in valid/ready handshakes. Also, watch out for combinational paths,
+which aren't completely avoided in these designs: use <a
+href="./Pipeline_Skid_Buffer.html">Skid Buffers</a> as necessary.
+
+<ul>
+
+<li>R. T. Possignolo, E. Ebrahimi, H. Skinner and J. Renau, <a
+href="https://masc.soe.ucsc.edu/docs/iccd16.pdf">Fluid Pipelines: Elastic
+Circuitry meets Out-of-Order Execution</a>, 2016 IEEE 34th International
+Conference on Computer Design (ICCD), Scottsdale, AZ, 2016, pp. 233-240, doi:
+10.1109/ICCD.2016.7753285
+
+<li>J. Cortadella, M. Kishinevsky, and B. Grundmann, <a
+href="http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.99.9778">SELF:
+Specification and design of synchronous elastic circuits</a>, TAU ’06:
+Proceedings of the ACM/IEEE International Workshop on Timing Issues
+
+<li>M. Abbas and V. Betz, <a
+href="http://kalman.mee.tcd.ie/fpl2018/content/pdfs/FPL2018-43iDzVTplcpussvbfIaaHz/1PNSl54xKC7BAFw7YOeZRT/1sc2uahgEryvvJ7qQkPXkz.pdf">Latency
+Insensitive Design Styles for FPGAs</a>, 2018 28th International Conference on
+Field Programmable Logic and Applications (FPL), Dublin, 2018, pp. 360-3607,
+doi: 10.1109/FPL.2018.00068
+
+</ul>
+
+<hr><a href="./index.html">back to FPGA Design Elements</a>
+</body>
+</html>

@@ -10,7 +10,7 @@
 // of the intermediate division steps*.
 
 // The implementation is based on the PowerPC method, as described in <a
-// href="./books.html#Warren2013">Hacker's Delight</a>, Section 10-1, *"Signed
+// href="./reading.html#Warren2013">Hacker's Delight</a>, Section 10-1, *"Signed
 // Division by a Known Power of Two"*: We perform the right shift and take
 // note if any 1-bits are shifted out. If so, add one to the shifted value.
 

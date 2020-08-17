@@ -1,7 +1,7 @@
 
 //# Bitmask: Turn On Trailing 0 Bits
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 // Use one of the following formulas to create a word with 1’s at the
 // positions of the trailing 0’s in the input, and 0’s elsewhere, producing

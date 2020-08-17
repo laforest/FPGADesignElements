@@ -1,7 +1,7 @@
 
 //# Bitmask: Thermometer from Count
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 // Sets the first N least-significant bits given integer N.
 // If N is greater than WORD_WIDTH, then the mask is all-ones.

@@ -1,7 +1,7 @@
 
 //# Bitmask: Turn Off Trailing 1 Bits
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 // Use the following formula to create a word with 0’s at the positions of the
 // trailing 1’s in the input, and 1’s elsewhere, producing all 1’s if none

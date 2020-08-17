@@ -18,7 +18,7 @@
  must be corrected by adding +1, <em>but only if an odd number results as part
  of the intermediate division steps</em>.</p>
 <p>The implementation is based on the PowerPC method, as described in <a
- href="./books.html#Warren2013">Hacker's Delight</a>, Section 10-1, <em>"Signed
+ href="./reading.html#Warren2013">Hacker's Delight</a>, Section 10-1, <em>"Signed
  Division by a Known Power of Two"</em>: We perform the right shift and take
  note if any 1-bits are shifted out. If so, add one to the shifted value.</p>
 <p>Since we divide only by powers of two, a division by zero cannot happen.

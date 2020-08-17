@@ -1,7 +1,7 @@
 
 //# Turn On Rightmost 0 Bit
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 // Use the following formula to turn on the rightmost 0-bit in a word,
 // producing all 1’s if none (e.g., 10100111 -> 10101111)

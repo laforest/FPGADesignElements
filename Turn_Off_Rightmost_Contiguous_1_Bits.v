@@ -1,7 +1,7 @@
 
 //# Turn Off Rightmost Contiguous 1 Bits
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits
 
 // Use  the following formula to turn off the rightmost contiguous 
 // string of 1’s (e.g., 01011100 -> 01000000)

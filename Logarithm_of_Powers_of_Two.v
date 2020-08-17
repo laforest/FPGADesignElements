@@ -37,7 +37,7 @@
 // You can use this module to implement unsigned division by powers-of-2 by
 // shifting right by the logarithm value. However, *signed* division by
 // powers-of-2 has a complication. See [Hacker's
-// Delight](./books.html#Warren2013), Section 10-1, "Signed Division by
+// Delight](./reading.html#Warren2013), Section 10-1, "Signed Division by
 // a Known Power of 2". 
 
 // When combined with [Bitmask: Isolate Rightmost

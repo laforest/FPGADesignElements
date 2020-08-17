@@ -7,7 +7,7 @@
 
 // This code implements "*How the Computer Sets the Comparison Predicates*" in
 // Section 2-12 of Henry S. Warren, Jr.'s [Hacker's
-// Delight](./books.html#Warren2013), which describes how to compute all the
+// Delight](./reading.html#Warren2013), which describes how to compute all the
 // integer comparisons, based on the condition flags generated after
 // a (2's-complement) subtraction `A-B`.
 

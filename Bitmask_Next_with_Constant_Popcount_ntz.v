@@ -1,7 +1,7 @@
 
 //# Bitmask: Next with Constant Popcount (via Number of Trailing Zeros)
 
-// Credit: [Hacker's Delight](./books.html#Warren2013), Section 2-1: Manipulating Rightmost Bits, "A Novel Application"
+// Credit: [Hacker's Delight](./reading.html#Warren2013), Section 2-1: Manipulating Rightmost Bits, "A Novel Application"
 
 // Given a bitmask, gives the next bitmask, in lexicographic order (a.k.a.
 // strictly incrementing order), with the same number of bits set (a.k.a. same
