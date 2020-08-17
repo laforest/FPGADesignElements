@@ -119,14 +119,18 @@ module ports together, and inferring tri-state I/O.  <em>(See <a
 href="#assign">Assign Statements</a> for details.)</em>
 
 <p>Only use <code>0,1,X,Z</code> values, and avoid X and Z if at all possible.
-All registers must be initialized (and reset, if necessary) with a value which
-does not contain X or Z, either at definition or using an <code>initial</code>
-block. Do not assign X to registers or wires, as X propagation will make
-testing difficult, and isn't supported in 2-state simulators (e.g.: Verilator).
+Do not assign X to registers or wires, as X propagation will make testing
+difficult, and isn't supported in 2-state simulators (e.g.: Verilator).
 Instead, have a default catch-all or fall-through logic expression which takes
 effect when all others don't. The same idea applies to Boolean tests. Z is only
 used to define tri-state I/O, and only if the CAD vendor does not provide
 tri-state I/O primitives, as the inference is unreliable.
+
+<p>All registers must be initialized (and reset, if necessary) with a value
+which does not contain X or Z, either at definition or using an
+<code>initial</code> block. <em>Note that some combinations of register reset and
+initialization may not work well together depending on the FPGA family. See <a
+href="#resets">Resets</a> for details.</em>
 
 <p><em>Never assign an initial value to wires</em>, either using an explicit <a
 href="#assign">assign</a> statement or an implicit initial assignment (e.g.:
@@ -789,9 +793,10 @@ are also better off encapsulating all the issues discussed below inside a <a
 href="./Register.html">Register module</a></i>)
 
 <p>Make use of the implicit power-on-reset in FPGAs, limit the number of things
-which need an explicit asynchronous reset signal, and feed it from a signal
-synchronous to the clock. This means passing an external reset through a CDC
-synchronizer. 
+which need an explicit asynchronous reset signal, and feed reset from a signal
+synchronous to the clock. This means passing an external reset through a <a
+href="./CDC_Synchronizer.html">CDC Synchronizer</a> and ensuring a sufficient
+reset time.
 
 <p>On FPGAs, the hardware reset of a flip-flop is usually asynchronous and so
 takes effect immediately rather than at the next clock edge, which can
@@ -816,7 +821,39 @@ state of registers by assigning it at declaration, or assigning it inside an
 <code>initial</code> block for module register output ports. Most on-chip
 memories can be similarly initialized with a known content via a
 <code>$readmemh()</code> directive, or some code in an <code>initial</code>
-block. 
+block. Refer to the <a href="./RAM_Single_Port.html">Single Port RAM</a> code
+for an example of on-chip memory initialization.
+
+<h4>Resets on Different FPGA Families</h4>
+
+The following was contributed by <a
+href="https://twitter.com/ravenslofty">@ravenslofty</a> (edited by me):
+
+<blockquote>
+<div class="bordered">
+Perhaps a better point against reg initialisation at declaration is its
+inconsistency across chips - not all FPGAs support all combinations of init and
+reset. FPGA flops can very roughly be split into four categories:
+
+<ul>
+<li> not initialisable (QuickLogic EOS S3)
+<li> constant zero (Intel Cyclone V; Lattice iCE40)
+<li> fully configurable (Xilinx 7 Series)
+<li> init-matches-set (Lattice ECP5)
+</ul>
+
+This means you can write a register init declaration which, when combined with
+an asynchronous set/reset wire, is impossible to directly satisfy in hardware.
+However, synchronous sets/resets can be emulated via input logic, so a global
+synchronous reset can always be implemented.
+</div>
+</blockquote>
+
+Fortunately, asynchronous resets to registers are rare, and not a good thing in
+general (they inhibits register retiming, which enables simpler, faster
+designs). So register initialization still works, except where you need an
+explicit asynchronous reset.
+
 
 <h4>The "Last Assignment Wins" Reset Idiom</h4>
 
