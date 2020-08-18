@@ -112,17 +112,7 @@ any random logic signifies a very local and special case (e.g.: combining two
 flags into one).
 
 <p>These building blocks should be quite small, implementing logic functions
-common to most any design: counters, <a href="./pulse_level.html">pulse/level
-converters</a>, <a href="./annuller.html">applying Boolean logic to vectors of
-bits</a>, <a href="./delay.html">configurable delay pipelines</a>, <a
-href="./mux.html">universal multiplexers</a>, <a href="./cdc.html">Clock Domain
-Crossing synchronizers</a>, <a href="./decoders.html">static and programmable
-address decoders</a>, <a href="./translation.html">address translators</a>, <a
-href="./priority.html">priority arbiters</a>, <a href="./skid_buffer.html">AXI
-skid buffers</a>, <a href="./master_reset.html">adjustable power-on resets</a>,
-<a href="./triadic.html">universal Boolean operators</a>, <a
-href="./condition.html">calculating equalities and inequalities</a>, <a
-href="./bram.html">on-chip memories</a>.
+common to most any design: <a href="./index.html">FPGA Design Elements</a>.
 
 <p>Using building blocks enables a better separation of control, processing,
 and interface in your design.  Divide a sub-system into one module for
@@ -190,7 +180,7 @@ those ports. The Adapter adds any logic necessary to support the Instance and
 also satisfy the FPGA CAD tools. For example, the Adapter will contain any
 clock generation and management hardware, add any differential buffers to
 signals that need it, even if unused, to satisfy CAD tool constraints, and
-convert interface protocols as required (e.g.: as AXI masters/slaves,
+convert interface protocols as required (e.g.: as AXI leader/followers,
 bi-directional or tri-state buffers, etc...).
 
 <p>At this point, synthesis of the design should find any final errors, such as
