@@ -1,21 +1,21 @@
 
 //# Signed Binary Accumulator, with Saturation
 
-// Adds the signed `increment` to the signed `accumulated_value` when
-// `increment_valid` is pulsed high *for one cycle*. `load_valid` (also pulsed
-// high for one cycle) overrides `increment_valid` and instead loads the
-// accumulator with `load_value`. The `accumulated_value_updated` output will
-// eventually pulse high once for each increment or load pulse, after the
-// pipeline delay.
+// Adds the signed `increment_value` to the signed `accumulated_value` when
+// `increment_valid` is pulsed high *for one cycle*. A new increment may be
+// added when `increment_done` pulses high, in the same cycle if necessary. 
 
-// `clear` overrides both `increment_valid` and `load_valid` and instead puts
-// the accumulator back at `INITIAL_VALUE` after the same pipeline delay, and
-// also pulses the `accumulated_value_updated` output only *once*, regardless
-// of the length of the `clear` pulse.
+// Pulsing `load_valid` high for one cycle replaces the `accumulated_value`
+// with the `load_value`. A new load can be done when `load_done` pulses high,
+// in the same cycle if necessary.
 
-// Deasserting `clock_enable` freezes the accumulator: increments, loads, and
-// clears are ignored, the internal pipeline (if any) holds steady, and all
-// outputs remain static.
+// Pulsing `clear` high for one cycle puts the accumulator back at
+// `INITIAL_VALUE`. The accumulator can be cleared again once `clear_done`
+// pulses high, in the same cycle if necessary.
+
+// Deasserting `clock_enable` freezes the accumulator: new increments, loads,
+// and clears are ignored, the internal pipeline (if any) holds steady, and
+// all outputs remain static.
 
 // When chaining accumulators, which may happen if you are incrementing in
 // unusual bases where each digit has its own accumulator, AND the `carry_out`
@@ -31,7 +31,7 @@
 // the minimum limit.** If the limits are reversed, such that max_limit
 // < min_limit, the result will be meaningless.
 
-//## Pipelining for high operating frequency
+//## Pipelining and Concurrency
 
 // This module is pipelined since we are chaining adder/subtractors together
 // inside the
@@ -43,11 +43,13 @@
 
 // We can't retime a pipeline from outside since there is a loop, so we
 // pipeline inside the loop here, and let that retime across the carry-chains.
-// The price to pay is a latency of EXTRA_PIPE_STAGES+1 cycles between
-// declaring an increment or load (or clear) valid and having it update the
-// accumulated_value.  This is why the input valid signals (increment and
-// load) must be asserted for only one cycle when EXTRA_PIPE_STAGES is greater
-// than zero, then wait until the output has updated before pulsing again.
+// The price to pay is a latency of EXTRA_PIPE_STAGES+1 cycles between an
+// increment, load, or clear, and the corresponding "done" signal.  This
+// latency is why the input pulses must be asserted *for only one cycle* when
+// `EXTRA_PIPE_STAGES` is greater than zero, then wait until the command has
+// completed before pulsing again, else any latter increments or loads will
+// override the previous ones (since the accumulated_value will have not yet
+// updated).
 
 `default_nettype none
 
@@ -60,17 +62,24 @@ module Accumulator_Binary_Saturating
 (
     input   wire                        clock,
     input   wire                        clock_enable,
+
     input   wire                        clear,
-    input   wire    [WORD_WIDTH-1:0]    max_limit,
-    input   wire    [WORD_WIDTH-1:0]    min_limit,
-    input   wire    [WORD_WIDTH-1:0]    increment,
+    output  wire                        clear_done,
+
+    input   wire    [WORD_WIDTH-1:0]    increment_value,
     input   wire                        increment_valid,
+    output  wire                        increment_done,
+
     input   wire    [WORD_WIDTH-1:0]    load_value,
     input   wire                        load_valid,
+    output  wire                        load_done,
+
+    input   wire    [WORD_WIDTH-1:0]    max_limit,
+    input   wire    [WORD_WIDTH-1:0]    min_limit,
+
     input   wire                        carry_in,
     output  wire                        carry_out,
     output  wire    [WORD_WIDTH-1:0]    accumulated_value,
-    output  wire                        accumulated_value_updated,
     output  wire                        at_max_limit,
     output  wire                        over_max_limit,
     output  wire                        at_min_limit,
@@ -86,27 +95,31 @@ module Accumulator_Binary_Saturating
 // (Backwards retiming is more difficult, and not supported by Vivado
 // post-synth optimizations)
 
+    wire                    clear_pipelined;
+
+    wire [WORD_WIDTH-1:0]   increment_value_pipelined;
+    wire                    increment_valid_pipelined;
+
+    wire [WORD_WIDTH-1:0]   load_value_pipelined;
+    wire                    load_valid_pipelined;
+
     wire [WORD_WIDTH-1:0]   max_limit_pipelined;
     wire [WORD_WIDTH-1:0]   min_limit_pipelined;
-    wire                    increment_valid_pipelined;
-    wire [WORD_WIDTH-1:0]   increment_pipelined;
-    wire                    load_valid_pipelined;
-    wire [WORD_WIDTH-1:0]   load_value_pipelined;
+
     wire                    carry_in_pipelined;
     wire [WORD_WIDTH-1:0]   accumulated_value_pipelined;
-    wire                    clear_pipelined;
 
     generate
         if (EXTRA_PIPE_STAGES == 0) begin: no_pipe
+            assign clear_pipelined              = clear;
+            assign increment_value_pipelined    = increment_value;
+            assign increment_valid_pipelined    = increment_valid;
+            assign load_value_pipelined         = load_value;
+            assign load_valid_pipelined         = load_valid;
             assign max_limit_pipelined          = max_limit;
             assign min_limit_pipelined          = min_limit;
-            assign increment_valid_pipelined    = increment_valid;
-            assign increment_pipelined          = increment;
-            assign load_valid_pipelined         = load_valid;
-            assign load_value_pipelined         = load_value;
             assign carry_in_pipelined           = carry_in;
             assign accumulated_value_pipelined  = accumulated_value;
-            assign clear_pipelined              = clear;
         end
         else if (EXTRA_PIPE_STAGES > 0) begin: extra_pipe
 
@@ -131,8 +144,8 @@ module Accumulator_Binary_Saturating
                 // verilator lint_off PINCONNECTEMPTY
                 .parallel_out   (),
                 // verilator lint_on  PINCONNECTEMPTY
-                .pipe_in        ({max_limit,           min_limit,           increment_valid,           increment,           load_valid,           load_value,           carry_in,           accumulated_value,           clear}),
-                .pipe_out       ({max_limit_pipelined, min_limit_pipelined, increment_valid_pipelined, increment_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined, clear_pipelined})
+                .pipe_in        ({max_limit,           min_limit,           increment_valid,           increment_value,           load_valid,           load_value,           carry_in,           accumulated_value,           clear}),
+                .pipe_out       ({max_limit_pipelined, min_limit_pipelined, increment_valid_pipelined, increment_value_pipelined, load_valid_pipelined, load_value_pipelined, carry_in_pipelined, accumulated_value_pipelined, clear_pipelined})
             );
         end
     endgenerate
@@ -172,7 +185,7 @@ module Accumulator_Binary_Saturating
     reg [WORD_WIDTH-1:0] increment_selected = WORD_ZERO;
 
     always @(*) begin
-        increment_selected = (load_valid_pipelined == 1'b1) ? load_value_pipelined : increment_pipelined;
+        increment_selected = (load_valid_pipelined == 1'b1) ? load_value_pipelined : increment_value_pipelined;
         increment_selected = (clear_pipelined      == 1'b1) ? INITIAL_VALUE        : increment_selected;
     end
 
@@ -207,33 +220,13 @@ module Accumulator_Binary_Saturating
         .under_min_limit (under_min_limit_internal)
     );
 
-// Convert `clear_pipelined` into a singe pulse, in case it is longer, since
-// it is guaranteed the output changes value only once to `INITIAL_VALUE`, as
-// opposed to loads and increments which can change the output value each
-// cycle they are high, based on input (if EXTRA_PIPE_STAGES is zero, they
-// can be high for multiple consecutive cycles).
-
-    wire clear_pulse;
-
-    Pulse_Generator
-    clear_one_shot
-    (
-        .clock              (clock),
-        .level_in           (clear_pipelined),
-        .pulse_posedge_out  (clear_pulse),
-        // verilator lint_off PINCONNECTEMPTY
-        .pulse_negedge_out  (),
-        .pulse_anyedge_out  ()
-        // verilator lint_on  PINCONNECTEMPTY
-    );
-
-// Finally, update the accumulator register and other outputs sychronized to
+// Then, update the accumulator register and other outputs sychronized to
 // it. Update the registers if load or increment or the clear pulse is valid. 
 
     reg enable_output  = 1'b0;
 
     always @(*) begin
-        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1) || (clear_pulse == 1'b1);
+        enable_output  = (increment_valid_pipelined == 1'b1) || (load_valid_pipelined == 1'b1) || (clear_pipelined == 1'b1);
         enable_output  = (enable_output             == 1'b1) && (clock_enable         == 1'b1);
     end
 
@@ -251,20 +244,6 @@ module Accumulator_Binary_Saturating
         .data_out       (accumulated_value)
     );
 
-    Register
-    #(
-        .WORD_WIDTH     (1),
-        .RESET_VALUE    (1'b0)
-    )
-    updated_output
-    (
-        .clock          (clock),
-        .clock_enable   (clock_enable),
-        .clear          (1'b0),
-        .data_in        (enable_output),
-        .data_out       (accumulated_value_updated)
-    );
-
     localparam STATUS_BITS_COUNT = 5;
     localparam STATUS_BITS_ZERO  = {STATUS_BITS_COUNT{1'b0}};
 
@@ -280,6 +259,52 @@ module Accumulator_Binary_Saturating
         .clear          (1'b0),
         .data_in        ({carry_out_internal,  at_max_limit_internal,  over_max_limit_internal,  at_min_limit_internal,  under_min_limit_internal}),
         .data_out       ({carry_out,           at_max_limit,           over_max_limit,           at_min_limit,           under_min_limit})
+    );
+
+// Finally, output the "done" signals, which are the pipelined command pulses
+// plus one register delay to synchronize them to the updated
+// `accumulated_value` and related data.
+
+    Register
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    for_clear
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
+        .data_in        (clear_pipelined),
+        .data_out       (clear_done)
+    );
+
+    Register
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    for_increment
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
+        .data_in        (increment_valid_pipelined),
+        .data_out       (increment_done)
+    );
+
+    Register
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    for_load
+    (
+        .clock          (clock),
+        .clock_enable   (clock_enable),
+        .clear          (1'b0),
+        .data_in        (load_valid_pipelined),
+        .data_out       (load_done)
     );
 
 endmodule
