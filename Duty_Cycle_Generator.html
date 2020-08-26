@@ -1,47 +1,54 @@
-//# Duty Cycle Generator
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duty Cycle Generator</title>
+</head>
+<body>
 
-// Outputs a simple waveform which is high or low for a set number of cycles,
-// then takes on the opposite state for a set number of cycles. If not
-// immediately re-started, the output remains steady in its last state.
+<p><a href="./Duty_Cycle_Generator.v">Source</a></p>
 
-// One-shot by default: Pulse `start` high for one cycle to begin. Then
-// `finish` pulses high for one cycle during the last clock cycle of the last
-// phase of the `duty_cycle_out` output.  However, `finish` can be looped back
-// to `start`, or `start` can be tied high, to generate a continuous waveform
-// with a duty cycle and frequency determined by the `high_cycles` and
-// `low_cycles` counts. The cycle count for one phase is loaded during the
-// last cycle of the previous phase.
+<h1>Duty Cycle Generator</h1>
+<p>Outputs a simple waveform which is high or low for a set number of cycles,
+ then takes on the opposite state for a set number of cycles. If not
+ immediately re-started, the output remains steady in its last state.</p>
+<p>One-shot by default: Pulse <code>start</code> high for one cycle to begin. Then
+ <code>finish</code> pulses high for one cycle during the last clock cycle of the last
+ phase of the <code>duty_cycle_out</code> output.  However, <code>finish</code> can be looped back
+ to <code>start</code>, or <code>start</code> can be tied high, to generate a continuous waveform
+ with a duty cycle and frequency determined by the <code>high_cycles</code> and
+ <code>low_cycles</code> counts. The cycle count for one phase is loaded during the
+ last cycle of the previous phase.</p>
+<p>Which phase comes first is set by the <code>first_phase</code> input. A value of <code>1</code>
+ means the high phase comes first. Note that <code>first_phase</code> is only read at
+ <code>start</code>.</p>
+<p>Asserting <code>clear</code> immediately sets <code>duty_cycle_out</code> to <code>INITIAL_OUTPUT</code> and
+ the <code>state</code> to <code>IDLE</code>.</p>
+<p><strong>NOTE</strong>: The limit case of a cycle count of zero is equal to a cycle count of
+ one. It takes one cycle to transition from phase to phase, so a zero length
+ phase would result in a constant output, and while adding state transitions
+ to support that is possible, it's pointless. If you need to stop the
+ output, either assert <code>clear</code> or stop pulsing <code>start</code>.</p>
+<h2>Use cases</h2>
+<ul>
+<li>Feeding a bit stream, synchronized to <code>start</code>, to <code>first_phase</code> will
+ produce a Manchester-encoded version of the bit stream.</li>
+<li>Altering the <code>high_cycles</code> and <code>low_cycles</code> values, while keeping their
+ sum constant, produces a variable duty cycle signal of constant frequency,
+ useful for driving servos, Pulse-Width Modulation, or to filter into a DC
+ analog value.</li>
+<li>Conversely, keeping the <code>high_cycles</code> and <code>low_cycles</code> ratio constant,
+ but scaling their values up and down, preserves the duty cycle but alters
+ the frequency of the output.</li>
+<li>You can generate a framing signal for a bit stream to indicate which
+ bits are header or body, based on the <code>start</code> of a frame.</li>
+</ul>
 
-// Which phase comes first is set by the `first_phase` input. A value of `1`
-// means the high phase comes first. Note that `first_phase` is only read at
-// `start`.
-
-// Asserting `clear` immediately sets `duty_cycle_out` to `INITIAL_OUTPUT` and
-// the `state` to `IDLE`.
-
-// **NOTE**: The limit case of a cycle count of zero is equal to a cycle count of
-// one. It takes one cycle to transition from phase to phase, so a zero length
-// phase would result in a constant output, and while adding state transitions
-// to support that is possible, it's pointless. If you need to stop the
-// output, either assert `clear` or stop pulsing `start`.
-
-//## Use cases
-
-// * Feeding a bit stream, synchronized to `start`, to `first_phase` will
-// produce a Manchester-encoded version of the bit stream.
-// * Altering the `high_cycles` and `low_cycles` values, while keeping their
-// sum constant, produces a variable duty cycle signal of constant frequency,
-// useful for driving servos, Pulse-Width Modulation, or to filter into a DC
-// analog value.
-// * Conversely, keeping the `high_cycles` and `low_cycles` ratio constant,
-// but scaling their values up and down, preserves the duty cycle but alters
-// the frequency of the output.
-// * You can generate a framing signal for a bit stream to indicate which
-// bits are header or body, based on the `start` of a frame.
-
+<pre>
 `default_nettype none
 
-module Duty_Cycle_Generator
+module <a href="./Duty_Cycle_Generator.html">Duty_Cycle_Generator</a>
 #(
     parameter COUNT_WIDTH       = 0,
     parameter INITIAL_OUTPUT    = 1'b0
@@ -66,11 +73,13 @@ module Duty_Cycle_Generator
     initial begin
         finish = 1'b0;
     end
+</pre>
 
-// Define the states. We always output a low and a high phase, starting in
-// either order, then we can either immediately start a new sequence (e.g.:
-// going from `LOW_SECOND` to `LOW_FIRST`), or wait in `IDLE`. 
+<p>Define the states. We always output a low and a high phase, starting in
+ either order, then we can either immediately start a new sequence (e.g.:
+ going from <code>LOW_SECOND</code> to <code>LOW_FIRST</code>), or wait in <code>IDLE</code>. </p>
 
+<pre>
     localparam STATE_WIDTH = 3;
 
     localparam [STATE_WIDTH-1:0] IDLE         = 'd0;
@@ -82,14 +91,16 @@ module Duty_Cycle_Generator
 
     wire [STATE_WIDTH-1:0] state;
     reg  [STATE_WIDTH-1:0] state_next = IDLE;
+</pre>
 
-// As the state changes, we load the necessary output value, otherwise the
-// output remains steady.
+<p>As the state changes, we load the necessary output value, otherwise the
+ output remains steady.</p>
 
+<pre>
     reg load_output_value   = 1'b0;
     reg output_value        = 1'b0;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (INITIAL_OUTPUT)
@@ -102,17 +113,19 @@ module Duty_Cycle_Generator
         .data_in        (output_value),
         .data_out       (duty_cycle_out)
     );
+</pre>
 
-// We count the number of clock cycles in each phase, signalling on the last
-// cycle of each phase. (We can halt the count by loading a `phase_cycles` of
-// zero, which we do in the IDLE state, which raises `div_by_zero`.)
+<p>We count the number of clock cycles in each phase, signalling on the last
+ cycle of each phase. (We can halt the count by loading a <code>phase_cycles</code> of
+ zero, which we do in the IDLE state, which raises <code>div_by_zero</code>.)</p>
 
+<pre>
     reg  [COUNT_WIDTH-1:0]  phase_cycles = COUNT_ZERO;
     wire                    end_of_phase;
     wire                    no_phase;
     reg                     phase_done = 1'b0;
 
-    Pulse_Divider
+    <a href="./Pulse_Divider.html">Pulse_Divider</a>
     #(
         .WORD_WIDTH         (COUNT_WIDTH),
         .INITIAL_DIVISOR    (COUNT_ZERO)
@@ -126,21 +139,25 @@ module Duty_Cycle_Generator
         .pulse_out          (end_of_phase),
         .div_by_zero        (no_phase)
     );
+</pre>
 
-// We need to signal the end of phase continuously in the `IDLE` state so we
-// can load a new cycle count right away when `start` is eventually asserted.
-// In effect, it remembers that a phase has ended in the past, while we wait
-// for an indeterminate time in `IDLE`. All other phase endings are handled
-// immediately.
+<p>We need to signal the end of phase continuously in the <code>IDLE</code> state so we
+ can load a new cycle count right away when <code>start</code> is eventually asserted.
+ In effect, it remembers that a phase has ended in the past, while we wait
+ for an indeterminate time in <code>IDLE</code>. All other phase endings are handled
+ immediately.</p>
 
+<pre>
     always @(*) begin
         phase_done = (end_of_phase == 1'b1) || (no_phase == 1'b1);
     end
+</pre>
 
-// Define the possible actions on the system, independent of state, based on
-// internal control signals and inputs. Here, that's the action to take at the
-// end of a phase: we either do nothing or start a low or high phase.
+<p>Define the possible actions on the system, independent of state, based on
+ internal control signals and inputs. Here, that's the action to take at the
+ end of a phase: we either do nothing or start a low or high phase.</p>
 
+<pre>
     reg start_no_phase   = 1'b0;
     reg start_low_phase  = 1'b0;
     reg start_high_phase = 1'b0;
@@ -150,10 +167,12 @@ module Duty_Cycle_Generator
         start_low_phase  = (phase_done == 1'b1) && (start == 1'b1) && (first_phase == 1'b0);
         start_high_phase = (phase_done == 1'b1) && (start == 1'b1) && (first_phase == 1'b1);
     end
+</pre>
 
-// Define the system transformations as a function of state and action.
-// These are the edges on the state diagram.
+<p>Define the system transformations as a function of state and action.
+ These are the edges on the state diagram.</p>
 
+<pre>
     reg start_low_first         = 1'b0; // Start with the low phase first,
     reg low_done_to_high        = 1'b0; // then move to the high phase second.
     reg high_done               = 1'b0; // When high phase is done and we don't start a new phase
@@ -179,9 +198,11 @@ module Duty_Cycle_Generator
         low_done_start_low      = (state == LOW_SECOND)  && (start_low_phase  == 1'b1);
         low_done_start_high     = (state == LOW_SECOND)  && (start_high_phase == 1'b1);
     end
+</pre>
 
-// Define the next state function: the state each transformation leads to.
+<p>Define the next state function: the state each transformation leads to.</p>
 
+<pre>
     always @(*) begin
         state_next = (start_low_first       == 1'b1) ? LOW_FIRST    : state;
         state_next = (low_done_to_high      == 1'b1) ? HIGH_SECOND  : state_next;
@@ -196,7 +217,7 @@ module Duty_Cycle_Generator
         state_next = (low_done_start_high   == 1'b1) ? HIGH_FIRST   : state_next;
     end
     
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (STATE_WIDTH),
         .RESET_VALUE    (IDLE)
@@ -209,9 +230,11 @@ module Duty_Cycle_Generator
         .data_in        (state_next),
         .data_out       (state)
     );
+</pre>
 
-// From the states and transformations, compute the control logic.
+<p>From the states and transformations, compute the control logic.</p>
 
+<pre>
     always @(*) begin
 
         // Signal when we've completed the high/low pair of phases.
@@ -252,4 +275,11 @@ module Duty_Cycle_Generator
     end
 
 endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
 
