@@ -249,13 +249,13 @@ module Pipeline_FIFO_Buffer
 //<pre>
 //                 /--\ +- flow              /--\ +- flow 
 //                 |  |                      |  |
-//          load   |  v    load       load   |  v    fill
+//          load   |  v    load       load   |  v    load
 // -------   +    -------   +          +    -------   +     -------
 //| Empty | ---> | Busy  | --->       ---> | Busy  | ----> | Full  |
 //|   0   |      |   1   |      . . .      |  N-1  |       |   N   |
 //|       | <--- |       | <---       <--- |       | <---  |       |
 // -------    -   -------    -          -   -------    -    -------
-//         unload         unload     unload          flush
+//         unload         unload     unload         unload
 //</pre>
 
 // We can see from the resulting state diagram that when the datapath is
@@ -318,31 +318,22 @@ module Pipeline_FIFO_Buffer
 // interface conditions, we only need the minimum logic to describe them, and
 // this logic gets re-used a lot later on, simplifying the code.
 
-
-    reg load    = 1'b0; // Inserts data into empty buffer.
-    reg flow    = 1'b0; // New inserted data into buffer as stored data is removed.
-    reg fill    = 1'b0; // New inserted data into last free buffer location.
-    reg flush   = 1'b0; // Remove data from a full buffer.
-    reg unload  = 1'b0; // Remove data from last used buffer location.
+    reg load    = 1'b0; // Inserts data into buffer.
+    reg flow    = 1'b0; // Inserts new data into buffer as stored data is removed.
+    reg unload  = 1'b0; // Remove data from buffer.
 
     always @(*) begin
-        load    = (empty == 1'b1) && (insert == 1'b1) && (remove == 1'b0);
+        load    = (full  == 1'b0) && (insert == 1'b1) && (remove == 1'b0);
+        unload  = (empty == 1'b0) && (insert == 1'b0) && (remove == 1'b1);
         flow    = (busy  == 1'b1) && (insert == 1'b1) && (remove == 1'b1);
-        fill    = (busy  == 1'b1) && (insert == 1'b1) && (remove == 1'b0);
-        flush   = (full  == 1'b1) && (insert == 1'b0) && (remove == 1'b1);
-        unload  = (busy  == 1'b1) && (insert == 1'b0) && (remove == 1'b1);
     end
 
 // And now we simply need to calculate the next state after each datapath
 // transformations. Here, this becomes the `data_count` counter control.
 
     always @(*) begin
-        update_buffer_data_count    = (load == 1'b1) || (fill == 1'b1) || (flush == 1'b1) || (unload == 1'b1);
-
-        incr_decr_buffer_data_count = (load   == 1'b1) ? COUNT_UP   : COUNT_DOWN;
-        incr_decr_buffer_data_count = (fill   == 1'b1) ? COUNT_UP   : incr_decr_buffer_data_count;
-        incr_decr_buffer_data_count = (flush  == 1'b1) ? COUNT_DOWN : incr_decr_buffer_data_count;
-        incr_decr_buffer_data_count = (unload == 1'b1) ? COUNT_DOWN : incr_decr_buffer_data_count;
+        update_buffer_data_count    = (load == 1'b1) || (unload == 1'b1);
+        incr_decr_buffer_data_count = (load == 1'b1) ? COUNT_UP : COUNT_DOWN;
     end
 
 // Similarly, from the datapath transformations, we can compute the necessary
@@ -350,9 +341,9 @@ module Pipeline_FIFO_Buffer
 // at registers in the datapath.
 
     always @(*) begin
-        increment_buffer_write_addr = (load   == 1'b1) || (fill  == 1'b1) || (flow == 1'b1);
+        increment_buffer_write_addr = (load   == 1'b1) || (flow == 1'b1);
+        increment_buffer_read_addr  = (unload == 1'b1) || (flow == 1'b1);
         buffer_wren                 = increment_buffer_write_addr;
-        increment_buffer_read_addr  = (unload == 1'b1) || (flush == 1'b1) || (flow == 1'b1);
         buffer_rden                 = increment_buffer_read_addr;
         load_buffer_write_addr      = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST);
         load_buffer_read_addr       = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST);
