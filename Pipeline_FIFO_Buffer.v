@@ -7,7 +7,7 @@
 
 // *This module is a generalization of the [Skid
 // Buffer](./Pipeline_Skid_Buffer.html). Go read it to get a deeper treatment
-// of pipeline buffering theory, and the particular method used to implement
+// of pipeline buffering theory, and the particular idiom used to implement
 // the control logic.*
 
 // Since a FIFO buffer stores larger and variable amounts of data, it will
@@ -21,9 +21,9 @@
 
 module Pipeline_FIFO_Buffer
 #(
-    parameter WORD_WIDTH = 32,
-    parameter DEPTH      = 512,
-    parameter RAMSTYLE   = "M10K"
+    parameter WORD_WIDTH = 8,
+    parameter DEPTH      = 16,
+    parameter RAMSTYLE   = "MLAB, no_rw_check"
 )
 (
     input   wire                        clock,
@@ -33,33 +33,33 @@ module Pipeline_FIFO_Buffer
     output  reg                         input_ready,
     input   wire    [WORD_WIDTH-1:0]    input_data,
 
-    output  reg                         output_valid,
+    output  wire                        output_valid,
     input   wire                        output_ready,
     output  wire    [WORD_WIDTH-1:0]    output_data
 );
 
     initial begin
         input_ready     = 1'b1; // Empty at start, so accept data
-        output_valid    = 1'b0;
     end
 
     `include "clog2_function.vh"
 
-    localparam                  WORD_ZERO   = {WORD_WIDTH{1'b0}};
+    localparam WORD_ZERO    = {WORD_WIDTH{1'b0}};
 
-    localparam                  ADDR_WIDTH  = clog2(DEPTH);
-    localparam                  ADDR_ONE    = {{ADDR_WIDTH-1{1'b0}},1'b1};
-    localparam                  ADDR_ZERO   = {ADDR_WIDTH{1'b0}};
-    localparam [ADDR_WIDTH-1:0] ADDR_LAST   = DEPTH [ADDR_WIDTH-1:0] - ADDR_ONE;
+    localparam ADDR_WIDTH   = clog2(DEPTH);
+    localparam ADDR_ONE     = {{ADDR_WIDTH-1{1'b0}},1'b1};
+    localparam ADDR_ZERO    = {ADDR_WIDTH{1'b0}};
+    localparam ADDR_LAST    = DEPTH-1;
 
     // Since the stored data count has to be able to represent DEPTH itself,
-    // and not a zero-based count of that quantity.
-    localparam                   COUNT_WIDTH = ADDR_WIDTH + 1;
-    localparam                   COUNT_ONE   = {{COUNT_WIDTH-1{1'b0}},1'b1};
-    localparam                   COUNT_ZERO  = {COUNT_WIDTH{1'b0}};
-    localparam [COUNT_WIDTH-1:0] COUNT_LAST  = DEPTH;
-    localparam                   COUNT_UP    = 1'b0;
-    localparam                   COUNT_DOWN  = 1'b1;
+    // and not a zero to DEPTH-1 count of that quantity, we need an extra bit,
+    // to guarantee sufficient range.
+    localparam COUNT_WIDTH  = ADDR_WIDTH + 1;
+    localparam COUNT_ONE    = {{COUNT_WIDTH-1{1'b0}},1'b1};
+    localparam COUNT_ZERO   = {COUNT_WIDTH{1'b0}};
+    localparam COUNT_LAST   = DEPTH;
+    localparam COUNT_UP     = 1'b0;
+    localparam COUNT_DOWN   = 1'b1;
 
 //## Data Path
 
@@ -104,6 +104,29 @@ module Pipeline_FIFO_Buffer
         .rden               (buffer_rden),
         .read_addr          (buffer_read_addr),
         .read_data          (output_data)
+    );
+
+// Since the buffer is a synchronous RAM, it takes a clock cycle before the
+// read data updates, so we pass along the read enable line through a register
+// to synchronize it and signal valid read data. However, the register needs
+// separate control: for example, when the output interface reads out the last
+// item out of the buffer, the output becomes invalid even though the buffer
+// output is unchanged.
+
+    reg update_output_valid = 1'b0;
+
+    Register
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    output_data_valid
+    (
+        .clock          (clock),
+        .clock_enable   (update_output_valid),
+        .clear          (clear),
+        .data_in        (buffer_rden),
+        .data_out       (output_valid)
     );
 
 // The buffer read and write addresses are stored in counters, which both
@@ -178,31 +201,17 @@ module Pipeline_FIFO_Buffer
 // to determine if the FIFO is full or empty.  All we need to do is count up
 // or down by 1.
 
-// Put another way, we found an equivalence between all possible pairs of read
-// and write address values which represent the same amount of stored data, so
-// we went from having to deal with (for a FIFO of depth N)
+// Put another way, instead of having to compare the whole value of both
+// address counters plus an extra empty/full bit, we only need to compare one
+// counter to two constant values (for the empty and full cases) which is
+// simpler and more local logic.
+
+// Put yet another way, we found an equivalence between all possible pairs of
+// read and write address values which represent the same amount of stored
+// data, so we went from having to deal with (for a FIFO of depth N)
 // ceil(2<sup>2log<sub>2</sub>(N)+1</sup>) possible states (two counters and
 // an empty/full bit), to only ceil(2<sup>log<sub>2</sub>(N)</sup>) actual
 // states (the number of stored words).
-
-// A FIFO has a rather larger number of states. For example, a 512 entry FIFO
-// has 9 bits for the read address, and either 9 bits for a write address, or
-// 9 bits for a stored data count, and a single bit to distinguish between the
-// otherwise idential full and empty states, where the read and write
-// addresses are equal. In either case, the missing write address or data
-// count can be calculated with a single addition or subtraction.  Other pairs
-// of these three 9-bit values are also possible, plus the empty/full bit.
-// With a total of 19 bits of state, the 512-entry FIFO has
-// <code>2<sup>19</sup> = 524,288</code> states!
-
-// However, a lot of these states are "similar": there is the same 512
-// transitions from any of the 512 empty states (where the read and write
-// addresses match and no data is stored), to the corresponding full state
-// (equal read and write addresses, after a wraparound, but all storage
-// locations holding data). A read during this state progression simply moves
-// to a parallel "track" of states, with the same set of 512 transitions.
-// This suggests it might be possible to only need 512 states to describe the
-// operation of the FIFO.
 
     reg                     update_buffer_data_count    = 1'b0;
     reg                     incr_decr_buffer_data_count = 1'b0;
@@ -234,7 +243,7 @@ module Pipeline_FIFO_Buffer
 // For a depth of N, the FIFO buffer has N states:
 
 // 1. Empty, representing 0 items in storage.
-// 2. Busy, N-2 identical versions, representing 1 to N-1 items in storage.
+// 2. Busy, N-2 similar states, representing 1 to N-1 items in storage.
 // 3. Full, representing N items in storage.
 
 // The operations which transition between these states are:
@@ -267,7 +276,8 @@ module Pipeline_FIFO_Buffer
 // We can also see that the state of the FIFO is exactly represented by the
 // number of items currently stored in it, and that number can only stay put,
 // increment by 1, or decrement by 1. Thus, the `data_count` counter will be
-// our state variable.
+// our state variable, and we do not need to uniquely distinguish the state
+// transitions.
 
     reg empty   = 1'b0;
     reg busy    = 1'b0;
@@ -284,31 +294,34 @@ module Pipeline_FIFO_Buffer
 // * The input interface can only insert when the datapath is not full.
 // * The output interface can only remove data when the datapath is not empty.
  
-// We do this by computing the allowable output read/valid handshake signals
-// based on the datapath state. This little bit of code prunes away a large
-// number of invalid state transitions. If some other logic seems to be
-// missing, first see if this code has made it unnecessary.
+// We do this by computing the allowable input and output interface read/valid
+// handshake signals based on the datapath state, which
+// prunes away a large number of invalid state transitions. If some other
+// logic seems to be missing, first see if that code has made it unnecessary.
 
-// *This tiny bit of code is critical* since it also implies the fundamental
-// operating assumptions of a FIFO buffer: that one interface cannot have its
-// current state depend on the current state of the other interface, as that
-// would be a combinational path between both interfaces.
+// Doing it this way also implements a fundamental operating assumptions of
+// a FIFO buffer: that one interface cannot have its current state depend on
+// the current state of the other interface, as that would be a combinational
+// path between both interfaces.
 
-    always @(*) begin
-        input_ready  = (full  == 1'b0);
-        output_valid = (empty == 1'b0);
-    end
+//### Input Interface
 
-// After, let's describe the interface signal conditions which implement our
-// two basic operations on the datapath: insert and remove. This also weeds
-// out a number of possible state transitions.
+// The input interface writes directly into the buffer, and only stops if
+// full.
 
     reg insert = 1'b0;
+
+    always @(*) begin
+        input_ready = (full == 1'b0);
+        insert      = (input_valid  == 1'b1) && (input_ready  == 1'b1);
+    end
+
     reg remove = 1'b0;
 
     always @(*) begin
-        insert = (input_valid  == 1'b1) && (input_ready  == 1'b1);
-        remove = (output_valid == 1'b1) && (output_ready == 1'b1);
+        update_output_valid = (output_valid == 1'b0) || (output_ready        == 1'b1);
+        buffer_rden         = (empty        == 1'b0) && (update_output_valid == 1'b1);
+        remove              = (output_valid == 1'b1) && (output_ready        == 1'b1);
     end
 
 // Now that we have our datapath states and operations, let's use them to
@@ -344,9 +357,8 @@ module Pipeline_FIFO_Buffer
         increment_buffer_write_addr = (load   == 1'b1) || (flow == 1'b1);
         increment_buffer_read_addr  = (unload == 1'b1) || (flow == 1'b1);
         buffer_wren                 = increment_buffer_write_addr;
-        buffer_rden                 = increment_buffer_read_addr;
-        load_buffer_write_addr      = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST);
-        load_buffer_read_addr       = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST);
+        load_buffer_write_addr      = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
+        load_buffer_read_addr       = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST [ADDR_WIDTH-1:0]);
     end
 
 endmodule
