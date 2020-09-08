@@ -180,6 +180,8 @@ reg [WORD_WIDTH-1:0] foo  = WORD_ZERO;
 localparam [WORD_WIDTH-1:0] WORD_CONSTANT = `SOME_INTEGER_CONSTANT;
 </pre>
 
+<p><b>FIXME: last example won't pass lint if SOME_INTEGER_CONSTANT is a power of two: it would need WORD_WIDTH+1 bits. Don't specify the width at definition, and truncate at point of use.</b>
+
 <h3>Bit Widths</h3>
 
 <p>Always match bit widths of variable assignments. Even with correct implicit
