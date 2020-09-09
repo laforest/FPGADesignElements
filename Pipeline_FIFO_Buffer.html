@@ -15,7 +15,7 @@
  pipelining the path to improve concurrency and/or timing.</p>
 <p><em>This module is a generalization of the <a href="./Pipeline_Skid_Buffer.html">Skid
  Buffer</a>. Go read it to get a deeper treatment
- of pipeline buffering theory, and the particular method used to implement
+ of pipeline buffering theory, and the particular idiom used to implement
  the control logic.</em></p>
 <p>Since a FIFO buffer stores larger and variable amounts of data, it will
  smooth out irregularities in the transfer rates of the input and output
@@ -29,9 +29,9 @@
 
 module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
 #(
-    parameter WORD_WIDTH = 32,
-    parameter DEPTH      = 512,
-    parameter RAMSTYLE   = "M10K"
+    parameter WORD_WIDTH = 8,
+    parameter DEPTH      = 16,
+    parameter RAMSTYLE   = "MLAB, no_rw_check"
 )
 (
     input   wire                        clock,
@@ -41,33 +41,33 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
     output  reg                         input_ready,
     input   wire    [WORD_WIDTH-1:0]    input_data,
 
-    output  reg                         output_valid,
+    output  wire                        output_valid,
     input   wire                        output_ready,
     output  wire    [WORD_WIDTH-1:0]    output_data
 );
 
     initial begin
         input_ready     = 1'b1; // Empty at start, so accept data
-        output_valid    = 1'b0;
     end
 
     `include "clog2_function.vh"
 
-    localparam                  WORD_ZERO   = {WORD_WIDTH{1'b0}};
+    localparam WORD_ZERO    = {WORD_WIDTH{1'b0}};
 
-    localparam                  ADDR_WIDTH  = clog2(DEPTH);
-    localparam                  ADDR_ONE    = {{ADDR_WIDTH-1{1'b0}},1'b1};
-    localparam                  ADDR_ZERO   = {ADDR_WIDTH{1'b0}};
-    localparam [ADDR_WIDTH-1:0] ADDR_LAST   = DEPTH [ADDR_WIDTH-1:0] - ADDR_ONE;
+    localparam ADDR_WIDTH   = clog2(DEPTH);
+    localparam ADDR_ONE     = {{ADDR_WIDTH-1{1'b0}},1'b1};
+    localparam ADDR_ZERO    = {ADDR_WIDTH{1'b0}};
+    localparam ADDR_LAST    = DEPTH-1;
 
     // Since the stored data count has to be able to represent DEPTH itself,
-    // and not a zero-based count of that quantity.
-    localparam                   COUNT_WIDTH = ADDR_WIDTH + 1;
-    localparam                   COUNT_ONE   = {{COUNT_WIDTH-1{1'b0}},1'b1};
-    localparam                   COUNT_ZERO  = {COUNT_WIDTH{1'b0}};
-    localparam [COUNT_WIDTH-1:0] COUNT_LAST  = DEPTH;
-    localparam                   COUNT_UP    = 1'b0;
-    localparam                   COUNT_DOWN  = 1'b1;
+    // and not a zero to DEPTH-1 count of that quantity, we need an extra bit,
+    // to guarantee sufficient range.
+    localparam COUNT_WIDTH  = ADDR_WIDTH + 1;
+    localparam COUNT_ONE    = {{COUNT_WIDTH-1{1'b0}},1'b1};
+    localparam COUNT_ZERO   = {COUNT_WIDTH{1'b0}};
+    localparam COUNT_LAST   = DEPTH;
+    localparam COUNT_UP     = 1'b0;
+    localparam COUNT_DOWN   = 1'b1;
 </pre>
 
 <h2>Data Path</h2>
@@ -111,6 +111,31 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
         .rden               (buffer_rden),
         .read_addr          (buffer_read_addr),
         .read_data          (output_data)
+    );
+</pre>
+
+<p>Since the buffer is a synchronous RAM, it takes a clock cycle before the
+ read data updates, so we pass along the read enable line through a register
+ to synchronize it and signal valid read data. However, the register needs
+ separate control: for example, when the output interface reads out the last
+ item out of the buffer, the output becomes invalid even though the buffer
+ output is unchanged.</p>
+
+<pre>
+    reg update_output_valid = 1'b0;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    output_data_valid
+    (
+        .clock          (clock),
+        .clock_enable   (update_output_valid),
+        .clear          (clear),
+        .data_in        (buffer_rden),
+        .data_out       (output_valid)
     );
 </pre>
 
@@ -186,29 +211,16 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
  addresses to see if they have wrapped around before they came to be equal
  to determine if the FIFO is full or empty.  All we need to do is count up
  or down by 1.</p>
-<p>Put another way, we found an equivalence between all possible pairs of read
- and write address values which represent the same amount of stored data, so
- we went from having to deal with (for a FIFO of depth N)
+<p>Put another way, instead of having to compare the whole value of both
+ address counters plus an extra empty/full bit, we only need to compare one
+ counter to two constant values (for the empty and full cases) which is
+ simpler and more local logic.</p>
+<p>Put yet another way, we found an equivalence between all possible pairs of
+ read and write address values which represent the same amount of stored
+ data, so we went from having to deal with (for a FIFO of depth N)
  ceil(2<sup>2log<sub>2</sub>(N)+1</sup>) possible states (two counters and
  an empty/full bit), to only ceil(2<sup>log<sub>2</sub>(N)</sup>) actual
  states (the number of stored words).</p>
-<p>A FIFO has a rather larger number of states. For example, a 512 entry FIFO
- has 9 bits for the read address, and either 9 bits for a write address, or
- 9 bits for a stored data count, and a single bit to distinguish between the
- otherwise idential full and empty states, where the read and write
- addresses are equal. In either case, the missing write address or data
- count can be calculated with a single addition or subtraction.  Other pairs
- of these three 9-bit values are also possible, plus the empty/full bit.
- With a total of 19 bits of state, the 512-entry FIFO has
- <code>2<sup>19</sup> = 524,288</code> states!</p>
-<p>However, a lot of these states are "similar": there is the same 512
- transitions from any of the 512 empty states (where the read and write
- addresses match and no data is stored), to the corresponding full state
- (equal read and write addresses, after a wraparound, but all storage
- locations holding data). A read during this state progression simply moves
- to a parallel "track" of states, with the same set of 512 transitions.
- This suggests it might be possible to only need 512 states to describe the
- operation of the FIFO.</p>
 
 <pre>
     reg                     update_buffer_data_count    = 1'b0;
@@ -241,7 +253,7 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
 <p>For a depth of N, the FIFO buffer has N states:</p>
 <ol>
 <li>Empty, representing 0 items in storage.</li>
-<li>Busy, N-2 identical versions, representing 1 to N-1 items in storage.</li>
+<li>Busy, N-2 similar states, representing 1 to N-1 items in storage.</li>
 <li>Full, representing N items in storage.</li>
 </ol>
 <p>The operations which transition between these states are:</p>
@@ -255,13 +267,13 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
 <pre>
                  /--\ +- flow              /--\ +- flow 
                  |  |                      |  |
-          load   |  v    load       load   |  v    fill
+          load   |  v    load       load   |  v    load
  -------   +    -------   +          +    -------   +     -------
 | Empty | ---> | Busy  | --->       ---> | Busy  | ----> | Full  |
 |   0   |      |   1   |      . . .      |  N-1  |       |   N   |
 |       | <--- |       | <---       <--- |       | <---  |       |
  -------    -   -------    -          -   -------    -    -------
-         unload         unload     unload          flush
+         unload         unload     unload         unload
 </pre>
 
 <p>We can see from the resulting state diagram that when the datapath is
@@ -272,7 +284,8 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
 <p>We can also see that the state of the FIFO is exactly represented by the
  number of items currently stored in it, and that number can only stay put,
  increment by 1, or decrement by 1. Thus, the <code>data_count</code> counter will be
- our state variable.</p>
+ our state variable, and we do not need to uniquely distinguish the state
+ transitions.</p>
 
 <pre>
     reg empty   = 1'b0;
@@ -291,85 +304,100 @@ module <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
 <li>The input interface can only insert when the datapath is not full.</li>
 <li>The output interface can only remove data when the datapath is not empty.</li>
 </ul>
-<p>We do this by computing the allowable output read/valid handshake signals
- based on the datapath state. This little bit of code prunes away a large
- number of invalid state transitions. If some other logic seems to be
- missing, first see if this code has made it unnecessary.</p>
-<p><em>This tiny bit of code is critical</em> since it also implies the fundamental
- operating assumptions of a FIFO buffer: that one interface cannot have its
- current state depend on the current state of the other interface, as that
- would be a combinational path between both interfaces.</p>
-
-<pre>
-    always @(*) begin
-        input_ready  = (full  == 1'b0);
-        output_valid = (empty == 1'b0);
-    end
-</pre>
-
-<p>After, let's describe the interface signal conditions which implement our
- two basic operations on the datapath: insert and remove. This also weeds
- out a number of possible state transitions.</p>
+<p>We do this by computing the allowable input and output interface read/valid
+ handshake signals based on the datapath state, which
+ prunes away a large number of invalid state transitions. If some other
+ logic seems to be missing, first see if that code has made it unnecessary.</p>
+<p>Doing it this way also implements a fundamental operating assumptions of
+ a FIFO buffer: that one interface cannot have its current state depend on
+ the current state of the other interface, as that would be a combinational
+ path between both interfaces.</p>
+<h3>Input Interface</h3>
+<p>The input interface inserts directly into the buffer, and only signals the
+ sender to stop if the buffer is full.</p>
 
 <pre>
     reg insert = 1'b0;
+
+    always @(*) begin
+        input_ready = (full == 1'b0);
+        insert      = (input_valid  == 1'b1) && (input_ready  == 1'b1);
+    end
+</pre>
+
+<h3>Output Interface</h3>
+<p>The buffer output is registered, so the output interface is necessarily
+ pipelined and works in parallel with the input interface. Keeping that
+ pipeline full and signalling to the <code>read_address</code> and <code>data_count</code>
+ counters when an item is removed from the buffer requires a separate little
+ engine.</p>
+<p>Recall from above that <code>output_valid</code> is a registered version of
+ <code>buffer_rden</code>, matching the latency of a buffer read and signalling when
+ a buffer read has completed and new <code>output_data</code> is available.</p>
+<p>We update <code>output_valid</code> and try to read from the buffer if the other end
+ of the output interface is ready (<code>output_ready</code> is high), or if
+ <code>output_data</code> is currently invalid, so even if <code>output_ready</code> is low, we
+ try and pre-load the output interface. A buffer read happens if the buffer
+ is not empty. Otherwise, <code>output_valid</code> updates from a <code>buffer_rden</code> which
+ is necessarily low, and thus <code>output_valid</code> goes (or remains) low in the
+ next cycle. If we can read from the buffer, and <code>output_ready</code> is high,
+ then we have removed an item from the buffer.</p>
+
+<pre>
     reg remove = 1'b0;
 
     always @(*) begin
-        insert = (input_valid  == 1'b1) && (input_ready  == 1'b1);
-        remove = (output_valid == 1'b1) && (output_ready == 1'b1);
+        update_output_valid = (output_valid == 1'b0) || (output_ready        == 1'b1);
+        buffer_rden         = (empty        == 1'b0) && (update_output_valid == 1'b1);
+        remove              = (buffer_rden  == 1'b1) && (output_ready        == 1'b1);
     end
 </pre>
 
-<p>Now that we have our datapath states and operations, let's use them to
- describe the possible transformations to the datapath, and in which state
- they can happen.  You'll see that these exactly describe each of the
- 5 edges in the state diagram, and since we've pruned the space of possible
- interface conditions, we only need the minimum logic to describe them, and
- this logic gets re-used a lot later on, simplifying the code.</p>
+<h3>Datapath Transformations</h3>
+<p>Now that we have defined the possible states and operations of the
+ datapath, we can define the transformations, which are the edges between
+ states. Or put otherwise: in which state(s) can operations happen, and what
+ do they mean. Afterwards, we will reuse this logic a lot.</p>
 
 <pre>
-    reg load    = 1'b0; // Inserts data into empty buffer.
-    reg flow    = 1'b0; // New inserted data into buffer as stored data is removed.
-    reg fill    = 1'b0; // New inserted data into last free buffer location.
-    reg flush   = 1'b0; // Remove data from a full buffer.
-    reg unload  = 1'b0; // Remove data from last used buffer location.
+    reg load    = 1'b0; // Inserts data into buffer.
+    reg unload  = 1'b0; // Remove data from buffer.
+    reg flow    = 1'b0; // Inserts new data into buffer as stored data is removed.
 
     always @(*) begin
-        load    = (empty == 1'b1) && (insert == 1'b1) && (remove == 1'b0);
+        load    = (full  == 1'b0) && (insert == 1'b1) && (remove == 1'b0);
+        unload  = (empty == 1'b0) && (insert == 1'b0) && (remove == 1'b1);
         flow    = (busy  == 1'b1) && (insert == 1'b1) && (remove == 1'b1);
-        fill    = (busy  == 1'b1) && (insert == 1'b1) && (remove == 1'b0);
-        flush   = (full  == 1'b1) && (insert == 1'b0) && (remove == 1'b1);
-        unload  = (busy  == 1'b1) && (insert == 1'b0) && (remove == 1'b1);
     end
 </pre>
 
-<p>And now we simply need to calculate the next state after each datapath
- transformations. Here, this becomes the <code>data_count</code> counter control.</p>
+<h3>Next-State Calculations</h3>
+<p>Calculating the next state after each datapath transformation becomes the
+ <code>data_count</code> counter control, where we increment, decrement, or leave
+ constant the count of items in the buffer.</p>
 
 <pre>
     always @(*) begin
-        update_buffer_data_count    = (load == 1'b1) || (fill == 1'b1) || (flush == 1'b1) || (unload == 1'b1);
-
-        incr_decr_buffer_data_count = (load   == 1'b1) ? COUNT_UP   : COUNT_DOWN;
-        incr_decr_buffer_data_count = (fill   == 1'b1) ? COUNT_UP   : incr_decr_buffer_data_count;
-        incr_decr_buffer_data_count = (flush  == 1'b1) ? COUNT_DOWN : incr_decr_buffer_data_count;
-        incr_decr_buffer_data_count = (unload == 1'b1) ? COUNT_DOWN : incr_decr_buffer_data_count;
+        update_buffer_data_count    = (load == 1'b1) || (unload == 1'b1);
+        incr_decr_buffer_data_count = (load == 1'b1) ? COUNT_UP : COUNT_DOWN;
     end
 </pre>
 
-<p>Similarly, from the datapath transformations, we can compute the necessary
- control signals to the datapath. These are not registered here, as they end
- at registers in the datapath.</p>
+<h3>Control Signals</h3>
+<p>Each datapath transformation also gives us a way to express the control
+ signals to the datapath. These are not registered here, as they end at
+ registers in the datapath.</p>
+<p>Here, we increment the read/write addresses as necessary (they only ever
+ increment), enable a write to the buffer as necessary, and wrap-around the
+ read/write addresses when they reach the end of the buffer.</p>
 
 <pre>
     always @(*) begin
-        increment_buffer_write_addr = (load   == 1'b1) || (fill  == 1'b1) || (flow == 1'b1);
+        increment_buffer_write_addr = (load   == 1'b1) || (flow == 1'b1);
+        increment_buffer_read_addr  = (unload == 1'b1) || (flow == 1'b1);
         buffer_wren                 = increment_buffer_write_addr;
-        increment_buffer_read_addr  = (unload == 1'b1) || (flush == 1'b1) || (flow == 1'b1);
-        buffer_rden                 = increment_buffer_read_addr;
-        load_buffer_write_addr      = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST);
-        load_buffer_read_addr       = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST);
+        load_buffer_write_addr      = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
+        load_buffer_read_addr       = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST [ADDR_WIDTH-1:0]);
     end
 
 endmodule

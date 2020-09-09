@@ -306,8 +306,8 @@ module Pipeline_FIFO_Buffer
 
 //### Input Interface
 
-// The input interface writes directly into the buffer, and only stops if
-// full.
+// The input interface inserts directly into the buffer, and only signals the
+// sender to stop if the buffer is full.
 
     reg insert = 1'b0;
 
@@ -316,24 +316,45 @@ module Pipeline_FIFO_Buffer
         insert      = (input_valid  == 1'b1) && (input_ready  == 1'b1);
     end
 
+//### Output Interface
+
+// The buffer output is registered, so the output interface is necessarily
+// pipelined and works in parallel with the input interface. Keeping that
+// pipeline full and signalling to the `read_address` and `data_count`
+// counters when an item is removed from the buffer requires a separate little
+// engine.
+
+// Recall from above that `output_valid` is a registered version of
+// `buffer_rden`, matching the latency of a buffer read and signalling when
+// a buffer read has completed and new `output_data` is available.
+
+// We update `output_valid` and try to read from the buffer if the other end
+// of the output interface is ready (`output_ready` is high), or if
+// `output_data` is currently invalid, so even if `output_ready` is low, we
+// try and pre-load the output interface. A buffer read happens if the buffer
+// is not empty. Otherwise, `output_valid` updates from a `buffer_rden` which
+// is necessarily low, and thus `output_valid` goes (or remains) low in the
+// next cycle. If we can read from the buffer, and `output_ready` is high,
+// then we have removed an item from the buffer.
+
     reg remove = 1'b0;
 
     always @(*) begin
         update_output_valid = (output_valid == 1'b0) || (output_ready        == 1'b1);
         buffer_rden         = (empty        == 1'b0) && (update_output_valid == 1'b1);
-        remove              = (output_valid == 1'b1) && (output_ready        == 1'b1);
+        remove              = (buffer_rden  == 1'b1) && (output_ready        == 1'b1);
     end
 
-// Now that we have our datapath states and operations, let's use them to
-// describe the possible transformations to the datapath, and in which state
-// they can happen.  You'll see that these exactly describe each of the
-// 5 edges in the state diagram, and since we've pruned the space of possible
-// interface conditions, we only need the minimum logic to describe them, and
-// this logic gets re-used a lot later on, simplifying the code.
+//### Datapath Transformations
+
+// Now that we have defined the possible states and operations of the
+// datapath, we can define the transformations, which are the edges between
+// states. Or put otherwise: in which state(s) can operations happen, and what
+// do they mean. Afterwards, we will reuse this logic a lot.
 
     reg load    = 1'b0; // Inserts data into buffer.
-    reg flow    = 1'b0; // Inserts new data into buffer as stored data is removed.
     reg unload  = 1'b0; // Remove data from buffer.
+    reg flow    = 1'b0; // Inserts new data into buffer as stored data is removed.
 
     always @(*) begin
         load    = (full  == 1'b0) && (insert == 1'b1) && (remove == 1'b0);
@@ -341,17 +362,26 @@ module Pipeline_FIFO_Buffer
         flow    = (busy  == 1'b1) && (insert == 1'b1) && (remove == 1'b1);
     end
 
-// And now we simply need to calculate the next state after each datapath
-// transformations. Here, this becomes the `data_count` counter control.
+//### Next-State Calculations
+
+// Calculating the next state after each datapath transformation becomes the
+// `data_count` counter control, where we increment, decrement, or leave
+// constant the count of items in the buffer.
 
     always @(*) begin
         update_buffer_data_count    = (load == 1'b1) || (unload == 1'b1);
         incr_decr_buffer_data_count = (load == 1'b1) ? COUNT_UP : COUNT_DOWN;
     end
 
-// Similarly, from the datapath transformations, we can compute the necessary
-// control signals to the datapath. These are not registered here, as they end
-// at registers in the datapath.
+//### Control Signals
+
+// Each datapath transformation also gives us a way to express the control
+// signals to the datapath. These are not registered here, as they end at
+// registers in the datapath.
+
+// Here, we increment the read/write addresses as necessary (they only ever
+// increment), enable a write to the buffer as necessary, and wrap-around the
+// read/write addresses when they reach the end of the buffer.
 
     always @(*) begin
         increment_buffer_write_addr = (load   == 1'b1) || (flow == 1'b1);
