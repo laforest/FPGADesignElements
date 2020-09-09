@@ -3,27 +3,29 @@
 
 // Decouples two sides of a ready/valid handshake to allow back-to-back
 // transfers without a combinational path between input and output, thus
-// pipelining the path to improve concurrency and/or timing.
+// pipelining the path to improve concurrency and/or timing. The latency from
+// input to output is 2 clock cycles. *Any FIFO depth is allowed, not only
+// powers-of-2.* Raising `clear` will return the FIFO to the empty state.
 
-// *This module is a generalization of the [Skid
-// Buffer](./Pipeline_Skid_Buffer.html). Go read it to get a deeper treatment
-// of pipeline buffering theory, and the particular idiom used to implement
-// the control logic.*
-
-// Since a FIFO buffer stores larger and variable amounts of data, it will
-// smooth out irregularities in the transfer rates of the input and output
-// ports, and when used in pipeline loops, can store enough data to prevent
-// deadlocks (re: [Kahn Process
+// Since a FIFO buffer stores variable amounts of data, it will smooth out
+// irregularities in the transfer rates of the input and output interfaces,
+// and when used in pipeline loops, can store enough data to prevent
+// artificial deadlocks (re: [Kahn Process
 // Networks](https://en.wikipedia.org/wiki/Kahn_process_networks#Boundedness_of_channels)
 // with bounded channels).
+
+// *This module is a generalization of the [Skid
+// Buffer](./Pipeline_Skid_Buffer.html), which acts as a 2-deep FIFO buffer.
+// Go read it to get a deeper treatment of pipeline buffering requirements,
+// and the particular idiom used to implement the control logic.*
 
 `default_nettype none
 
 module Pipeline_FIFO_Buffer
 #(
-    parameter WORD_WIDTH = 8,
-    parameter DEPTH      = 16,
-    parameter RAMSTYLE   = "MLAB, no_rw_check"
+    parameter WORD_WIDTH = 0,
+    parameter DEPTH      = 0,
+    parameter RAMSTYLE   = ""
 )
 (
     input   wire                        clock,
@@ -39,8 +41,13 @@ module Pipeline_FIFO_Buffer
 );
 
     initial begin
-        input_ready     = 1'b1; // Empty at start, so accept data
+        input_ready = 1'b1; // Empty at start, so accept data
     end
+
+//## Constants
+
+// From the FIFO `DEPTH`, we derive the bit width of the buffer addresses and
+// item count, and construct the constants we work with.
 
     `include "clog2_function.vh"
 
@@ -51,9 +58,10 @@ module Pipeline_FIFO_Buffer
     localparam ADDR_ZERO    = {ADDR_WIDTH{1'b0}};
     localparam ADDR_LAST    = DEPTH-1;
 
-    // Since the stored data count has to be able to represent DEPTH itself,
-    // and not a zero to DEPTH-1 count of that quantity, we need an extra bit,
-    // to guarantee sufficient range.
+// Since the stored data count has to be able to represent `DEPTH` itself, and
+// not a zero to `DEPTH-1` count of that quantity, we need an extra bit, to
+// guarantee sufficient range.
+
     localparam COUNT_WIDTH  = ADDR_WIDTH + 1;
     localparam COUNT_ONE    = {{COUNT_WIDTH-1{1'b0}},1'b1};
     localparam COUNT_ZERO   = {COUNT_WIDTH{1'b0}};
@@ -63,17 +71,21 @@ module Pipeline_FIFO_Buffer
 
 //## Data Path
 
-// The data path is a simple dual-port memory: one write port to receive data,
-// and one read port to concurrently send data. Typically this memory will be
-// a dedicated Block RAM, but can also be LUT RAM if the width and depth are
-// small, or even plain registers for very small cases. (Though at that latter
-// point, you might be better off chaining a couple of [Skid
-// Buffers](./Pipeline_Skid_Buffer.html) instead.)
+// The buffer itself is a *synchronous* dual-port memory: one write port to
+// insert data, and one read port to concurrently remove data. Typically this
+// memory will be a dedicated Block RAM, but can also be built from LUT RAM if
+// the width and depth are small, or even plain registers for very small
+// cases. If your CAD tool does not support inference of memories as
+// registers, you can instead chain together a few [Skid
+// Buffers](./Pipeline_Skid_Buffer.html), though the latency will increase by
+// 1 clock cycle per Skid Buffer.
 
-// NOTE: there will NEVER be a concurrent read and write to the same address,
-// so write-forwarding logic is not necessary. Guide your CAD tool as
-// necessary to tell it this fact, so you can obtain the highest possible
-// operating frequency.
+// **NOTE**: There will *NEVER* be a concurrent read and write to the same
+// address, so write-forwarding logic is not necessary, as specififed by the
+// values of the `READ_NEW_DATA` and `RW_ADDR_COLLISION` parameters. Guide
+// your CAD tool as necessary to tell it there will never be read/write
+// address collisions, so you can obtain the highest possible operating
+// frequency. 
 
 // We initialize the read/write enables to zero, signifying an idle system.
 
@@ -107,11 +119,12 @@ module Pipeline_FIFO_Buffer
     );
 
 // Since the buffer is a synchronous RAM, it takes a clock cycle before the
-// read data updates, so we pass along the read enable line through a register
-// to synchronize it and signal valid read data. However, the register needs
-// separate control: for example, when the output interface reads out the last
-// item out of the buffer, the output becomes invalid even though the buffer
-// output is unchanged.
+// read data updates, so we pass along the read enable line (`buffer_rden`)
+// through a register to synchronize it and signal valid read data
+// (`output_valid`). However, the register needs separate control: for
+// example, when the output interface reads out the last item out of the
+// buffer, the output becomes invalid even though the buffer output is
+// unchanged.
 
     reg update_output_valid = 1'b0;
 
@@ -129,20 +142,22 @@ module Pipeline_FIFO_Buffer
         .data_out       (output_valid)
     );
 
+//### Read/Write Address Counters
+
 // The buffer read and write addresses are stored in counters, which both
 // start at (and `clear` to) `ADDR_ZERO`. Each counter can only increment by
-// one at each read or write, and will wrap around to zero if incremented past
-// a value of `DEPTH-1`, labelled as `ADDR_LAST`. *The depth can be any
-// arbitrary number, not only a power-of-2.*
+// `ADDR_ONE` at each read or write, and will wrap around to `ADDR_ZERO` if
+// incremented past a value of `DEPTH-1`, labelled as `ADDR_LAST`. *The depth
+// can be any positive number, not only a power-of-2.*
 
-// *The counters never pass eachother.* If the write counter runs ahead of the
-// read counter enough to wrap-around and reach the read counter from behind,
-// the buffer is full and all writes to the buffer halt until after a read
-// happens.  Conversely, if the read counter catches up to the write counter
-// from behind, the buffer is empty and all reads halt until after a write
-// happens. In both the full and empty cases, both counters are equal but they
-// get to that state by different paths, so we will need some extra state
-// further down to make these two cases look different.
+// **NOTE**: *The counters never pass eachother.* If the write counter runs
+// ahead of the read counter enough to wrap-around and reach the read counter
+// from behind, the buffer is full and all writes to the buffer halt until
+// after a read happens.  Conversely, if the read counter catches up to the
+// write counter from behind, the buffer is empty and all reads halt until
+// after a write happens. In both the full and empty cases, both counters are
+// equal but they get to that state by different paths, so we will need some
+// extra state further down to make these two cases look different.
 
     reg increment_buffer_write_addr = 1'b0;
     reg load_buffer_write_addr      = 1'b0;
@@ -192,6 +207,8 @@ module Pipeline_FIFO_Buffer
         .count          (buffer_read_addr)
     );
 
+//### Stored Item Counter
+
 // To distinguish between the empty and full cases, which both identically
 // show as equal read and write counters, we also count the number of words
 // currently stored in the FIFO. This is not the most compact way of
@@ -199,7 +216,7 @@ module Pipeline_FIFO_Buffer
 // simplest and fastest, as we don't need to track the read and write
 // addresses to see if they have wrapped around before they came to be equal
 // to determine if the FIFO is full or empty.  All we need to do is count up
-// or down by 1.
+// or down by `COUNT_ONE`.
 
 // Put another way, instead of having to compare the whole value of both
 // address counters plus an extra empty/full bit, we only need to compare one
@@ -248,12 +265,12 @@ module Pipeline_FIFO_Buffer
 
 // The operations which transition between these states are:
  
-// * the input interface inserting a data item into the datapath (`+`)
-// * the output interface removing a data item from the datapath (`-`)
+// * the input interface **inserting** a data item into the datapath (`+`)
+// * the output interface **removing** a data item from the datapath (`-`)
 // * both interfaces inserting and removing at the same time (`+-`)
 
 // We also descriptively name each transition between states. These names will
-// show up later in the code.
+// show up later in the code as datapath transformations.
 
 //<pre>
 //                 /--\ +- flow              /--\ +- flow 
@@ -269,9 +286,8 @@ module Pipeline_FIFO_Buffer
 
 // We can see from the resulting state diagram that when the datapath is
 // empty, it can only support an insertion, and when it is full, it can only
-// support a removal. *These constraints will become very important later on.*
-// If the interfaces try to remove while Empty, or insert while Full, data
-// will be duplicated or lost, respectively.
+// support a removal.  If the interfaces try to remove while Empty, or insert
+// while Full, data will be duplicated or lost, respectively.
 
 // We can also see that the state of the FIFO is exactly represented by the
 // number of items currently stored in it, and that number can only stay put,
@@ -289,25 +305,10 @@ module Pipeline_FIFO_Buffer
         busy  = (empty == 1'b0) && (full == 1'b0);
     end
 
-// Now, let's express the constraints we figured out from the state diagram:
- 
-// * The input interface can only insert when the datapath is not full.
-// * The output interface can only remove data when the datapath is not empty.
- 
-// We do this by computing the allowable input and output interface read/valid
-// handshake signals based on the datapath state, which
-// prunes away a large number of invalid state transitions. If some other
-// logic seems to be missing, first see if that code has made it unnecessary.
-
-// Doing it this way also implements a fundamental operating assumptions of
-// a FIFO buffer: that one interface cannot have its current state depend on
-// the current state of the other interface, as that would be a combinational
-// path between both interfaces.
-
 //### Input Interface
 
 // The input interface inserts directly into the buffer, and only signals the
-// sender to stop if the buffer is full.
+// other end to stop if the buffer is full.
 
     reg insert = 1'b0;
 
@@ -322,7 +323,7 @@ module Pipeline_FIFO_Buffer
 // pipelined and works in parallel with the input interface. Keeping that
 // pipeline full and signalling to the `read_address` and `data_count`
 // counters when an item is removed from the buffer requires a separate little
-// engine.
+// engine to continually read from the buffer when possible.
 
 // Recall from above that `output_valid` is a registered version of
 // `buffer_rden`, matching the latency of a buffer read and signalling when
@@ -348,9 +349,12 @@ module Pipeline_FIFO_Buffer
 //### Datapath Transformations
 
 // Now that we have defined the possible states and operations of the
-// datapath, we can define the transformations, which are the edges between
-// states. Or put otherwise: in which state(s) can operations happen, and what
-// do they mean. Afterwards, we will reuse this logic a lot.
+// datapath, we can define the datapath transformations, which are the edges
+// between states. Or put otherwise: in which state(s) can the *insert* and/or
+// *remove* operations happen, and what do they mean.
+
+// After this point, we can describe the rest of the control logic using only
+// transformations, without reference to states, I/O signals, or operations.
 
     reg load    = 1'b0; // Inserts data into buffer.
     reg unload  = 1'b0; // Remove data from buffer.
@@ -365,8 +369,9 @@ module Pipeline_FIFO_Buffer
 //### Next-State Calculations
 
 // Calculating the next state after each datapath transformation becomes the
-// `data_count` counter control, where we increment, decrement, or leave
-// constant the count of items in the buffer.
+// control lines of the `data_count` counter, where we increment, decrement,
+// or leave constant the count of items in the buffer, which defines the state
+// of the FIFO.
 
     always @(*) begin
         update_buffer_data_count    = (load == 1'b1) || (unload == 1'b1);
@@ -374,10 +379,6 @@ module Pipeline_FIFO_Buffer
     end
 
 //### Control Signals
-
-// Each datapath transformation also gives us a way to express the control
-// signals to the datapath. These are not registered here, as they end at
-// registers in the datapath.
 
 // Here, we increment the read/write addresses as necessary (they only ever
 // increment), enable a write to the buffer as necessary, and wrap-around the
