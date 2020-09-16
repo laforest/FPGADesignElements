@@ -86,7 +86,7 @@ module Register_areset
 // priority. The "last assignment wins" idiom is also one of the very few
 // places where you must use an if-statement instead of a ternary operator.
 
-    always @(posedge clock or posedge areset) begin
+    always @(posedge clock, posedge areset) begin
         if (areset == 1'b1) begin
             data_out <= RESET_VALUE;
         end
