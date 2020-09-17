@@ -22,7 +22,7 @@
 // apply some attributes directly to `reg` values to make a good synchronizer,
 // and the CDC Synchronizer module does not have a reset.
 
-//## Usage Notes
+//## Usage Notes and Limitations
 
 // Much like a CDC Synchronizer, you can only synchronize a given reset bit in
 // one place, as two synchronizers fed by the same input may have different
@@ -31,6 +31,17 @@
 // spurious resets. Finally, you cannot place any of the registers into I/O
 // registers: they are too far away from the main logic fabric to make a good
 // synchronizer.
+
+// *Make sure no logic under asynchronous reset feeds logic which is not also
+// under reset, else metastability may happen in the latter logic since the
+// reset assertion is not synchronous to the clock.* If you need reset
+// assertion to be synchronous, use a [CDC
+// Synchronizer](./CDC_Synchronizer.html) instead.
+
+// **Also, note that introducing an asynchronous reset, even with synchronized
+// release, may prevent any register retiming from ocurring in connected
+// logic.** Check your CAD tool results, and favour the plain [CDC
+// Synchronizer](./CDC_Synchronizer.html) instead.
 
 //## Use Cases
 
