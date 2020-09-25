@@ -86,7 +86,7 @@ module <a href="./Register_areset.html">Register_areset</a>
  places where you must use an if-statement instead of a ternary operator.</p>
 
 <pre>
-    always @(posedge clock or posedge areset) begin
+    always @(posedge clock, posedge areset) begin
         if (areset == 1'b1) begin
             data_out <= RESET_VALUE;
         end
