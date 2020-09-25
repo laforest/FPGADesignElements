@@ -1,0 +1,297 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CDC Word Synchronizer</title>
+</head>
+<body>
+
+<p><a href="./CDC_Word_Synchronizer.v">Source</a></p>
+
+<h1>CDC Word Synchronizer</h1>
+<p>Synchronizes the transfer of a word of data from one clock domain to
+ another, regardless of relative clock frequencies. Uses ready/valid
+ handshakes at the sending and receiving ends, but these can be
+ short-circuited for continuous transfers without backpressure: ignore
+ <code>sending_data_ready</code> and tie <code>receiving_data_ready</code> high. Add <code>EXTRA_DEPTH</code>
+ if you are running near the limits of your silicon (consult your
+ vendor datasheets regarding metastability).</p>
+<p>The code is laid out in transfer order: we start at the sending handshake,
+ convert a signal for new valid data into a level, which passes through CDC
+ into the receiving clock domain and begins the receiving ready/valid
+ handshake. Once the receiving handshake completes, we convert that event
+ into a level, which passes through CDC back into the sending clock domain
+ to complete the sending handshake and start a new handshake if there is
+ more data to send.</p>
+<p>This module is closely related to the <a href="./CDC_Pulse_Synchronizer_2phase.html">2-phase Pulse
+ Synchronizer</a>.</p>
+<h2>Operating Conditions</h2>
+<p>This module depends on a few critical conditions:</p>
+<ul>
+<li>Once <code>sending_data_valid</code> is asserted, it stays constant until the
+ sending ready/valid handshake completes.</li>
+<li>While <code>sending_data_valid</code> is asserted, <code>sending_data</code> stays constant
+ until the sending ready/valid handshake completes.</li>
+<li>If a reset happens, you must assert both <code>sending_clear</code> and
+ <code>receiving_clear</code> with a synchronous reset signal long enough to let any
+ level toggle pass through CDC and reach its destination latch or toggle
+ register. <em>This takes 3 cycles in both <code>sending_clock</code> and
+ <code>receiving_clock</code>.</em></li>
+</ul>
+<h2>Latency and Throughput</h2>
+<p>The absolute latency depends on the relative clock frequencies, but we can
+ count the cycles, in order:</p>
+<ul>
+<li>1 sending cycle to transform the start of a sending handshake to a level</li>
+<li>2 to 3 cycles to do the CDC into the receiving clock domain</li>
+<li>1 receiving cycle to begin the receiving handshake</li>
+<li>1 receiving cycle to transform the end of the receiving handshake to a level</li>
+<li>2 to 3 cycles to do the CDC into the sending clock domain (which also ends the sending handshake)</li>
+</ul>
+<p>Thus, given roughly equal sending and receiving clock rates, a complete
+ transfer takes between 7 and 9 sending clock cycles. If the receiving clock
+ rate is effectively "infinite", allowing for the whole receiving side to
+ finish within a single sending clock cycle, a complete transfer takes 3 to
+ 4 sending cycles.  If the sending clock rate is similarly effectively
+ "infinite" relative to the receiving clock rate, a transfer takes 4 to
+ 5 receiving clock cycles.</p>
+<p>Thus, we can calculate the time for a single transfer as 3 to 4 times the
+ sending clock period plus 4 to 5 times the receiving clock period. The
+ inverse of that is, of course, the number of transfers per unit time.</p>
+<h2>Interfaces and Data Pass-Through</h2>
+
+<pre>
+`default_nettype none
+
+module CDC_Word_Synchronizer
+#(
+    parameter WORD_WIDTH    = 0,
+    parameter EXTRA_DEPTH   = 0
+)
+(
+    input   wire                        sending_clock,
+    input   wire                        sending_clear,
+    input   wire    [WORD_WIDTH-1:0]    sending_data,
+    input   wire                        sending_data_valid,
+    output  wire                        sending_data_ready,
+
+    input   wire                        receiving_clock,
+    input   wire                        receiving_clear,
+    output  reg     [WORD_WIDTH-1:0]    receiving_data, 
+    output  wire                        receiving_data_valid,
+    input   wire                        receiving_data_ready
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        receiving_data = WORD_ZERO;
+    end
+</pre>
+
+<p>The data is a direct pass-through, which <strong>MUST</strong> be held steady until both
+ the sending and receiving handshaked complete. You may also have to guide
+ your CAD tool to limit the maximum delay on these signals.</p>
+
+<pre>
+    always @(*) begin
+        receiving_data = sending_data;
+    end
+</pre>
+
+<h2>Sending Handshake Start</h2>
+<p>First, we express the completion of a transfer when <code>sending_data_ready</code> is
+ asserted <em>for one cycle</em>, which then gates <code>sending_data_valid</code> for one
+ cycle. Then, if there is no further data to transfer, <code>sending_data_valid</code>
+ will stay low, else it will re-assert itself in the next cycle, and this
+ rising edge will start another sending handshake.</p>
+
+<pre>
+    reg  sending_data_valid_gated = 1'b0;
+
+    always @(*) begin
+        sending_data_valid_gated = (sending_data_valid == 1'b1) && (sending_data_ready == 1'b0); 
+    end
+
+    wire sending_start_pulse;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    start_sending
+    (
+        .clock              (sending_clock),
+        .level_in           (sending_data_valid_gated),
+        .pulse_posedge_out  (sending_start_pulse),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+</pre>
+
+<p>Convert the sending start pulse into a level toggle, which initiates
+ a 2-phase handshake. This level does not toggle again until the start of
+ the next sending handshake, which since it can only happen after the
+ receiving handshake completes, guarantees the level stays constant long
+ enough to pass through the <a href="./CDC_Bit_Synchronizer.html">CDC Synchronizer</a>.</p>
+
+<pre>
+    wire sending_start_level;
+
+    <a href="./Register_Toggle.html">Register_Toggle</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    start_handshake
+    (
+        .clock          (sending_clock),
+        .clock_enable   (1'b1),
+        .clear          (sending_clear),
+        .toggle         (sending_start_pulse),
+        .data_in        (sending_start_level),
+        .data_out       (sending_start_level)
+    );
+</pre>
+
+<p>Then we synchronize the start of the 2-phase handshake into the receiving
+ clock domain.</p>
+
+<pre>
+    wire sending_start_level_synced;
+
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
+    #(
+        .EXTRA_DEPTH        (EXTRA_DEPTH)  // Must be 0 or greater
+    )
+    into_receiving
+    (
+        .receiving_clock    (receiving_clock),
+        .bit_in             (sending_start_level),
+        .bit_out            (sending_start_level_synced)
+    );
+</pre>
+
+<h2>Receiving Handshake Start</h2>
+<p>Once in the receiving clock domain, we convert any toggle in level into
+ a pulse, which signals new data is available.</p>
+
+<pre>
+    wire sending_handshake_start;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    new_sending_handshake
+    (
+        .clock              (receiving_clock),
+        .level_in           (sending_start_level_synced),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_posedge_out  (),
+        .pulse_negedge_out  (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pulse_anyedge_out  (sending_handshake_start)
+    );
+</pre>
+
+<p>Since the receiving handshake may not complete immediately, we latch the
+ pulse to hold it as <code>receiving_data_valid</code>.</p>
+
+<pre>
+    reg receiving_handshake_done = 1'b0;
+
+    <a href="./Pulse_Latch.html">Pulse_Latch</a>
+    #(
+        .RESET_VALUE    (1'b0)
+    )
+    pending_handshake
+    (
+        .clock          (receiving_clock),
+        .clear          (receiving_handshake_done || receiving_clear),
+        .pulse_in       (sending_handshake_start),
+        .level_out      (receiving_data_valid)
+    );
+</pre>
+
+<h2>Receiving Handshake Finish</h2>
+<p>The receiving handshake completes when <code>receiving_data_ready</code> goes (or
+ already was) high, which we use to clear the latched
+ <code>receiving_data_valid</code>. Conveniently, this also drops
+ <code>receiving_handshake_done</code> in the next cycle, giving us a one-cycle pulse
+ to signal the completion of the receiving handshake.</p>
+
+<pre>
+    always @(*) begin
+        receiving_handshake_done = (receiving_data_valid == 1'b1) && (receiving_data_ready == 1'b1);
+    end
+</pre>
+
+<p>We then convert the completion of the receiving handshake into a level
+ toggle back into the sending clock domain to complete the 2-phase
+ handshake. This level does not toggle again until the end of the next
+ receiving handshake, which since it can only happen after the next sending
+ handshake completes, guarantees the level stays constant long enough to
+ pass through the <a href="./CDC_Bit_Synchronizer.html">CDC Synchronizer</a>.</p>
+
+<pre>
+    wire receiving_handshake_level;
+
+    <a href="./Register_Toggle.html">Register_Toggle</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    finish_handshake
+    (
+        .clock          (receiving_clock),
+        .clock_enable   (1'b1),
+        .clear          (receiving_clear),
+        .toggle         (receiving_handshake_done),
+        .data_in        (receiving_handshake_level),
+        .data_out       (receiving_handshake_level)
+    );
+</pre>
+
+<p>Then we synchronize the end of the 2-phase handshake into the sending clock
+ domain.</p>
+
+<pre>
+    wire receiving_handshake_level_synced;
+
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
+    #(
+        .EXTRA_DEPTH        (EXTRA_DEPTH)  // Must be 0 or greater
+    )
+    into_sending
+    (
+        .receiving_clock    (sending_clock),
+        .bit_in             (receiving_handshake_level),
+        .bit_out            (receiving_handshake_level_synced)
+    );
+</pre>
+
+<h2>Sending Handshake Finish</h2>
+<p>Finally, convert the synchronized receiving handshake completion into
+ a pulse to both complete the sending handshake and start a new one if
+ <code>sending_data_valid</code> remains high after the current cycle.</p>
+
+<pre>
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    finish_sending
+    (
+        .clock              (sending_clock),
+        .level_in           (receiving_handshake_level_synced),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_posedge_out  (),
+        .pulse_negedge_out  (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pulse_anyedge_out  (sending_data_ready)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
