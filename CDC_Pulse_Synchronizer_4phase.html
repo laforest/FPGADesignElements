@@ -25,10 +25,10 @@
 </div>
 
 <h2>Theory of Operation</h2>
-<p>We can't simply use a <a href="./CDC_Synchronizer.html">CDC Synchronizer</a> to pass
- a pulse of unknown duration between clock domains of unknown relation, as
- the receiving clock may not be able to sample the pulse correctly. So, we
- solve this by:</p>
+<p>We can't simply use a <a href="./CDC_Bit_Synchronizer.html">CDC Synchronizer</a> to
+ pass a pulse of unknown duration between clock domains of unknown relation,
+ as the receiving clock may not be able to sample the pulse correctly. So,
+ we solve this by:</p>
 <ul>
 <li>first latching the incoming pulse into a level signal,</li>
 <li>synchronizing that level signal into the receiving clock domain,</li>
@@ -124,7 +124,7 @@ module <a href="./CDC_Pulse_Synchronizer_4phase.html">CDC_Pulse_Synchronizer_4ph
 <pre>
     wire receiving_level;
 
-    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -140,7 +140,7 @@ module <a href="./CDC_Pulse_Synchronizer_4phase.html">CDC_Pulse_Synchronizer_4ph
  signal that the CDC is complete and to clear the latch.</p>
 
 <pre>
-    <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )

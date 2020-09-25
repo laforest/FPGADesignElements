@@ -20,10 +20,10 @@
 
 //## Theory of Operation
 
-// We can't simply use a [CDC Synchronizer](./CDC_Synchronizer.html) to pass
-// a pulse of unknown duration between clock domains of unknown relation, as
-// the receiving clock may not be able to sample the pulse correctly. So, we
-// solve this by:
+// We can't simply use a [CDC Synchronizer](./CDC_Bit_Synchronizer.html) to
+// pass a pulse of unknown duration between clock domains of unknown relation,
+// as the receiving clock may not be able to sample the pulse correctly. So,
+// we solve this by:
 
 // * first latching the incoming pulse into a level signal,
 // * synchronizing that level signal into the receiving clock domain,
@@ -117,7 +117,7 @@ module CDC_Pulse_Synchronizer_4phase
 
     wire receiving_level;
 
-    CDC_Synchronizer
+    CDC_Bit_Synchronizer
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )
@@ -131,7 +131,7 @@ module CDC_Pulse_Synchronizer_4phase
 // Now pass the synchronized level back to the sending clock domain to
 // signal that the CDC is complete and to clear the latch.
 
-    CDC_Synchronizer
+    CDC_Bit_Synchronizer
     #(
         .EXTRA_DEPTH        (CDC_EXTRA_DEPTH)
     )

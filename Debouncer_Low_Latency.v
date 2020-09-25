@@ -148,7 +148,7 @@ module Debouncer_Low_Latency
 
     wire synchronized_input;
 
-    CDC_Synchronizer
+    CDC_Bit_Synchronizer
     #(
         .EXTRA_DEPTH        (EXTRA_CDC_STAGES)  // Must be 0 or greater
     )

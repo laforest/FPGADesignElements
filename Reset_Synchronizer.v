@@ -15,12 +15,12 @@
 
 //## Implementation
 
-// This design combines the internals of a [CDC
-// Synchronizer](./CDC_Synchronizer.html) and of a [Register with Asynchronous
-// Reset](./Register_areset.html) (please see those modules for more
-// background).  We cannot instantiate those modules here since we have to
-// apply some attributes directly to `reg` values to make a good synchronizer,
-// and the CDC Synchronizer module does not have a reset.
+// This design combines the internals of a [CDC Bit
+// Synchronizer](./CDC_Bit_Synchronizer.html) and of a [Register with
+// Asynchronous Reset](./Register_areset.html) (please see those modules for
+// more background).  We cannot instantiate those modules here since we have
+// to apply some attributes directly to `reg` values to make a good
+// synchronizer, and the CDC Synchronizer module does not have a reset.
 
 //## Usage Notes and Limitations
 
@@ -36,12 +36,12 @@
 // under reset, else metastability may happen in the latter logic since the
 // reset assertion is not synchronous to the clock.* If you need reset
 // assertion to be synchronous, use a [CDC
-// Synchronizer](./CDC_Synchronizer.html) instead.
+// Synchronizer](./CDC_Bit_Synchronizer.html) instead.
 
 // **Also, note that introducing an asynchronous reset, even with synchronized
 // release, may prevent any register retiming from ocurring in connected
 // logic.** Check your CAD tool results, and favour the plain [CDC
-// Synchronizer](./CDC_Synchronizer.html) instead.
+// Synchronizer](./CDC_Bit_Synchronizer.html) instead.
 
 //## Use Cases
 

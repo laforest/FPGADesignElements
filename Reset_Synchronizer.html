@@ -21,12 +21,12 @@
  you may have to add some extra synchronizer stages with the <code>EXTRA_DEPTH</code>
  parameter. Consult your datasheets.</p>
 <h2>Implementation</h2>
-<p>This design combines the internals of a <a href="./CDC_Synchronizer.html">CDC
- Synchronizer</a> and of a <a href="./Register_areset.html">Register with Asynchronous
- Reset</a> (please see those modules for more
- background).  We cannot instantiate those modules here since we have to
- apply some attributes directly to <code>reg</code> values to make a good synchronizer,
- and the CDC Synchronizer module does not have a reset.</p>
+<p>This design combines the internals of a <a href="./CDC_Bit_Synchronizer.html">CDC Bit
+ Synchronizer</a> and of a <a href="./Register_areset.html">Register with
+ Asynchronous Reset</a> (please see those modules for
+ more background).  We cannot instantiate those modules here since we have
+ to apply some attributes directly to <code>reg</code> values to make a good
+ synchronizer, and the CDC Synchronizer module does not have a reset.</p>
 <h2>Usage Notes and Limitations</h2>
 <p>Much like a CDC Synchronizer, you can only synchronize a given reset bit in
  one place, as two synchronizers fed by the same input may have different
@@ -38,11 +38,11 @@
 <p><em>Make sure no logic under asynchronous reset feeds logic which is not also
  under reset, else metastability may happen in the latter logic since the
  reset assertion is not synchronous to the clock.</em> If you need reset
- assertion to be synchronous, use a <a href="./CDC_Synchronizer.html">CDC
+ assertion to be synchronous, use a <a href="./CDC_Bit_Synchronizer.html">CDC
  Synchronizer</a> instead.</p>
 <p><strong>Also, note that introducing an asynchronous reset, even with synchronized
  release, may prevent any register retiming from ocurring in connected
- logic.</strong> Check your CAD tool results, and favour the plain <a href="./CDC_Synchronizer.html">CDC
+ logic.</strong> Check your CAD tool results, and favour the plain <a href="./CDC_Bit_Synchronizer.html">CDC
  Synchronizer</a> instead.</p>
 <h2>Use Cases</h2>
 <ul>
