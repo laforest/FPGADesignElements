@@ -3,13 +3,13 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CDC Synchronizer</title>
+<title>CDC Bit Synchronizer</title>
 </head>
 <body>
 
-<p><a href="./CDC_Synchronizer.v">Source</a></p>
+<p><a href="./CDC_Bit_Synchronizer.v">Source</a></p>
 
-<h1>Clock Domain Crossing (CDC) Synchronizer</h1>
+<h1>Clock Domain Crossing (CDC) Bit Synchronizer</h1>
 <p>Use a synchronizer to convert changes in a signal in one clock domain into
  changes which are synchronous to another clock domain, while reducing the
  probability of metastable events propagating.</p>
@@ -44,12 +44,15 @@
  2 and 3 cycles, depending on metastability events, and so <strong>only one signal
  may be synchronized at each clock domain crossing</strong>. Using multiple CDC
  Synchronizers in parallel is <strong>not deterministic</strong> as there is no guarantee
- they will all have the same latency.  If you need to pass multiple signals
- (e.g.: a bus), synchronize one signal in each direction as a ready/valid
- handshake, and capture the other signals (held steady during
- synchronization) directly in the receiving clock domain once the one signal
- has synchronized. Remember to constrain and check the delay on the other
- signals.</p>
+ they will all have the same latency.</p>
+<p>If you need to pass multiple signals (e.g.: a bus), synchronize one signal
+ in each direction as a ready/valid handshake, and capture the other signals
+ (held steady during synchronization) directly in the receiving clock domain
+ once the one signal has synchronized. Remember to constrain and check the
+ delay on the other signals. The <a href="./CDC_Word_Synchronizer.html">CDC Data
+ Synchronizer</a> implements this approach, and
+ the <a href="./CDC_Pulse_Synchronizer_2phase.html">CDC Pulse Synchronizer</a> can also
+ be used to build similar CDC circuits.</p>
 <h2>Avoid Logic Glitches</h2>
 <p><strong>You must feed a CDC Synchronizer directly from a register</strong>, with no
  logic between it and the synchronizer. Otherwise, it's possible that
@@ -75,7 +78,7 @@
 <pre>
 `default_nettype none
 
-module <a href="./CDC_Synchronizer.html">CDC_Synchronizer</a>
+module CDC_Bit_Synchronizer
 #(
     parameter EXTRA_DEPTH = 0 // Must be 0 or greater
 )

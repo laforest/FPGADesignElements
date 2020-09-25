@@ -1,5 +1,5 @@
 
-//# Clock Domain Crossing (CDC) Synchronizer
+//# Clock Domain Crossing (CDC) Bit Synchronizer
 
 // Use a synchronizer to convert changes in a signal in one clock domain into
 // changes which are synchronous to another clock domain, while reducing the
@@ -43,12 +43,16 @@
 // 2 and 3 cycles, depending on metastability events, and so **only one signal
 // may be synchronized at each clock domain crossing**. Using multiple CDC
 // Synchronizers in parallel is **not deterministic** as there is no guarantee
-// they will all have the same latency.  If you need to pass multiple signals
-// (e.g.: a bus), synchronize one signal in each direction as a ready/valid
-// handshake, and capture the other signals (held steady during
-// synchronization) directly in the receiving clock domain once the one signal
-// has synchronized. Remember to constrain and check the delay on the other
-// signals.
+// they will all have the same latency.
+
+// If you need to pass multiple signals (e.g.: a bus), synchronize one signal
+// in each direction as a ready/valid handshake, and capture the other signals
+// (held steady during synchronization) directly in the receiving clock domain
+// once the one signal has synchronized. Remember to constrain and check the
+// delay on the other signals. The [CDC Data
+// Synchronizer](./CDC_Word_Synchronizer.html) implements this approach, and
+// the [CDC Pulse Synchronizer](./CDC_Pulse_Synchronizer_2phase.html) can also
+// be used to build similar CDC circuits.
 
 //## Avoid Logic Glitches
 
@@ -77,7 +81,7 @@
 
 `default_nettype none
 
-module CDC_Synchronizer
+module CDC_Bit_Synchronizer
 #(
     parameter EXTRA_DEPTH = 0 // Must be 0 or greater
 )
