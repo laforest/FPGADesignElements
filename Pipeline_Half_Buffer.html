@@ -28,21 +28,22 @@
 
 module <a href="./Pipeline_Half_Buffer.html">Pipeline_Half_Buffer</a>
 #(
-    parameter WORD_WIDTH    = 0,
-    parameter RESET_VALUE   = 0
+    parameter WORD_WIDTH    = 0
 )
 (
     input  wire                  clock,
     input  wire                  clear,
 
-    input  wire                  data_in_valid,
-    output reg                   data_in_ready,
-    input  wire [WORD_WIDTH-1:0] data_in,
+    input  wire                  input_valid,
+    output reg                   input_ready,
+    input  wire [WORD_WIDTH-1:0] input_data,
 
-    output reg                   data_out_valid,
-    input  wire                  data_out_ready,
-    output wire [WORD_WIDTH-1:0] data_out
+    output reg                   output_valid,
+    input  wire                  output_ready,
+    output wire [WORD_WIDTH-1:0] output_data
 );
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 </pre>
 
 <p>Storage for the data</p>
@@ -53,15 +54,15 @@ module <a href="./Pipeline_Half_Buffer.html">Pipeline_Half_Buffer</a>
     <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH),
-        .RESET_VALUE    (RESET_VALUE)
+        .RESET_VALUE    (WORD_ZERO)
     )
     half_buffer
     (
         .clock          (clock),
         .clock_enable   (half_buffer_load),
         .clear          (clear),
-        .data_in        (data_in),
-        .data_out       (data_out)
+        .data_in        (input_data),
+        .data_out       (output_data)
     );
 </pre>
 
@@ -95,14 +96,14 @@ module <a href="./Pipeline_Half_Buffer.html">Pipeline_Half_Buffer</a>
 
 <pre>
     always @(*) begin
-        set_to_empty     = (data_out_valid == 1'b1) && (data_out_ready == 1'b1);
-        set_to_full      = (data_in_valid  == 1'b1) && (buffer_full    == 1'b0);
-        half_buffer_load = (set_to_full == 1'b1);
+        set_to_empty     = (output_valid == 1'b1) && (output_ready == 1'b1);
+        set_to_full      = (input_valid  == 1'b1) && (buffer_full  == 1'b0);
+        half_buffer_load = (set_to_full  == 1'b1);
     end
 
     always @(*) begin
-        data_in_ready    = (buffer_full == 1'b0);
-        data_out_valid   = (buffer_full == 1'b1);
+        input_ready      = (buffer_full == 1'b0);
+        output_valid     = (buffer_full == 1'b1);
     end
 
 endmodule
