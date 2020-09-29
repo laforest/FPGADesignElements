@@ -11,12 +11,9 @@
 
 <h1>Pulse to Pipeline Interface</h1>
 <p>Wraps a module with an output pulse interface inside a ready/valid output
- handshake interface. Supports full throughput (one output per cycle) if
- necessary, though that's not usually the case when this interface is
- needed.</p>
-<p><em>The connected module must have at least one pipeline stage from input to
- output. No combinational paths allowed else the input and output handshake
- logic will form a loop.</em></p>
+ handshake interface.  <em>The connected module must have at least one pipeline
+ stage from input to output. No combinational paths allowed else the input
+ and output handshake logic will form a loop.</em></p>
 <p>When we have a module that cannot be fully pipelined due to a data
  dependency (e.g.: because of a backwards loop in the pipeline, or simply by
  the iterative nature of the implemented algorithm), and thus cannot accept
@@ -31,17 +28,37 @@
  held steady until the next update. This is necessary to meet some Kahn
  Process Network criteria, and to allow for the connected module to use its
  output registers as part of its computations, rather than have extra
- buffers (which we instead hold here as the Skid Buffer).</p>
+ buffers (which we instead hold here as the <code>output_buffer</code>).</p>
 <p>We assume here that the connected module is not C-Slowed, though that is
  allowed. You will have to keep track of the separate computation streams
  yourself in the enclosing module.</p>
+<h2>Choosing the Output Buffer Type</h2>
+<p>An output buffer is necessary to cut the backwards combinational path from
+ <code>ready_out</code> to <code>module_ready</code>, as well as to get the best performance and
+ expected behaviour, depending on the connected module. Set
+ <code>OUTPUT_BUFFER_TYPE</code> (and maybe <code>FIFO_BUFFER_DEPTH</code> and
+ <code>FIFO_BUFFER_RAMSTYLE</code>) as required.</p>
+<ul>
+<li>A <strong>Skid Buffer</strong> is generally the right choice: it allows the connected module
+ to start a new computation while the <code>output_buffer</code> waits for the next
+ pipeline stage to read out the previous result.</li>
+<li>Use a <strong>Half-Buffer</strong> when the connected module should NOT be allowed to start
+ a new computation until the previous result has been read out of the
+ <code>output_buffer</code>. </li>
+<li>Use a <strong>FIFO Buffer</strong> when the later pipeline stages read in a bursty
+ pattern, so the connected module can get through multiple computations in
+ the meantime.</li>
+</ul>
 
 <pre>
 `default_nettype none
 
 module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
 #(
-    parameter WORD_WIDTH = 0
+    parameter WORD_WIDTH            = 0,
+    parameter OUTPUT_BUFFER_TYPE    = "", // "HALF", "SKID", "FIFO"
+    parameter FIFO_BUFFER_DEPTH     = 0,  // Only for "FIFO"
+    parameter FIFO_BUFFER_RAMSTYLE  = ""  // Only for "FIFO"
 )
 (
     input   wire                        clock,
@@ -113,29 +130,77 @@ module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
     end
 </pre>
 
-<p>Buffer the output handshake to both cut the backwards combinational path
- from <code>ready_out</code> to <code>module_ready</code>, and to allow a transfer through the
- pulse-driven module every cycle, if possible, while supporting pipeline
- back-pressure.</p>
+<p>Buffer the output handshake to cut the backwards combinational path from
+ <code>ready_out</code> to <code>module_ready</code>. A Half-Buffer blocks <code>module_ready</code> until it
+ is read out. A Skid Buffer allows overlap by raising <code>module_ready</code> while
+ holding 1 previous result, but holding 2 results will cause it to block.
+ A FIFO buffer will allow overlap and hold up to <code>FIFO_BUFFER_DEPTH</code> values
+ before blocking.</p>
 
 <pre>
-    <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
-    #(
-        .WORD_WIDTH (WORD_WIDTH)
-    )
-    buffer_out
-    (
-        .clock          (clock),
-        .clear          (clear),
+    generate
 
-        .input_valid    (valid_out_internal),
-        .input_ready    (ready_out_internal),
-        .input_data     (module_data_out),
+        if (OUTPUT_BUFFER_TYPE == "HALF") begin
+            <a href="./Pipeline_Half_Buffer.html">Pipeline_Half_Buffer</a>
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            output_buffer
+            (
+                .clock          (clock),
+                .clear          (clear),
 
-        .output_valid   (valid_out),
-        .output_ready   (ready_out),
-        .output_data    (data_out)
-    );
+                .input_valid    (valid_out_internal),
+                .input_ready    (ready_out_internal),
+                .input_data     (module_data_out),
+
+                .output_valid   (valid_out),
+                .output_ready   (ready_out),
+                .output_data    (data_out)
+            );
+        end
+        else if (OUTPUT_BUFFER_TYPE == "SKID") begin
+            <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            output_buffer
+            (
+                .clock          (clock),
+                .clear          (clear),
+
+                .input_valid    (valid_out_internal),
+                .input_ready    (ready_out_internal),
+                .input_data     (module_data_out),
+
+                .output_valid   (valid_out),
+                .output_ready   (ready_out),
+                .output_data    (data_out)
+            );
+        end
+        else if (OUTPUT_BUFFER_TYPE == "FIFO") begin
+            <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
+            #(
+                .WORD_WIDTH (WORD_WIDTH),
+                .DEPTH      (FIFO_BUFFER_DEPTH),
+                .RAMSTYLE   (FIFO_BUFFER_RAMSTYLE)
+            )
+            output_buffer
+            (
+                .clock          (clock),
+                .clear          (clear),
+
+                .input_valid    (valid_out_internal),
+                .input_ready    (ready_out_internal),
+                .input_data     (module_data_out),
+
+                .output_valid   (valid_out),
+                .output_ready   (ready_out),
+                .output_data    (data_out)
+            );
+        end
+
+    endgenerate
 
 endmodule
 </pre>
