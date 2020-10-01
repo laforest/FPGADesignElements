@@ -1,0 +1,55 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>word pad function</title>
+</head>
+<body>
+
+<p><a href="./word_pad_function.vh">Source</a></p>
+
+<h1>Number of pad bits to fill an incomplete word</h1>
+<p>Given the width of a bit vector, and the width of a word, returns the number
+ of unused bits at the end of the last word which must be filled with a pad
+ value (usually zero). Handles case where the word width is larger than the
+ bit vector width.</p>
+<p><strong>NOTE:</strong> since zero-width values cannot exist in Verilog, if no pad bits are
+ needed, this function returns <code>word_width</code> instead of 0. This case cannot
+ happen (a pad width is maximum <code>word_width-1</code> and minimum 0), so you can
+ selectively use the pad by checking if the return value of this function is
+ equal to <code>word_width</code>, like so:</p>
+<pre>
+localparam PAD_WIDTH = word_pad(bit_vector_width, word_width);
+localparam PAD       = {PAD_WIDTH{1'b0}};
+
+if (PAD_WIDTH != word_width) begin
+    baz = {{PAD, wibble, ....};
+end
+else begin
+    baz = {wibble, ... };
+end
+</pre>
+
+<p>Pass the function values which, at elaboration time, are either constants
+ or expressions which evaluate to a constant. Then use the return value as an
+ integer for a localparam, genvar, etc...</p>
+
+<pre>
+function integer word_pad;
+    input integer bit_vector_width;
+    input integer word_width;
+          integer raw_pad_width;
+    begin
+        raw_pad_width = (bit_vector_width < word_width) ? word_width - bit_vector_width : bit_vector_width % word_width;
+        word_pad      = (raw_pad_width > 0) ? raw_pad_width : word_width;
+    end
+endfunction
+</pre>
+
+<hr>
+<p><a href="./index.html">back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

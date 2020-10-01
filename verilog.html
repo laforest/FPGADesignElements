@@ -907,6 +907,9 @@ always begin
 end
 </pre>
 
+<p>The <a href="./Simulation_Clock.html">Simulation Clock</a> module implements
+this idiom.  
+
 <h3>Constant Values</h3>
 
 <p>When a combinational procedural block contains only constant values on the
@@ -929,6 +932,41 @@ register in a port definition, you must instead set the constant value in an
 to a <code>wire</code> and <code>assign</code> it a constant value. (But this
 is strongly discouraged.) <em>(This corner case was pointed out (and fixed!) by
 <a href="https://twitter.com/rodrigomelo9ok">Rodrigo Melo</a>.)</em>
+
+<a name="zeropad"></a>
+
+<h3>Avoiding Zero-Width Padding</h3>
+
+<p>When splitting a long bit vector into a number of words of a given width,
+it's possible that you will need to pad the last few bits of the last word,
+usually with zeros. Typically, you compute the difference or the division
+remainder to get the pad width, then create the pad with a replication:
+
+<pre>
+localparam PAD_WIDTH = BIG_VECTOR_WIDTH % WORD_WIDTH;
+localparam PAD       = {PAD_WIDTH{1'b0}};
+</pre>
+
+<p>However, this fails if no pad is needed. Variables of zero width cannot
+exist in Verilog, and a zero width replication is also illegal in Verilog-2001.
+Zero width concatenations are partially fixed in Verilog-2005, and thus
+SystemVerilog, but the above <code>PAD</code> would still fail at linting and
+elaboration since there are no other sized elements being concatenated.
+
+<p>We can eliminate zero from the possible <code>PAD_WIDTH</code> values by instead returning <code>WORD_WIDTH</code> if the pad width would have been zero. This works because a pad is necessarily between 0 and <code>WORD_WIDTH-1</code> bits wide. We can then check later and instantiate a concatenation with or without a pad:
+
+<pre>
+generate
+    if (PAD_WIDTH != WORD_WIDTH) begin
+        baz = {{PAD, wibble, ....};
+    end
+    else begin
+        baz = {wibble, ... };
+    end
+endgenerate
+</pre>
+
+<p>The <a href="./word_pad_function.html">Word Pad</a> function implements this idiom.
 
 <hr>
 
