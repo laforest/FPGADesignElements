@@ -18,6 +18,9 @@
  synthesizable Verilog, and thus does not support delayed assignments.</strong>
  Simulate the clock in the C++ testbench instead, or if you must use
  Verilog, try the Icarus Verilog simulator.</p>
+<p><strong>NOTE: This clock cannot be used directly as a periodic data signal.</strong> It
+causes a race condition in the Verilog simulation event queue. I have not
+yet found a solution.</p>
 <p>In simulation, a race condition can exist at time zero between the initial
  value assignment of a register and the first clock edge. For example:</p>
 <pre><code>reg clock = 1'b0; // Counts as a negedge at time zero! (1'bX -&gt; 1'b0)

@@ -11,6 +11,10 @@
 // Simulate the clock in the C++ testbench instead, or if you must use
 // Verilog, try the Icarus Verilog simulator.
 
+//**NOTE: This clock cannot be used directly as a periodic data signal.** It
+//causes a race condition in the Verilog simulation event queue. I have not
+//yet found a solution.
+
 // In simulation, a race condition can exist at time zero between the initial
 // value assignment of a register and the first clock edge. For example:
 
