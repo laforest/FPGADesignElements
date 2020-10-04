@@ -95,7 +95,6 @@ module CDC_Pulse_Synchronizer_2phase
 
     wire cleaned_pulse_in;
 
-
     Pulse_Generator
     pulse_cleaner
     (
