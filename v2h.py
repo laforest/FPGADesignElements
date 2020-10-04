@@ -13,7 +13,7 @@ Thus you can keep the Verilog code, its documentation, and its presentation in s
 
 A file is only updated if the newly generated HTML is not identical to the existing HTML file.
 
-Copyright (c) 2019 Charles Eric LaForest
+Copyright (c) 2019-2020 Charles Eric LaForest
 License: https://opensource.org/licenses/MIT
 """
 
@@ -32,12 +32,14 @@ header = """<html>
 </head>
 <body>
 
-<p><a href="./{1}">Source</a></p>
+<p class="inline bordered"><b><a href="./{1}">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Back to FPGA Design Elements</a></b></p>
 
 """
 
 footer = """<hr>
-<p><a href="./index.html">back to FPGA Design Elements</a>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
 <center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
 </body>
 </html>

@@ -6,6 +6,12 @@
     padding: 1em;
 }
 
+.inline {
+    display: inline;
+}
+
+.inline.bordered {}
+
 a:hover {
     background-color: #f0f0f0;
 }
@@ -51,7 +57,7 @@ li:hover {
 }
 
 dt {
-    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+    font-family:   "Palatino Linotype", "Palatino", "Palladio", "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
 }
 
 dt:hover {
@@ -70,12 +76,12 @@ dd:hover {
 h1 {
     padding-top:   0;
     margin-bottom: 3%;
-    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+    font-family:   "Palatino Linotype", "Palatino", "Palladio", "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
     border-bottom: thick solid black;
 }
 
 h2, h3, h4, h5, h6 {
-    font-family:   "Palatino Linotype", Palatino, Palladio, "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
+    font-family:   "Palatino Linotype", "Palatino", "Palladio", "Book Antiqua", "Apple Garamond", "URW Palladio L", "Noto Serif", "Droid Serif", serif;
     border-bottom: thin solid black;
 }
 
