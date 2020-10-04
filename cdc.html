@@ -59,8 +59,19 @@ which will also explain why a synchronizer is necessary:
 
 <ol>
 
-<li>The receiving clock captures the incoming bit properly, which then exits
-the synchronizer on the next cycle. Latency: 2 cycles.
+<li>The receiving clock captures the incoming bit just after a transition, such
+that the output of the first synchronizer register updates nearly
+simultaneously with the output of the register (in the sending clock domain)
+feeding the synchronizer. The bit then exits the synchronizer on the next
+receiving clock cycle. Latency: 1 cycle.
+<ul><li><em>This is a corner case that happens only when the receiving clock edge
+happens just after the sending clock edge and setup time was met. However, if
+the clocks are very close in frequency and phase (plesiochronous), this corner
+case can be the most frequent case!</em></ul>
+
+<li>The receiving clock captures the incoming bit properly some time after a
+transition, which then exits the synchronizer on the next cycle. Latency: 2
+cycles.
 
 <li>The receiving clock captures the incoming bit just before a transition, so
 that transition will pass through after two more cycles. Latency: 3 cycles.
@@ -79,7 +90,7 @@ cycles.
 the first register output to go metastable, which then settles into either the
 pre-transition or post-transition state, <em>but takes too long</em>. The input
 of the second register thus samples a metastable bit, causing one of the
-previous two cases (3,4) to happen, or this case (5) again, at its own output.
+previous two cases (4,5) to happen, or this case (6) again, at its own output.
 However, this second metastability is <em>exponentially</em> less likely than
 the first, and should in practice "never" happen (meaning, once every many,
 many years on average, swamped by other failure modes).

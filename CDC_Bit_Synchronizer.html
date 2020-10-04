@@ -7,7 +7,9 @@
 </head>
 <body>
 
-<p><a href="./CDC_Bit_Synchronizer.v">Source</a></p>
+<p class="inline bordered"><b><a href="./CDC_Bit_Synchronizer.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Back to FPGA Design Elements</a></b></p>
 
 <h1>Clock Domain Crossing (CDC) Bit Synchronizer</h1>
 <p>Use a synchronizer to convert changes in a signal in one clock domain into
@@ -41,10 +43,10 @@
 <h2>Single-Bit Synchronization Only</h2>
 <p>Also, for reasons explained in <a href="./cdc.html">A Primer on Clock Domain Crossing
  Theory</a>, the latency of a CDC Synchronizer can vary between
- 2 and 3 cycles, depending on metastability events, and so <strong>only one signal
- may be synchronized at each clock domain crossing</strong>. Using multiple CDC
- Synchronizers in parallel is <strong>not deterministic</strong> as there is no guarantee
- they will all have the same latency.</p>
+ 1 and 3 cycles, depending on clock phase and metastability events, and so
+ <strong>only one signal may be synchronized at each clock domain crossing</strong>.
+ Using multiple CDC Synchronizers in parallel is <strong>not deterministic</strong> as
+ there is no guarantee they will all have the same latency.</p>
 <p>If you need to pass multiple signals (e.g.: a bus), synchronize one signal
  in each direction as a ready/valid handshake, and capture the other signals
  (held steady during synchronization) directly in the receiving clock domain
@@ -146,7 +148,7 @@ endmodule
 </pre>
 
 <hr>
-<p><a href="./index.html">back to FPGA Design Elements</a>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
 <center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
 </body>
 </html>

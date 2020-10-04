@@ -40,10 +40,10 @@
 
 // Also, for reasons explained in [A Primer on Clock Domain Crossing
 // Theory](./cdc.html), the latency of a CDC Synchronizer can vary between
-// 2 and 3 cycles, depending on metastability events, and so **only one signal
-// may be synchronized at each clock domain crossing**. Using multiple CDC
-// Synchronizers in parallel is **not deterministic** as there is no guarantee
-// they will all have the same latency.
+// 1 and 3 cycles, depending on clock phase and metastability events, and so
+// **only one signal may be synchronized at each clock domain crossing**.
+// Using multiple CDC Synchronizers in parallel is **not deterministic** as
+// there is no guarantee they will all have the same latency.
 
 // If you need to pass multiple signals (e.g.: a bus), synchronize one signal
 // in each direction as a ready/valid handshake, and capture the other signals
