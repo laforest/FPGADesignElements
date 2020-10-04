@@ -25,7 +25,7 @@ design.
 blocks, and not concern ourselves (too much) with the implementation of these
 blocks. Nonetheless, a block needs to be well-implemented and understood. I
 describe related implementation practices in the companion <a
-href="verilog.html">Verilog Coding Standard</a>.
+href="./verilog.html">Verilog Coding Standard</a>.
 
 <h2>Scope</h2>
 
@@ -39,7 +39,7 @@ verification, validation, or documentation methodologies (though I hope you
 have some!).
 
 <p>Nor does this standard specify an implementation language, method or CAD
-tool. However, it was written in tandem with a <a href="verilog.html">Verilog
+tool. However, it was written in tandem with a <a href="./verilog.html">Verilog
 Coding Standard</a>.
 
 <p>Finally, this standard assumes you are already familiar with digital design
@@ -48,7 +48,7 @@ in general. It is not a language or tool reference.
 <h2>Modularization</h2>
 
 Divide your design into modules to a very fine degree, even to the point of a
-simple <a href="http://fpgacpu.ca/fpga/annuller.html">vector of AND gates</a>.
+simple <a href="./Annuller.html">vector of AND gates</a>.
 When a design is entirely composed of modules, the code expresses the design
 itself rather than its implementation, and gives you multiple forms of
 documentation and checking for free, and greater control over implementation.
@@ -121,9 +121,6 @@ interfacing to the rest of the system (memory-mapping the data storage and
 configuration registers).
 
 <h2>System Architecture</h2>
-
-<p><i>This section is taken almost verbatim from <a
-href="./shim.html">Core/Instance/Adapter/Shim Architecture</a></i>
 
 <p>In a project with multiple FPGAs and boards and connecting paths between
 them, all designed by separate engineering teams, a common code architecture on
