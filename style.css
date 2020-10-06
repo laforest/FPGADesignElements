@@ -1,6 +1,14 @@
 
 /* A simple and portable CSS file. Looks the same under most any browser. */
 
+.clearfix {
+    overflow: auto;
+}
+
+.twothirds {
+    width: 63%;
+}
+
 .bordered {
     border: thin solid black;
     padding: 1em;
@@ -42,6 +50,18 @@ img {
     float:  right;
     margin: 0em 1em 1em 1em;
     width:  33%;
+}
+
+img.left {
+    float:  left;
+    margin: 1em 1em 1em 1em;
+    width:  63%;
+}
+
+img.full {
+    float:  left;
+    margin: 0em 0em 0em 0em;
+    width:  100%;
 }
 
 table {
