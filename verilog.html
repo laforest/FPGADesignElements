@@ -178,9 +178,14 @@ reg [WORD_WIDTH-1:0] foo  = WORD_ZERO;
 
 // Also legal to define bit width
 localparam [WORD_WIDTH-1:0] WORD_CONSTANT = `SOME_INTEGER_CONSTANT;
-</pre>
 
-<p><b>FIXME: last example won't pass lint if SOME_INTEGER_CONSTANT is a power of two: it would need WORD_WIDTH+1 bits. Don't specify the width at definition, and truncate at point of use.</b>
+// Sometimes you have to clip at the point of use
+localparam NARROW_ZERO = {NARROW_WIDTH{1'b0}};
+reg [NARROW_WIDTH-1:0] bar = NARROW_ZERO;
+always @(*) begin
+    bar = WORD_CONSTANT [NARROW_WIDTH-1:0];
+end
+</pre>
 
 <h3>Bit Widths</h3>
 
@@ -250,8 +255,6 @@ end
 </pre>
 
 <h2>Module Definition</h2>
-
-<p>FIXME: ADD NOTION OF "ENCLOSING MODULE" AS HIERARCHY DEFINER BY GROUPING RELATED SIGNALS. (I wrote that somewhere....in Core/Instance/Adapter/Shim?)
 
 <h3>Parameters</h3>
 
@@ -473,8 +476,14 @@ clear read.
 design idiom: to break-down complex logic into simpler expressions we can then
 think about sequentially and re-use as necessary.
 
-<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES CAUSING SIMULATION/SYNTHESIS MISMATCH.
-<p>FIXME: ADD NOTE RE: VERILATOR NOT LINTING SEQUENTIAL DEPENDENCIES WELL (false comb loop, must split always block, due to passing through modules?).
+<p class="bordered"><b>Backward Dependencies:</b> if you find you have a
+backwards dependency between blocking assignments (an earlier line depends on a
+later line), then either re-order the assignments, or split one assignment off
+into its own <code>always()</code> block. Otherwise, the simulation and
+synthesis will still be correct, but they may not match anymore. You will see
+functionally correct behaviour in your simulations that does not match the
+hardware, such as signals not changing when they should when they otherwise
+have no effect on the calculations.
 
 <p>Thus, while simple logic can be correctly computed and assigned in a single
 line in a clocked always block, it's often clearer to implement more complex
@@ -550,9 +559,8 @@ localparams and module parameters.
 
 <li>We can replace nested case/if/else statements with chained lines of ternary
 operators in blocking assignments, which make the code more compact and easier
-to follow.
-
-<p>FIXME: ADD NOTE RE: BACKWARDS DEPENDENCIES AND SIMULATION/SYNTHESIS MISMATCH.
+to follow. <b>But see note above regarding backward dependencies in blocking
+assignments.</b>
 
 <li>In simulation, Verilog if/else statements treat X and Z values as false, and so
 will fail to propagate these values and give unexpected results:
