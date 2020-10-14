@@ -4,15 +4,37 @@
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>References and Reading List</title>
+<meta name="description" content="Here are the sources I've used while writing this book, covering digital design, bit manipulation, elastic pipelines, and clock-domain crossing.">
 </head>
 <body>
 
 <h1>References and Reading List</h1>
 
-<p>Here are the sources I've used while writing this book, organized by topic.
+<p>Here are the sources I've used while writing this book, covering digital design, bit manipulation, elastic pipelines, and clock-domain crossing.
 
 <a name="digital"</a> 
 <h2>Digital Design</h2>
+
+<ul>
+
+<li>Ken Chapman's <a
+href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
+Smart About Reset: Think Local, Not Global</a> discusses why, on FPGAs, it's
+important to minimize the number of registers receiving a reset signal, and to
+instead use the built-in register initialization at configuration or to
+architect the system to eventually get to a consistent state after a minimal
+reset.
+
+</ul>
+
+<a name="bit"</a> 
+<h2>Bit Manipulation</h2>
+
+<p>Bit manipulation algorithms usually contain only Boolean, bit-shift, and
+addition operations, are often branch-free, and operate in parallel on all the
+bits in a word. Thus, they translate naturally to high-performance hardware.
+Note that many bit manipulation algorithms assume a certain word width, which
+affects the necessary constants.
 
 <ul>
 
@@ -23,13 +45,43 @@ related to bit manipulation, arithmetic, branch-free code, and other deep
 topics. A must-have for hardware designers. The website, which has extra
 material and errata, has since gone down, so this is an Archive.org link.
 
-<li>Ken Chapman's <a
-href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
-Smart About Reset: Think Local, Not Global</a> discusses why, on FPGAs, it's
-important to minimize the number of registers receiving a reset signal, and to
-instead use the built-in register initialization at configuration or to
-architect the system to eventually get to a consistent state after a minimal
-reset.
+<li> <a href="https://catonmat.net/low-level-bit-hacks">Introduction to Low
+Level Bit Hacks</a> provides a detailed explanation of the fundamental bit
+manipulations from which most others are built. (See: Hacker's Delight, Chapter
+2, "Basics").
+
+<li> <a href="https://graphics.stanford.edu/~seander/bithacks.html">Bit
+Twiddling Hacks</a> is another repository of bit manipulation algorithms,
+complementing Hacker's Delight.
+
+<li> <a href="http://aggregate.org/MAGIC/">The Aggregate Magic Algorithms</a>
+has a few different algorithms, and notably, SWAR (SIMD Within A Register).
+
+<li> <a href=""https://bits.stephan-brumme.com>the bit twiddler</a> lists some
+C code, with cycle counts, explanations, and assembly output.
+
+<li> <a href="http://programming.sirrida.de/">Programming pages</a> of Jasper
+Neumann. Detailed explanations with beautiful diagrams.
+
+<li> <a href=""https://github.com/keon/awesome-bits>awesome-bits</a> by Keon
+Kim. Some nifty string and float algorithms here.
+
+<li> The defunct (thus the archive.org links) <a
+href="https://web.archive.org/web/20180714171943/https://chessprogramming.wikispaces.com/">Chess
+Programming Wiki</a> describes 64-bit <a
+href="https://web.archive.org/web/20180715002049/http://chessprogramming.wikispaces.com/Bitboards">Bitboards</a>,
+used to represent chess boards, which lend themselves to a rich discussion of
+various bit algorithms and their implementations:
+
+    <ul>
+
+    <li> <a href="https://web.archive.org/web/20180715002044/http://chessprogramming.wikispaces.com/General%20Setwise%20Operations">General Setwise Operations</a>
+    <li> <a href="https://web.archive.org/web/20180715003918/http://chessprogramming.wikispaces.com/Bit-Twiddling">Bit Twiddling</a>
+    <li> <a href="https://web.archive.org/web/20180713092652/https://chessprogramming.wikispaces.com/population%20count">Population count</a>
+    <li> <a href="https://web.archive.org/web/20180715002053/http://chessprogramming.wikispaces.com/BitScan">BitScan</a>
+    <li> <a href="https://web.archive.org/web/20180716150755/http://chessprogramming.wikispaces.com/Flipping%20Mirroring%20and%20Rotating">Flipping Mirroring and Rotating</a>
+
+    </ul>
 
 </ul>
 
