@@ -5,7 +5,8 @@
 // a ready/valid handshake to allow back-to-back transfers without
 // a combinational path between input and output, thus pipelining the path to
 // improve concurrency and/or timing. *Any FIFO depth is allowed, not only
-// powers-of-2.* The input-to-output latency is ??? cycles.
+// powers-of-2.* The minimum input-to-output latency is 7 cycles when both
+// clocks are plesiochronous.
 
 // Since a FIFO buffer stores variable amounts of data, it will smooth out
 // irregularities in the transfer rates of the input and output interfaces,
