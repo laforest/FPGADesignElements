@@ -976,6 +976,101 @@ endgenerate
 
 <p>The <a href="./word_pad_function.html">Word Pad</a> function implements this idiom.
 
+<a name="loops"></a>
+
+<h3>Apparent Combinational Loops</h3>
+
+<p>The following corner case was shown to me by <a
+href="https://twitter.com/gpiodev">@gpiodev</a>, and the explanation figured
+out by <a href="https://twitter.com/awygle">@awygle</a>. My expansion of
+the explanation here isn't precise with regards to the Verilog event queue
+model, but I think it is essentially correct.
+
+<p>It's obvious that the following code is a combinational loop that isn't
+normally synthesizable:
+
+<pre>
+reg [WORD_WIDTH-1:0] foo = WORD_ZERO;
+
+always @(*) begin
+    foo = foo + WORD_ONE;
+end
+</pre>
+
+<p>However, the following example of an AND bit-reduction <em>is not a
+combinational loop</em> and passes linting and synthesis:
+
+<pre>
+integer                     i;
+reg     [WORD_WIDTH-1:0]    word          = WORD_ZERO;
+reg                         and_reduction = 1'b0;
+
+always @(*) begin
+    and_reduction = 1'b1;
+    for (i=0; i < WORD_WIDTH; i=i+1) begin
+        and_reduction = and_reduction & word[i];
+    end
+end
+</pre>
+
+<p>The key difference is the first blocking assignment of <code>1'b1</code>
+<em>inside the always block</em>.  The code unrolls into a sequence of blocking
+assignments like so:
+
+<pre>
+and_reduction = 1'b1;
+and_reduction = and_reduction & word[0]
+and_reduction = and_reduction & word[1];
+...
+</pre>
+
+<p>Assignments inside procedural blocks (always, initial) are evaluated in
+sequence, even though procedural blocks themselves can be scheduled in any
+order. Each blocking assignment's right-hand expression is completely evaluated
+and assigned to the left-hand expression before proceeding to the next blocking
+statement. And since the always block does not depend on a clock event, all these
+assignments are evaluated within the current time step. Thus, the current value
+of <code>and_reduction</code> is known at each assignment, as follows, with the
+parentheses indicating the current value of <code>and_reduction</code>:
+
+<pre>
+and_reduction =  1'b1;
+and_reduction = (1'b1) & word[0];
+and_reduction = (1'b1  & word[0]) & word[1];
+...
+</pre>
+
+<p>At each step, there is no need to schedule any other procedural block to
+find out the current value of <code>and_reduction</code>, so the sequential
+evaluation of the blocking assignments neatly implements the sequence of steps
+to implement the AND-reduction, <em>provided that the value of the first
+assignment creates an identity function with the second assignment, which
+depends on the reduction function (e.g.: 1'b0 for OR-reduction).</em>
+
+<p>Without the first assignment, the code would unroll as a combinational loop:
+
+<pre>
+and_reduction = and_reduction & word[0]
+and_reduction = and_reduction & word[0] & word[1];
+...
+</pre>
+
+<p>Resolving the right-hand value of <code>and_reduction</code> would involve
+scheduling another procedural block which provides the value, but there are no
+other procedural blocks here, and if there were we would have two separate
+procedural blocks assigning to the same variable, which isn't synthesizable
+(and non-deterministic in simulation also!).  The initial assignment
+(<code>and_reduction = 1'b0;</code>) is scheduled separately, at time zero, and
+runs only once. So it cannot be scheduled again and has no effect on the loop.
+
+<p>When implementing combinational logic as iterated operations on a variable,
+the <a href="./Bit_Reducer.html">Bit Reducer</a> module shows a clearer idiom
+which does not depend on initializing the iterated variable with the correct
+value, and separates the result of each iteration into its own bit, which
+avoids the problem of multiple assignments across procedural blocks. (I will
+admit that the way I wrote it confuses the linter a bit, so I need to direct it
+that no combinational loop exists.)
+
 <hr>
 
 <a href="http://fpgacpu.ca/">fpgacpu.ca</a> </body> </html>
