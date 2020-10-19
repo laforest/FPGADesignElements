@@ -19,13 +19,36 @@ crossing.
 
 <ul>
 
-<li>Ken Chapman's <a
+<li><h3>Resets</h3>Ken Chapman's <a
 href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
 Smart About Reset: Think Local, Not Global</a> discusses why, on FPGAs, it's
 important to minimize the number of registers receiving a reset signal, and to
 instead use the built-in register initialization at configuration or to
 architect the system to eventually get to a consistent state after a minimal
 reset.
+
+<a name="flancter"</a> 
+<li><h3>Flancter</h3>Rob Weinstein's <a href="./Flancter_App_Note.pdf">Flancter</a> is a clever
+little circuit which allows you to set a bit in one clock domain, and clear it
+from another clock domain <em>without using an asynchronous reset or even
+having access to the setting clock domain</em>. It needs supporting circuitry
+to be useful (e.g.: at least one <a href="./CDC_Bit_Synchronizer.html">CDC Bit
+Synchronizer</a>), and you will have to <a
+href="https://forums.xilinx.com/t5/Implementation/How-to-constraint-a-flancter/td-p/672533">carefully
+instruct your CAD tool</a> on how to analyze the timing and set min/max delays
+on the two signals which cross clock domains without synchronization, and
+design your control circuitry to keep the set/reset signals mutually exclusive.
+That said, it's amazing for some advanced use cases, such as <a
+href="./Flancter_fastevent_counter.pdf"> counting very fast and asynchronous
+sensor pulses</a>. However, in most cases, you can get the same functionality
+with simpler CDC behaviour by using a <a href="./CDC_Flag_Bit.html">CDC Flag
+Bit</a>.
+
+<p>(Thanks to Eric Smith (<a
+href="http://www.twitter.com/brouhaha">@brouhaha</a>) for allowing me to host a
+copy of the hard-to-find original Flancter App Note, originally from his <a
+href="http://www.floobydust.com/">Floobydust</a> page.)
+
 
 </ul>
 

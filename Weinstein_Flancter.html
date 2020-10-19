@@ -1,0 +1,120 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weinstein Flancter</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Weinstein_Flancter.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Weinstein Flancter</h1>
+<p>A Flancter allows you to set a bit in one clock domain, and reset the same
+ bit from another clock domain, without using an asynchronous reset, and
+ without the set/reset operation depending on the other clock.</p>
+<p>In most cases, you can get the same functionality with simpler CDC
+ behaviour and control logic by using a <a href="./CDC_Flag_Bit.html">CDC Flag Bit</a>.</p>
+<h2>Operation</h2>
+<p>Pulse <code>bit_set</code> for one <code>clock_set</code> cycle to raise <code>bit_out</code>, and pulse
+ <code>bit_reset</code> for one <code>clock_reset</code> cycle to lower <code>bit_out</code>. Raise <em>both</em>
+ <code>clear_set</code> and <code>clear_reset</code> for at least one cycle in each clock domain
+ (<code>clock_set</code> and <code>clock_reset</code>) to reset the entire Flancter, else
+ <code>bit_out</code> may unexpectedly set rather than clear. Depending on your
+ application, you may need to use <a href="./Register_areset.html">Registers with asynchronous
+ resets</a> instead.</p>
+<h2>Operating Conditions</h2>
+<p>A Flancter needs supporting control and CDC circuitry to be usable, and
+ requires more work in the CAD tool to properly constrain and analyze
+ timing. See the related <a href="./reading.html#flancter">References and Reading List
+ entry</a> for details, links, and application notes.</p>
+<p>The primary operating condition is that the <code>bit_set</code> and <code>bit_reset</code>
+ signals must never overlap, or be in each other's setup/hold windows, since
+ set/reset are asynchronous to each other. To guarantee such overlaps cannot
+ happen: once set, the Flancter must not be set again until reset, and
+ once reset, must not be reset again until set.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Weinstein_Flancter.html">Weinstein_Flancter</a>
+(
+    input   wire    clock_set,
+    input   wire    clear_set,
+    input   wire    bit_set,
+
+    input   wire    clock_reset,
+    input   wire    clear_reset,
+    input   wire    bit_reset,
+
+    output  reg     bit_out
+);
+
+    initial begin
+        bit_out = 1'b0;
+    end
+</pre>
+
+<p>When enabled, the output of <code>register_set</code> takes on the <em>opposite</em> value of
+ the output of <code>register_reset</code>. This only happens in the <code>clock_set</code>
+ domain.</p>
+
+<pre>
+    wire register_reset_data;
+    wire register_set_data;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    register_set
+    (
+        .clock          (clock_set),
+        .clock_enable   (bit_set),
+        .clear          (clear_set),
+        .data_in        (~register_reset_data),
+        .data_out       (register_set_data)
+    );
+</pre>
+
+<p>When enabled, the output of <code>register_reset</code> takes on the the value of the
+ output of <code>register_set</code>. This only happens in the <code>clock_reset</code> domain.</p>
+
+<pre>
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    register_reset
+    (
+        .clock          (clock_reset),
+        .clock_enable   (bit_reset),
+        .clear          (clear_reset),
+        .data_in        (register_set_data),
+        .data_out       (register_reset_data)
+    );
+</pre>
+
+<p>When the two register outputs differ, the <code>bit_out</code> is set. <strong>Note that
+ <code>bit_out</code> must be considered asynchronous to both clock domains</strong>, and must
+ be run through a <a href="./CDC_Bit_Synchronizer.html">CDC Bit Synchronizer</a> before
+ being used.</p>
+
+<pre>
+    always @(*) begin
+        bit_out = register_set_data != register_reset_data;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

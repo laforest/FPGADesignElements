@@ -1,0 +1,168 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CDC Flag Bit</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./CDC_Flag_Bit.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>CDC Flag Bit</h1>
+<p>Implements a flag bit which is set in one clock domain and cleared from
+ another clock domain, without any asynchronous resets, and with simpler CDC
+ behaviour and control than a Flancter.</p>
+<p>This design is derived from <a href="./Weinstein_Flancter.html">Rob Weinstein's Flancter
+ design</a>, but synchronizes all signals crossing
+ clock domains, which makes it simpler to ensure it works correctly. The
+ synchronization also frees us from the constraint that set and reset must
+ never be asserted at the same time or within each others setup/hold window.</p>
+<p>On the other hand, this circuit isn't <em>quite</em> equivalent to a Flancter as
+ it depends on both clock domains to be always running for the synchronizers
+ to pass values, while a Flancter does not (e.g.: we can still reset
+ a Flancter even if the set clock is not running).  Depending on your
+ application, you may need to use <a href="./Register_areset.html">Registers with asynchronous
+ resets</a> instead.</p>
+<h2>Operation</h2>
+<p>Pulse <code>bit_set</code> for one <code>clock_set</code> cycle to raise <code>bit_out_set</code> (and then
+ <code>bit_out_reset</code>), and pulse <code>bit_reset</code> for one <code>clock_reset</code> cycle to
+ lower <code>bit_out_reset</code> (and then <code>bit_out_set</code>).  <strong>A set or reset is
+ immediately visible in its own domain, then propagates to the other domain
+ after the usual CDC synchronization delay.</strong> A set operation while already
+ set, or a reset operation while already reset, is allowable and has no
+ effect. </p>
+<p>Raise both <code>clear_set</code> and <code>clear_reset</code> <em>together</em> for at least <code>4
+ + EXTRA_CDC_STAGES</code> cycles in each clock domain (<code>clock_set</code> and
+ <code>clock_reset</code>) to reset the entire CDC Flag Bit, else <code>bit_out_set</code> and/or
+ <code>bit_out_reset</code> may unexpectedly set rather than clear.</p>
+<p>Adjust the <code>EXTRA_CDC_STAGES</code> parameter if you are running near the
+ speed/temperature limits of your device. Consult your vendor datasheets.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./CDC_Flag_Bit.html">CDC_Flag_Bit</a>
+#(
+    parameter EXTRA_CDC_STAGES = 0
+)
+(
+    input   wire    clock_set,
+    input   wire    clear_set,
+    input   wire    bit_set,
+    output  reg     bit_out_set,
+
+    input   wire    clock_reset,
+    input   wire    clear_reset,
+    input   wire    bit_reset,
+    output  reg     bit_out_reset
+);
+
+    initial begin
+        bit_out_set   = 1'b0;
+        bit_out_reset = 1'b0;
+    end
+</pre>
+
+<p>The <code>setting_bit</code> and <code>resetting_bit</code> Registers together form a toggle
+ register but split into two parts, one in each clock domain (set and
+ reset), whose relative difference expresses the value of the CDC flag bit.</p>
+<p>Raising <code>bit_set</code> makes the output of <code>setting_bit</code> take the <strong>opposite</strong>
+ value of the synchronised <code>resetting_bit</code> output, which signifies a flag
+ value of one.</p>
+
+<pre>
+    wire reset_toggle_synced;
+    wire set_toggle;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    setting_bit
+    (
+        .clock          (clock_set),
+        .clock_enable   (bit_set),
+        .clear          (clear_set),
+        .data_in        (~reset_toggle_synced),
+        .data_out       (set_toggle)
+    );
+</pre>
+
+<p>We then sync the <code>set_toggle</code> into the reset clock domain.</p>
+
+<pre>
+    wire set_toggle_synced;
+
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
+    #(
+        .EXTRA_DEPTH        (EXTRA_CDC_STAGES)  // Must be 0 or greater
+    )
+    set_to_reset
+    (
+        .receiving_clock    (clock_reset),
+        .bit_in             (set_toggle),
+        .bit_out            (set_toggle_synced)
+    );
+</pre>
+
+<p>And use the <code>set_toggle_synced</code> as the input to the <code>resetting_bit</code>.
+ Raising <code>bit_reset</code> makes the output of <code>resetting_bit</code> match that of the
+ synchronized version of <code>setting_bit</code>, which signifies a flag value of
+ zero.</p>
+
+<pre>
+    wire reset_toggle;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    resetting_bit
+    (
+        .clock          (clock_reset),
+        .clock_enable   (bit_reset),
+        .clear          (clear_reset),
+        .data_in        (set_toggle_synced),
+        .data_out       (reset_toggle)
+    );
+</pre>
+
+<p>Then we sync the <code>reset_toggle</code> into the set clock domain.</p>
+
+<pre>
+    <a href="./CDC_Bit_Synchronizer.html">CDC_Bit_Synchronizer</a>
+    #(
+        .EXTRA_DEPTH        (EXTRA_CDC_STAGES)  // Must be 0 or greater
+    )
+    reset_to_set
+    (
+        .receiving_clock    (clock_set),
+        .bit_in             (reset_toggle),
+        .bit_out            (reset_toggle_synced)
+    );
+</pre>
+
+<p>Finally, in each clock domain, if the set and reset toggles differ, the
+ flag is one. If they are the same, the flag is zero. The toggles, and thus
+ the output bits, will eventually always match after CDC completes.</p>
+
+<pre>
+    always @(*) begin
+        bit_out_set   = (set_toggle        != reset_toggle_synced);
+        bit_out_reset = (set_toggle_synced != reset_toggle);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
