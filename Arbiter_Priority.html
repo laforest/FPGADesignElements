@@ -1,0 +1,65 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arbiter Priority</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Arbiter_Priority.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>A Priority Arbiter</h1>
+<p>Returns a one-hot bitmask of the least-significant bit set in a word, where
+ bit 0 can be viewed as having highest priority. </p>
+<p>The requestors must raise and hold a <code>requests</code> bit and wait until the
+ corresponding <code>grant</code> bit rises to begin their transaction. At any point,
+ the highest priority request is granted.  The grant remains for as long as
+ the request is held without interruption, <em>or until a higher priority
+ request appears</em>. Requesters can hold or drop their requests as desired, as
+ this is a combinational circuit.</p>
+<p>This Priority Arbiter is the building block of more complex arbiters: By
+ masking other requests with a mask derived from the grants, we can alter
+ the priority scheme as desired, and guarantee the current grant cannot be
+ interrupted by another request. </p>
+<p>A common use-case for an arbiter is to drive a <a href="./Multiplexer_One_Hot.html">one-hot
+ multiplexer</a> to select one of multiple senders
+ requesting for one receiver, or one of multiple receivers requesting from
+ one sender.</p>
+<p>Note that if a higher-priority request happens too frequently, even if
+ brief, it will starve lower priority requests. To distribute the grants
+ fairly, you need a <a href="./Arbiter_Round_Robin.html">Round-Robin Arbiter</a>.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
+#(
+    parameter INPUT_COUNT = 0
+)
+(
+    input   wire    [INPUT_COUNT-1:0]    requests,
+    output  wire    [INPUT_COUNT-1:0]    grant
+);
+
+    <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
+    #(
+        .WORD_WIDTH (INPUT_COUNT)
+    )
+    calc_grant 
+    (
+        .word_in    (requests),
+        .word_out   (grant)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
