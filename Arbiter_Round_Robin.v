@@ -40,7 +40,7 @@
 
 module Arbiter_Round_Robin
 #(
-    parameter INPUT_COUNT = 7
+    parameter INPUT_COUNT = 0
 )
 (
     input   wire                        clock,
