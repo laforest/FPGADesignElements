@@ -16,7 +16,7 @@
 // implementation will output the bitwise-OR of the logarithm of each set bit
 // treated as a power-of-2, which I'm not sure has any use or meaning. To save
 // hardware (we'd need a [Population Count](./Population_Count.html) or a pair
-// of [Priority Arbiters](./Priority_Arbiter.html)), we don't signal these
+// of [Priority Arbiters](./Arbiter_Priority.html)), we don't signal these
 // cases.
 // Also, this calculation fails if no bits are set, since log<sub>2</sub>(0)
 // is undefined, and we cannot output zero as that's a valid logarithm. To
