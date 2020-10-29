@@ -105,9 +105,9 @@ module Pipeline_Merge_Priority
 
     wire [INPUT_COUNT-1:0] input_valid_granted;
 
-    Priority_Arbiter
+    Arbiter_Priority
     #(
-        .WORD_WIDTH     (INPUT_COUNT)
+        .INPUT_COUNT    (INPUT_COUNT)
     )
     pipeline_arbiter
     (

@@ -98,9 +98,9 @@ module Pipeline_Merge_Round_Robin
 
     wire [INPUT_COUNT-1:0] input_valid_granted;
 
-    Round_Robin_Arbiter
+    Arbiter_Round_Robin
     #(
-        .WORD_WIDTH (INPUT_COUNT)
+        .INPUT_COUNT (INPUT_COUNT)
     )
     pipeline_arbiter
     (

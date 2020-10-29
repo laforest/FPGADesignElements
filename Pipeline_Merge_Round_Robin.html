@@ -108,9 +108,9 @@ module <a href="./Pipeline_Merge_Round_Robin.html">Pipeline_Merge_Round_Robin</a
 <pre>
     wire [INPUT_COUNT-1:0] input_valid_granted;
 
-    <a href="./Round_Robin_Arbiter.html">Round_Robin_Arbiter</a>
+    <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     #(
-        .WORD_WIDTH (INPUT_COUNT)
+        .INPUT_COUNT (INPUT_COUNT)
     )
     pipeline_arbiter
     (
