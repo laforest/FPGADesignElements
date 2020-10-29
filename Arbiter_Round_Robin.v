@@ -69,8 +69,9 @@ module Arbiter_Round_Robin
         .grant      (grant_raw)
     );
 
-// Mask-off all requests of lower priority than the request granted in the
-// previous cycle.
+// Mask-off all requests of equal and higher priority than the request
+// currently granted, from the previous cycle. The mask must be inverted
+// before use.
 
     wire [INPUT_COUNT-1:0] mask;
 
@@ -85,22 +86,19 @@ module Arbiter_Round_Robin
     );
 
 // The mask includes the currently granted request, which we don't want to
-// interrupt, so we shift the mask right one bit to leave the current granted
-// request intact, before masking off all lower priority requests.
-
-// The mask shift has the side-effect that in the specific case of all
-// requestors going from idle to active at the same time, the round-robin
-// begins with the *lowest* priority request first (MSB) instead of the
-// highest priority request (LSB).
+// interrupt, so we OR `grant_previous` to the inverted mask to exclude the
+// currently granted request from the mask, thus masking off all higher
+// priority requests, leaving the currently granted request as highest
+// priority.
 
     reg [INPUT_COUNT-1:0] requests_masked;
 
     always @(*) begin
-        requests_masked = requests & ~(mask >> 1);
+        requests_masked = requests & (~mask | grant_previous);
     end
 
 // Grant a request in priority order, but from the masked requests, which only
-// contain requests of lower priority to the request granted last cycle.
+// contain requests of equal or lower priority to the currently granted request.
 
     wire [INPUT_COUNT-1:0] grant_masked;
 
@@ -116,7 +114,7 @@ module Arbiter_Round_Robin
 
 // If no granted requests remain after masking, then grant from the unmasked
 // requests, which starts over granting from the highest (LSB) priority. This
-// also resets the mask. And the process begins again.
+// also resets the mask. And the round-robin process begins again.
 
     always @(*) begin
         grant = (grant_masked == ZERO) ? grant_raw : grant_masked; 
