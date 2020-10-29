@@ -13,8 +13,8 @@
 
 <h1>A Round-Robin Arbiter</h1>
 <p>Returns a one-hot grant bitmask selected from one of the raised request
- bits in a word, in round-robin order, going from least-significant to
- most-significant bit, and back around.</p>
+ bits in a word, in round-robin order, going from least-significant (highest
+ priority) to most-significant (lowest priority) bit, and back around.</p>
 <p>Unset request bits are skipped, which avoids wasting time. Requests can be
  raised or dropped before their turn comes, but this must be done
  synchronously to the clock. Grants are calculated combinationally from the
@@ -63,7 +63,46 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     end
 </pre>
 
-<p>Grant a request in priority order (LSB has higest priority)</p>
+<p>We need to detect if any requests are active: <em>when all requests go idle,
+ we want to remember the last granted request.</em> Otherwise, that lost state
+ means the round-robin restarts from the highest priority request rather
+ than the next lower priority request after the last granted request. </p>
+<p>Always granting the highest priority first after an idle period allows
+ a pathological request pattern to cause starvation: all but the highest
+ priority request would starve if they keep asserting and de-asserting in
+ lock-step after an idle period.</p>
+
+<pre>
+    reg any_requests_active = 1'b0;
+
+    always @(*) begin
+        any_requests_active = (requests != ZERO);
+    end
+</pre>
+
+<p>For the same reasons, we need to detect when we leave an idle request
+ period so we can, for that cycle, refuse to grant again the last granted
+ request, which would otherwise cause starvation of other requests happening
+ in lock-step.</p>
+
+<pre>
+    wire out_from_idle;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    requests_restart
+    (
+        .clock              (clock),
+        .level_in           (any_requests_active),
+        .pulse_posedge_out  (out_from_idle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+</pre>
+
+<p>Grant a request in priority order (LSB has higest priority). This is the
+ base case which starts the round-robin.</p>
 
 <pre>
     wire [INPUT_COUNT-1:0] grant_raw;
@@ -80,7 +119,9 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
 </pre>
 
 <p>Mask-off all requests of equal and higher priority than the request
- currently granted, from the previous cycle. The mask must be inverted
+ currently granted, from the previous cycle. This masking makes the
+ round-robin progress towards lower priority requests as the previously
+ granted higher priority requests are released. The mask must be inverted
  before use.</p>
 
 <pre>
@@ -97,17 +138,23 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     );
 </pre>
 
-<p>The mask includes the currently granted request, which we don't want to
- interrupt, so we OR <code>grant_previous</code> to the inverted mask to exclude the
- currently granted request from the mask, thus masking off all higher
- priority requests, leaving the currently granted request as highest
- priority.</p>
+<p>The mask includes the currently granted request, from the previous cycle,
+ which we don't want to interrupt, so we OR the currently granted request
+ bit into the inverted mask to exclude the currently granted request from
+ the mask, thus masking off only all higher priority requests, leaving the
+ currently granted request as highest priority, <strong>EXCEPT</strong> if we are
+ returning from an idle request phase, when we instead zero-out that granted
+ request bit, so the round-robin can resume to the next lower priority
+ request based on the mask, instead of possibly re-granting the same request
+ again.</p>
 
 <pre>
-    reg [INPUT_COUNT-1:0] requests_masked;
+    reg [INPUT_COUNT-1:0] requests_masked       = ZERO;
+    reg [INPUT_COUNT-1:0] grant_previous_gated  = ZERO;
 
     always @(*) begin
-        requests_masked = requests & (~mask | grant_previous);
+        grant_previous_gated = (out_from_idle == 1'b1) ? ZERO : grant_previous;
+        requests_masked      = requests & (~mask | grant_previous_gated);
     end
 </pre>
 
@@ -129,14 +176,21 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
 </pre>
 
 <p>If no granted requests remain after masking, then grant from the unmasked
- requests, which starts over granting from the highest (LSB) priority. This
- also resets the mask. And the round-robin process begins again.</p>
+ requests, which starts over the round-robin granting from the highest (LSB)
+ priority. This also resets the mask.</p>
 
 <pre>
     always @(*) begin
         grant = (grant_masked == ZERO) ? grant_raw : grant_masked; 
     end
+</pre>
 
+<p>Remember the last granted request so we can compute the mask to exclude
+ higher priority requests than the last granted request. If all requests go
+ idle, don't update, so we can continue the round-robin from where we left
+ off when requests appear again.</p>
+
+<pre>
     wire [INPUT_COUNT-1:0] grant_previous;
 
     <a href="./Register.html">Register</a>
@@ -147,7 +201,7 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     previously_granted_request
     (
         .clock          (clock),
-        .clock_enable   (1'b1),
+        .clock_enable   (any_requests_active),
         .clear          (clear),
         .data_in        (grant),
         .data_out       (grant_previous)
