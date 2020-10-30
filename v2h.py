@@ -28,11 +28,12 @@ header = """<html>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{0}</title>
+<meta name="description" content="{0}">
+<title>{1}</title>
 </head>
 <body>
 
-<p class="inline bordered"><b><a href="./{1}">Source</a></b></p>
+<p class="inline bordered"><b><a href="./{2}">Source</a></b></p>
 <p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
 <p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
@@ -65,6 +66,9 @@ def is_verilog_filename(filename):
 def is_comment(line):
     return line.startswith("//")
 
+def is_header(line):
+    return line.startswith("//#")
+
 def is_blank(line):
     """If a line is only spaces or tabs and a return, it's blank."""
     return line.strip(" \t") == "\n"
@@ -72,6 +76,19 @@ def is_blank(line):
 def is_eof(line):
     """readline only ever returns an empty line at EOF"""
     return line == ""
+
+def process_first_paragraph(line, f):
+    """Extract just the first paragraph of comments after header"""
+    paragraph_block = ""
+    while (is_header(line) or is_blank(line)) and not is_eof(line):
+        line = f.readline()
+    while is_comment(line) and not is_blank(line) and not is_eof(line):
+        line = line.lstrip("/")
+        paragraph_block = paragraph_block + line
+        line = f.readline()
+    paragraph_block = paragraph_block.replace("\n", "").strip()
+    f.seek(0)
+    return line, paragraph_block
 
 def process_comments(line, processed_contents, f):
     """Take in comment/blank lines until a line is neither.
@@ -132,9 +149,10 @@ if __name__ == "__main__":
 
         f = open(verilog_filename, 'r')
         processed_contents = ""
-        title = filename_to_title(verilog_filename)
-        processed_contents += header.format(title, verilog_filename)
         line = f.readline()
+        line, meta_description = process_first_paragraph(line, f)
+        title = filename_to_title(verilog_filename)
+        processed_contents += header.format(meta_description, title, verilog_filename)
         # Note the returning of the last line read and restarting of parsing.
         # This avoids the need for look-ahead to know when to end a comment or code block.
         while not is_eof(line):
