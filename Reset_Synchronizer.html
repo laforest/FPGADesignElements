@@ -3,6 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Filters an asynchronous reset signal so it can assert immediately and asynchronously, but can only release synchronously with a receiving clock (after 2 or 3 (plus `EXTRA_DEPTH`) cycles of latency), which avoids metastability issues should the reset release too close to the receiving clock edge.">
 <title>Reset Synchronizer</title>
 </head>
 <body>

@@ -3,6 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Synchronizes the transfer of a word of data from one clock domain to another, regardless of relative clock frequencies. Uses ready/valid handshakes at the sending and receiving ends, but these can be short-circuited for continuous transfers without backpressure: ignore `sending_ready` and tie `receiving_ready` high. Add `EXTRA_CDC_DEPTH` if you are running near the limits of your silicon (consult your vendor datasheets regarding metastability).">
 <title>CDC Word Synchronizer</title>
 </head>
 <body>

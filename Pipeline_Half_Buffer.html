@@ -3,6 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A single pipeline register with ready/valid handshakes.  Decouples the input and ouput handshakes (no combinational path), but does not allow concurrent read/write like a full [Pipeline Skid Buffer](./Pipeline_Skid_Buffer.html). The half-buffer must be read out before you can write into it again, halving the maximum bandwidth.">
 <title>Pipeline Half Buffer</title>
 </head>
 <body>

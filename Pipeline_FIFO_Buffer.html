@@ -3,6 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Decouples two sides of a ready/valid handshake to allow back-to-back transfers without a combinational path between input and output, thus pipelining the path to improve concurrency and/or timing. The latency from input to output is 2 clock cycles. *Any FIFO depth is allowed, not only powers-of-2.* Raising `clear` will return the FIFO to the empty state.">
 <title>Pipeline FIFO Buffer</title>
 </head>
 <body>

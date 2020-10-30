@@ -3,6 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="When developing a new module, it's very convenient to run it through your CAD tool by itself, on a smaller target FPGA, with any random automatic pin assignments, to iterate quickly and find synth and timing issues. However, you can run out of physical pins, and your logic will get scattered all over the FPGA as it tries to stay close to the pins, wrecking your timing estimates.  Also, any input or output logic which isn't registered won't be part of the STA (Static Timing Analysis), so that also makes the timing estimate less accurate when synthesized in isolation.">
 <title>Synthesis Harness Output</title>
 </head>
 <body>
