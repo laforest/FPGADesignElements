@@ -962,7 +962,11 @@ Zero width concatenations are partially fixed in Verilog-2005, and thus
 SystemVerilog, but the above <code>PAD</code> would still fail at linting and
 elaboration since there are no other sized elements being concatenated.
 
-<p>We can eliminate zero from the possible <code>PAD_WIDTH</code> values by instead returning <code>WORD_WIDTH</code> if the pad width would have been zero. This works because a pad is necessarily between 0 and <code>WORD_WIDTH-1</code> bits wide. We can then check later and instantiate a concatenation with or without a pad:
+<p>We can eliminate zero from the possible <code>PAD_WIDTH</code> values by
+instead returning <code>WORD_WIDTH</code> if the pad width would have been
+zero. This works because a pad is necessarily between 0 and
+<code>WORD_WIDTH-1</code> bits wide. We can then check later and instantiate a
+concatenation with or without a pad:
 
 <pre>
 generate
