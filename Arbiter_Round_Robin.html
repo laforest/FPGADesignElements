@@ -3,7 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Returns a one-hot grant bitmask selected from one of the raised request bits in a word, in round-robin order, going from least-significant (highest priority) to most-significant (lowest priority) bit, and back around.">
+<meta name="description" content="Returns a one-hot grant bitmask selected from one of the raised request bits in a word, in round-robin order, going from least-significant bit (highest priority) to most-significant bit (lowest priority), and back around. *A grant is held until the request is released.*">
 <title>Arbiter Round Robin</title>
 </head>
 <body>
@@ -14,12 +14,27 @@
 
 <h1>A Round-Robin Arbiter</h1>
 <p>Returns a one-hot grant bitmask selected from one of the raised request
- bits in a word, in round-robin order, going from least-significant (highest
- priority) to most-significant (lowest priority) bit, and back around.</p>
+ bits in a word, in round-robin order, going from least-significant bit
+ (highest priority) to most-significant bit (lowest priority), and back
+ around. <em>A grant is held until the request is released.</em></p>
 <p>Unset request bits are skipped, which avoids wasting time. Requests can be
  raised or dropped before their turn comes, but this must be done
- synchronously to the clock. Grants are calculated combinationally from the
- requests.</p>
+ synchronously to the clock. <em>Grants are calculated combinationally from the
+ requests</em>, so pipeline as necessary. If the <code>requests_mask</code> bit
+ corresponding to a <code>requests</code> bit is zero, then that request cannot be
+ granted that cycle. The round-robin always continues from the last granted
+ request, even after an idle period of no requests, unless <code>clear</code> is
+ asserted.</p>
+<h2>Usage</h2>
+<p>A common use-case for an arbiter is to drive a <a href="./Multiplexer_One_Hot.html">one-hot
+ multiplexer</a> to select one of multiple senders
+ requesting for one receiver, or one of multiple receivers requesting from
+ one sender. This arrangement requires that the requestors can raise and
+ hold a <code>requests</code> bit, wait until they receive the correspondig <code>grant</code> bit
+ to begin their transaction, and to drop their <code>requests</code> bit only once they
+ are done.  This is very similar to a ready/valid handshake, except that the
+ transaction cannot be interrupted, else the granted access is lost.</p>
+<h2>Fairness</h2>
 <p>Here, we implement a "mask method" round-robin arbiter, as described in
  Section 4.2.4, Figure 12 of Matt Weber's <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.86.550&amp;rep=rep1&amp;type=pdf">Arbiters: Design Ideas and Coding
  Styles</a>. </p>
@@ -34,14 +49,24 @@
  requestor finishes. Thus, that new request waits less than the others. One
  solution periodically takes a snapshot of the current pending requests, and
  services all of these requests before refreshing the snapshot.</p>
-<p>A common use-case for an arbiter is to drive a <a href="./Multiplexer_One_Hot.html">one-hot
- multiplexer</a> to select one of multiple senders
- requesting for one receiver, or one of multiple receivers requesting from
- one sender. This arrangement requires that the requestors can raise and
- hold a "request" signal, wait until they receive the "grant" signal to
- begin their transaction, and to drop "request" only once they are done.
- This is very similar to a ready/valid handshake, except that the
- transaction cannot be interrupted, else the granted access is lost.</p>
+<h3>Customizations</h3>
+<p>To enable the creation of custom fairness adjustments, the <code>requests_mask</code>
+ input can be used to exclude one or more requests from being granted in the
+ current cycle, and must be updated synchronously to the <code>clock</code>. The
+ <code>requests_mask</code> is arbitrary, and if desired can be calculated from the
+ current <code>requests</code>, the <code>grant_previous</code> one-hot output which always holds
+ the last given grant even if the requests are currently all idle, and the
+ current one-hot <code>grant</code> output.</p>
+<ul>
+<li>Since a grant typically lasts longer than one cycle and won't get granted
+ again for several cycles, taking multiple cycles to compute the next
+ <code>requests_mask</code> is a valid option.</li>
+<li>The <code>requests_mask</code> is applied combinationally to the <code>requests</code> input
+ and to the internal <code>round_robin_mask</code>, both of which have a combinational
+ path to <code>grant</code>, so pipeline as necessary. </li>
+</ul>
+<p>If unused, leave <code>requests_mask</code> set to all-ones, and the masking logic
+ will optimize away.</p>
 
 <pre>
 `default_nettype none
@@ -53,7 +78,10 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
 (
     input   wire                        clock,
     input   wire                        clear,
+
     input   wire    [INPUT_COUNT-1:0]   requests,
+    input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
+    output  wire    [INPUT_COUNT-1:0]   grant_previous,
     output  reg     [INPUT_COUNT-1:0]   grant
 );
 
@@ -102,31 +130,37 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     );
 </pre>
 
-<p>Grant a request in priority order (LSB has higest priority). This is the
- base case which starts the round-robin.</p>
+<p>Grant a request in priority order (LSB has higest priority) after applying
+ <code>requests_mask</code>. This is the base case which starts the round-robin.</p>
 
 <pre>
-    wire [INPUT_COUNT-1:0] grant_raw;
+    reg [INPUT_COUNT-1:0] requests_masked_priority = ZERO;
+
+    always @(*) begin
+        requests_masked_priority = requests & requests_mask;
+    end
+
+    wire [INPUT_COUNT-1:0] grant_priority;
 
     <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     #(
         .INPUT_COUNT (INPUT_COUNT)
     )
-    raw_grants
+    priority_grants
     (
-        .requests   (requests),
-        .grant      (grant_raw)
+        .requests   (requests_masked_priority),
+        .grant      (grant_priority)
     );
 </pre>
 
-<p>Mask-off all requests of equal and higher priority than the request
+<p>Mask-off all requests <em>of equal and higher priority</em> than the request
  currently granted, from the previous cycle. This masking makes the
  round-robin progress towards lower priority requests as the previously
- granted higher priority requests are released. The mask must be inverted
- before use.</p>
+ granted higher priority requests are released. The <code>thermometer_mask</code> must
+ be inverted before use.</p>
 
 <pre>
-    wire [INPUT_COUNT-1:0] mask;
+    wire [INPUT_COUNT-1:0] thermometer_mask;
 
     <a href="./Bitmask_Thermometer_to_Rightmost_1_Bit.html">Bitmask_Thermometer_to_Rightmost_1_Bit</a>
     #(
@@ -135,65 +169,74 @@ module <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
     grant_mask
     (
         .word_in    (grant_previous),
-        .word_out   (mask)
+        .word_out   (thermometer_mask)
     );
-</pre>
 
-<p>The mask includes the currently granted request, from the previous cycle,
- which we don't want to interrupt, so we OR the currently granted request
- bit into the inverted mask to exclude the currently granted request from
- the mask, thus masking off only all higher priority requests, leaving the
- currently granted request as highest priority, <strong>EXCEPT</strong> if we are
- returning from an idle request phase, when we instead zero-out that granted
- request bit, so the round-robin can resume to the next lower priority
- request based on the mask, instead of possibly re-granting the same request
- again.</p>
-
-<pre>
-    reg [INPUT_COUNT-1:0] requests_masked       = ZERO;
-    reg [INPUT_COUNT-1:0] grant_previous_gated  = ZERO;
+    reg [INPUT_COUNT-1:0] round_robin_mask = ZERO;
 
     always @(*) begin
-        grant_previous_gated = (out_from_idle == 1'b1) ? ZERO : grant_previous;
-        requests_masked      = requests & (~mask | grant_previous_gated);
+        round_robin_mask = ~thermometer_mask;
     end
 </pre>
 
-<p>Grant a request in priority order, but from the masked requests, which only
- contain requests of equal or lower priority to the currently granted request.</p>
+<p>The <code>round_robin_mask</code> excludes the currently granted request, which we
+ don't want to interrupt, so we OR the currently granted request bit into
+ the <code>round_robin_mask</code> so we only mask-off all <em>higher</em> priority requests,
+ leaving the currently granted request as highest priority.</p>
+<p><strong>EXCEPTION:</strong> If we are returning from an all-idle request phase, we
+ instead zero-out that granted request bit, so the round-robin can resume to
+ the next lower priority request based on the <code>round_robin_mask</code>, instead of
+ possibly re-granting the same request again.</p>
+<p>The <code>round_robin_mask</code> is further masked, in the same manner, by the
+ <code>requests_mask</code> input, which may prevent the granting of some <code>requests</code> of
+ lower priority after the currently granted request is released.</p>
 
 <pre>
-    wire [INPUT_COUNT-1:0] grant_masked;
+    reg [INPUT_COUNT-1:0] requests_masked_round_robin   = ZERO;
+    reg [INPUT_COUNT-1:0] grant_previous_gated          = ZERO;
+
+    always @(*) begin
+        grant_previous_gated        = (out_from_idle == 1'b1) ? ZERO : grant_previous;
+        requests_masked_round_robin = requests & (round_robin_mask | grant_previous_gated) & (requests_mask | grant_previous_gated);
+    end
+</pre>
+
+<p>Grant a request in priority order, but from the round-robin masked
+ requests, which only contain requests of equal or lower priority to the
+ currently granted request, minus any requests further masked by the
+ <code>requests_mask</code> input.</p>
+
+<pre>
+    wire [INPUT_COUNT-1:0] grant_round_robin;
 
     <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     #(
         .INPUT_COUNT (INPUT_COUNT)
     )
-    masked_grants
+    round_robin_grants
     (
-        .requests   (requests_masked),
-        .grant      (grant_masked)
+        .requests   (requests_masked_round_robin),
+        .grant      (grant_round_robin)
     );
 </pre>
 
-<p>If no granted requests remain after masking, then grant from the unmasked
- requests, which starts over the round-robin granting from the highest (LSB)
- priority. This also resets the mask.</p>
+<p>If no round-robin granted requests remain, then instead grant from the
+ priority requests, which starts over the round-robin at the highest
+ priority (LSB) request.  This also resets <code>round_robin_mask</code>.</p>
 
 <pre>
     always @(*) begin
-        grant = (grant_masked == ZERO) ? grant_raw : grant_masked; 
+        grant = (grant_round_robin == ZERO) ? grant_priority : grant_round_robin; 
     end
 </pre>
 
-<p>Remember the last granted request so we can compute the mask to exclude
- higher priority requests than the last granted request. If all requests go
- idle, don't update, so we can continue the round-robin from where we left
- off when requests appear again.</p>
+<p>Remember the last granted request so we can compute <code>round_robin_mask</code> to
+ exclude higher priority requests than the last granted request. If all
+ requests go idle, don't update, so we can continue the round-robin from
+ where we left off when requests appear again, to avoid starvation of lower
+ priority requests.</p>
 
 <pre>
-    wire [INPUT_COUNT-1:0] grant_previous;
-
     <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (INPUT_COUNT),
