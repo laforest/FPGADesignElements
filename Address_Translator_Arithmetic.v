@@ -62,7 +62,7 @@
 
 module Address_Translator_Arithmetic
 #(
-    parameter       OUTPUT_ADDR_WIDTH   = 0
+    parameter       OUTPUT_ADDR_WIDTH = 0
 )
 (
     input   wire    [OUTPUT_ADDR_WIDTH-1:0] offset,
@@ -78,11 +78,13 @@ module Address_Translator_Arithmetic
     (
         .add_sub    (1'b1),    // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (input_addr),
-        .B_in       (offset),
-        .sum_out    (output_addr),
+        .A          (input_addr),
+        .B          (offset),
+        .sum        (output_addr),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
+        .carry_out  (),
+        .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 

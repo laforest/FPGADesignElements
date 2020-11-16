@@ -101,10 +101,14 @@ module Bitmask_Next_with_Constant_Popcount_ntz
     (
         .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (word_in),
-        .B_in       (smallest),
-        .sum_out    (ripple),
-        .carry_out  (ripple_carry_out)
+        .A          (word_in),
+        .B          (smallest),
+        .sum        (ripple),
+        .carry_out  (ripple_carry_out),
+        // verilator lint_off PINCONNECTEMPTY
+        .carries    (),
+        .overflow   ()
+        // verilator lint_on  PINCONNECTEMPTY
     );
 
 // Compute `x^r`: find the bits which changed after the ripple

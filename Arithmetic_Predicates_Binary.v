@@ -3,7 +3,7 @@
 
 // Given two integers, `A` and `B`, derives all the possible arithmetic
 // predictates (equal, greater-than, less-than-equal, etc...) as both signed
-// and unsigned integers.
+// and unsigned comparisons.
 
 // This code implements "*How the Computer Sets the Comparison Predicates*" in
 // Section 2-12 of Henry S. Warren, Jr.'s [Hacker's
@@ -48,10 +48,11 @@ module Arithmetic_Predicates_Binary
         A_gte_B_signed      = 1'b0;
     end
 
-// First, let's subtract B from A, and get the the carry-out.
+// First, let's subtract B from A, and get the the carry-out and overflow bits.
 
     wire [WORD_WIDTH-1:0]   difference;
     wire                    carry_out;
+    wire                    overflow_signed;
 
     Adder_Subtractor_Binary
     #(
@@ -61,27 +62,14 @@ module Arithmetic_Predicates_Binary
     (
         .add_sub    (1'b1),    // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (A),
-        .B_in       (B),
-        .sum_out    (difference),
-        .carry_out  (carry_out)
-    );
-
-// Then, let's [reconstruct the carry-in](./CarryIn_Binary.html) into the last
-// (most-significant) bit position of the result.
-
-    wire final_carry_in;
-
-    CarryIn_Binary
-    #(
-        .WORD_WIDTH (1)
-    )
-    calc_final_carry_in
-    (
-        .A          (A          [WORD_WIDTH-1]),
-        .B          (B          [WORD_WIDTH-1]),
-        .sum        (difference [WORD_WIDTH-1]),
-        .carryin    (final_carry_in)
+        .A          (A),
+        .B          (B),
+        .sum        (difference),
+        .carry_out  (carry_out),
+        // verilator lint_off PINCONNECTEMPTY
+        .carries    (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .overflow   (overflow_signed)
     );
 
 // We now have enough information to compute all the arithmetic predicates.
@@ -91,12 +79,10 @@ module Arithmetic_Predicates_Binary
 // the sequential evaluation of blocking assignments in a Verilog procedural
 // block to re-use and optimize the logic expressions.
 
-    reg negative        = 1'b0;
-    reg overflow_signed = 1'b0;
+    reg negative = 1'b0;
 
     always @(*) begin
         negative            = (difference[WORD_WIDTH-1] == 1'b1);
-        overflow_signed     = (carry_out != final_carry_in);
         A_eq_B              = (difference == ZERO);
 
         A_lt_B_unsigned     = (carry_out == 1'b0);

@@ -179,6 +179,8 @@ module Pipeline_FIFO_Buffer
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (buffer_write_addr)
     );
@@ -203,6 +205,8 @@ module Pipeline_FIFO_Buffer
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (buffer_read_addr)
     );
@@ -251,6 +255,8 @@ module Pipeline_FIFO_Buffer
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (buffer_data_count)
     );

@@ -85,10 +85,14 @@ module Bitmask_Next_with_Constant_Popcount_pop
     (
         .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (word_in),
-        .B_in       (smallest),
-        .sum_out    (ripple),
-        .carry_out  (ripple_carry_out)
+        .A          (word_in),
+        .B          (smallest),
+        .sum        (ripple),
+        .carry_out  (ripple_carry_out),
+        // verilator lint_off PINCONNECTEMPTY
+        .carries    (),
+        .overflow   ()
+        // verilator lint_on  PINCONNECTEMPTY
     );
 
 // Now we compute the number of bits which changed after the ripple
@@ -149,11 +153,13 @@ module Bitmask_Next_with_Constant_Popcount_pop
     (
         .add_sub    (1'b1), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (changed_bits),
-        .B_in       (distance_adjustment),
-        .sum_out    (adjusted_distance),
+        .A          (changed_bits),
+        .B          (distance_adjustment),
+        .sum        (adjusted_distance),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
+        .carry_out  (),
+        .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 
@@ -198,11 +204,13 @@ module Bitmask_Next_with_Constant_Popcount_pop
     (
         .add_sub    (1'b1), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A_in       (shifted_one),
-        .B_in       (ONE),
-        .sum_out    (lost_ones),
+        .A          (shifted_one),
+        .B          (ONE),
+        .sum        (lost_ones),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out  ()
+        .carry_out  (),
+        .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 

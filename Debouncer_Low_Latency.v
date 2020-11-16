@@ -77,7 +77,7 @@
 
 module Debouncer_Low_Latency
 #(
-    parameter COUNTER_WIDTH     = 32,   // Wide enough to hold largest delay.
+    parameter COUNTER_WIDTH     = 0,    // Wide enough to hold largest delay.
     parameter INITIAL_INPUT     = 1'b0, // 1'b0 or 1'b1. The input rest state.
     parameter EXTRA_CDC_STAGES  = 0     // Must be 0 or greater.
 )
@@ -275,6 +275,8 @@ module Debouncer_Low_Latency
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (count)
     );

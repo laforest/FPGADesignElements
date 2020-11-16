@@ -123,11 +123,13 @@ module Divider_Integer_Signed_by_Powers_of_Two
     (
         .add_sub        (1'b0),    // 0/1 -> A+B/A-B
         .carry_in       (correction),
-        .A_in           (uncorrected_quotient),
-        .B_in           (WORD_ZERO),
-        .sum_out        (quotient),
+        .A              (uncorrected_quotient),
+        .B              (WORD_ZERO),
+        .sum            (quotient),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out      ()
+        .carry_out      (),
+        .carries        (),
+        .overflow       ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 
@@ -145,11 +147,13 @@ module Divider_Integer_Signed_by_Powers_of_Two
     (
         .add_sub        (1'b1),    // 0/1 -> A+B/A-B
         .carry_in       (1'b0),
-        .A_in           (WORD_WIDTH_LONG),
-        .B_in           (exponent_of_two),
-        .sum_out        (remainder_shift_amount),
+        .A              (WORD_WIDTH_LONG),
+        .B              (exponent_of_two),
+        .sum            (remainder_shift_amount),
         // verilator lint_off PINCONNECTEMPTY
-        .carry_out      ()
+        .carry_out      (),
+        .carries        (),
+        .overflow       ()
         // verilator lint_on  PINCONNECTEMPTY
     );
 

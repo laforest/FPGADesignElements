@@ -3,7 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="This counter counts by the `INCREMENT` parameter value, up or down, when `run` is high.  Set `up_down` to 0 to count up, or to 1 to count down. Load overrides counting, so you can load a `load_count` value even if `run` is low.  `clear` puts the counter back at INITIAL_COUNT.  The counter will wrap around if it goes below zero or above (2^WORD_WIDTH)-1.">
+<meta name="description" content="This counter counts by the `INCREMENT` parameter value, up or down, when `run` is high.  Set `up_down` to 0 to count up, or to 1 to count down. Load overrides counting, so you can load a `load_count` value even if `run` is low.  `clear` puts the counter back at INITIAL_COUNT.  The counter will wrap around if it goes below zero or above `(2^WORD_WIDTH)-1` and set `overflow` for that cycle.">
 <title>Counter Binary</title>
 </head>
 <body>
@@ -17,14 +17,16 @@
  <code>run</code> is high.  Set <code>up_down</code> to 0 to count up, or to 1 to count down.
  Load overrides counting, so you can load a <code>load_count</code> value even if <code>run</code>
  is low.  <code>clear</code> puts the counter back at INITIAL_COUNT.  The counter will
- wrap around if it goes below zero or above (2^WORD_WIDTH)-1.</p>
+ wrap around if it goes below zero or above <code>(2^WORD_WIDTH)-1</code> and set
+ <code>overflow</code> for that cycle.</p>
 <p>The <code>INCREMENT</code> parameter allows you to deal with situations where, for
  example, you need to count the number of bytes transferred, but your
  interface transfers multiple bytes per cycle.</p>
 <p>When chaining counters, which may happen if you are counting in unusual
  bases where each digit has its own counter, AND the <code>carry_out</code> of the
  previous counter with the signal fed to the <code>run</code> input of the next
- counter. The <code>carry_in</code> is kept for generality.</p>
+ counter. The <code>carry_in</code> is kept for generality, as are the <code>carries</code> into
+ each bit.</p>
 
 <pre>
 `default_nettype none
@@ -38,16 +40,22 @@ module <a href="./Counter_Binary.html">Counter_Binary</a>
 (
     input   wire                        clock,
     input   wire                        clear,
+
     input   wire                        up_down, // 0/1 --> up/down
     input   wire                        run,
+
     input   wire                        load,
     input   wire    [WORD_WIDTH-1:0]    load_count,
+
     input   wire                        carry_in,
     output  wire                        carry_out,
+    output  wire    [WORD_WIDTH-1:0]    carries,
+    output  wire                        overflow,
+
     output  wire    [WORD_WIDTH-1:0]    count
 );
 
-    localparam ZERO = {WORD_WIDTH{1'b0}};
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 </pre>
 
 <p>First we calculate the next counter value using a <a href="./Adder_Subtractor_Binary.html">Binary
@@ -58,6 +66,9 @@ module <a href="./Counter_Binary.html">Counter_Binary</a>
 
 <pre>
     wire [WORD_WIDTH-1:0] incremented_count;
+    wire                  carry_out_internal;
+    wire [WORD_WIDTH-1:0] carries_internal;
+    wire                  overflow_internal;
 
     <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
@@ -67,26 +78,34 @@ module <a href="./Counter_Binary.html">Counter_Binary</a>
     (
         .add_sub    (up_down), // 0/1 -> A+B/A-B
         .carry_in   (carry_in),
-        .A_in       (count),
-        .B_in       (INCREMENT),
-        .sum_out    (incremented_count),
-        .carry_out  (carry_out)
+        .A          (count),
+        .B          (INCREMENT),
+        .sum        (incremented_count),
+        .carry_out  (carry_out_internal),
+        .carries    (carries_internal),
+        .overflow   (overflow_internal)
     );
 </pre>
 
 <p>Then calculate which value to load into the counter, and when.</p>
 
 <pre>
-    reg [WORD_WIDTH-1:0]    next_count      = ZERO;
-    reg                     clock_enable    = 0;
+    reg [WORD_WIDTH-1:0]    next_count      = WORD_ZERO;
+    reg                     load_counter    = 0;
+    reg                     clear_counter   = 0;
+    reg                     load_flags      = 0;
+    reg                     clear_flags     = 0;
 
     always @(*) begin
-        next_count      = (load == 1'b1) ? load_count : incremented_count;
-        clock_enable    = (run == 1'b1) || (load == 1'b1);
+        next_count      = (load  == 1'b1) ? load_count : incremented_count;
+        load_counter    = (run   == 1'b1) || (load == 1'b1);
+        clear_counter   = (clear == 1'b1);
+        load_flags      = (run   == 1'b1);
+        clear_flags     = (load  == 1'b1) || (clear == 1'b1);
     end
 </pre>
 
-<p>Finally, store the next count value, using a <a href="./Register.html">Register</a>.</p>
+<p>Finally, store the next count value and flags, using a <a href="./Register.html">Register</a>.</p>
 
 <pre>
     <a href="./Register.html">Register</a>
@@ -94,13 +113,55 @@ module <a href="./Counter_Binary.html">Counter_Binary</a>
         .WORD_WIDTH     (WORD_WIDTH),
         .RESET_VALUE    (INITIAL_COUNT)
     )
-    Counter
+    count_storage
     (
         .clock          (clock),
-        .clock_enable   (clock_enable),
-        .clear          (clear),
+        .clock_enable   (load_counter),
+        .clear          (clear_counter),
         .data_in        (next_count),
         .data_out       (count)
+    );
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .RESET_VALUE    (WORD_ZERO)
+    )
+    carries_storage
+    (
+        .clock          (clock),
+        .clock_enable   (load_flags),
+        .clear          (clear_flags),
+        .data_in        (carries_internal),
+        .data_out       (carries)
+    );
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    carry_out_storage
+    (
+        .clock          (clock),
+        .clock_enable   (load_flags),
+        .clear          (clear_flags),
+        .data_in        (carry_out_internal),
+        .data_out       (carry_out)
+    );
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    overflow_storage
+    (
+        .clock          (clock),
+        .clock_enable   (load_flags),
+        .clear          (clear_flags),
+        .data_in        (overflow_internal),
+        .data_out       (overflow)
     );
 
 endmodule

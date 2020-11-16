@@ -54,9 +54,9 @@
 
 module CDC_FIFO_Buffer
 #(
-    parameter WORD_WIDTH        = 32,
-    parameter DEPTH             = 512,
-    parameter RAMSTYLE          = "M10K",
+    parameter WORD_WIDTH        = 0,
+    parameter DEPTH             = 0,
+    parameter RAMSTYLE          = "",
     parameter CDC_EXTRA_STAGES  = 0
 )
 (
@@ -190,6 +190,8 @@ module CDC_FIFO_Buffer
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (buffer_write_addr)
     );
@@ -214,6 +216,8 @@ module CDC_FIFO_Buffer
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (buffer_read_addr)
     );

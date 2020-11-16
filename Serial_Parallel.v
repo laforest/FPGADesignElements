@@ -75,6 +75,8 @@ module Serial_Parallel
         .carry_in       (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out      (),
+        .carries        (),
+        .overflow       (),
         // verilator lint_on  PINCONNECTEMPTY
         .count          (count)
     );
