@@ -21,8 +21,8 @@
  phase of the <code>duty_cycle_out</code> output.  However, <code>finish</code> can be looped back
  to <code>start</code>, or <code>start</code> can be tied high, to generate a continuous waveform
  with a duty cycle and frequency determined by the <code>high_cycles</code> and
- <code>low_cycles</code> counts. The cycle count for one phase is loaded during the
- last cycle of the previous phase.</p>
+ <code>low_cycles</code> counts. <em>The cycle count for one phase is loaded during the
+ last cycle of the previous phase.</em></p>
 <p>Which phase comes first is set by the <code>first_phase</code> input. A value of <code>1</code>
  means the high phase comes first. Note that <code>first_phase</code> is only read at
  <code>start</code>.</p>

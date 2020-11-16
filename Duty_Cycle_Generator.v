@@ -9,8 +9,8 @@
 // phase of the `duty_cycle_out` output.  However, `finish` can be looped back
 // to `start`, or `start` can be tied high, to generate a continuous waveform
 // with a duty cycle and frequency determined by the `high_cycles` and
-// `low_cycles` counts. The cycle count for one phase is loaded during the
-// last cycle of the previous phase.
+// `low_cycles` counts. *The cycle count for one phase is loaded during the
+// last cycle of the previous phase.*
 
 // Which phase comes first is set by the `first_phase` input. A value of `1`
 // means the high phase comes first. Note that `first_phase` is only read at
