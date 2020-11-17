@@ -1,0 +1,47 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Given a number (bit width, word count, etc...) and a multiple, returns the number of bits/words/etc... padded upwards to the next multiple, if necessary.">
+<title>adjust to multiple function</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./adjust_to_multiple_function.vh">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Adjust a number to the next higher given multiple, if not already an exact multiple.</h1>
+<p>Given a number (bit width, word count, etc...) and a multiple, returns the
+ number of bits/words/etc... padded upwards to the next multiple, if
+ necessary.</p>
+<p>This function is useful when you must have things exist as an exact multiple
+ of some minimum size, such as fitting large bit vectors into multiple
+ machine words, or chunks of data into structures of a given size.  Use the
+ <a href="./word_pad_function.html">Word Pad</a> function to calculate the width of the
+ padding, if any.</p>
+<p>Pass the function values which, at elaboration time, are either constants
+ or expressions which evaluate to a constant. Then use the return value as an
+ integer for a localparam, genvar, etc...</p>
+
+<pre>
+function integer adjust_to_multiple;
+    input integer count;
+    input integer multiple;
+          integer remainder;
+          integer pad;
+    begin
+        remainder = count % multiple;
+        pad = (remainder > 0) ? multiple - remainder : 0;
+        adjust_to_multiple = count + pad;
+    end
+endfunction
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
