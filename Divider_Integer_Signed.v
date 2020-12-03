@@ -51,29 +51,58 @@ module Divider_Integer_Signed
 
 // Define constants to keep the intent clear.
 
-    localparam WORD_ZERO_SHORT  = {WORD_WIDTH-1{1'b0}};
     localparam WORD_ZERO        = {WORD_WIDTH{1'b0}};
     localparam WORD_ONE         = {{WORD_WIDTH-1{1'b0}},1'b1};
     localparam WORD_ONES        = {WORD_WIDTH{1'b1}};
+
+// We have to internally compute with one extra bit of range to allow the
+// minimum signed number to be expressible as an unsigned number. Else, we
+// cannot subtract any multiple of itself from it (e.g. -8/1 needs to add +8
+// to the remainder to reach "1 rem 0", and with the minimum number of bits
+// (4), we can only represent up to +7)
+
+    localparam WORD_WIDTH_LONG  = WORD_WIDTH + 1;
+
+    localparam WORD_ZERO_LONG   = {WORD_WIDTH_LONG{1'b0}};
+    localparam WORD_ONE_LONG    = {{WORD_WIDTH_LONG-1{1'b0}},1'b1};
+    localparam WORD_ONES_LONG   = {WORD_WIDTH_LONG{1'b1}};
 
     localparam ADD              = 1'b0;
     localparam SUB              = 1'b1;
     localparam POSITIVE         = 1'b0;
     localparam NEGATIVE         = 1'b1;
 
-// Each division takes WORD_WIDTH steps: 1 load, then WORD_WIDTH-1 division
-// steps.
+// Each division takes WORD_WIDTH+2 steps: 1 load, then WORD_WIDTH_LONG
+// division steps. So we set up a counter which goes from WORD_WIDTH_LONG-1 to
+// zero.
 
     `include "clog2_function.vh"
 
-    localparam STEPS_WIDTH      = clog2(WORD_WIDTH);
-    localparam STEPS_INITIAL    = WORD_WIDTH - 1;
+    localparam STEPS_WIDTH      = clog2(WORD_WIDTH_LONG);
+    localparam STEPS_INITIAL    = WORD_WIDTH_LONG - 1;
     localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
     localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
 
 //## Data Path
 
 //### Divisor and Remainder Increment
+
+    wire [WORD_WIDTH_LONG-1:0] divisor_long;
+
+    Width_Adjuster
+    #(
+        .WORD_WIDTH_IN  (WORD_WIDTH),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH_LONG)
+    )
+    divisor_extend
+    (
+        // It's possible some input bits are truncated away
+        // verilator lint_off UNUSED
+        .original_input     (divisor),
+        // verilator lint_on  UNUSED
+        .adjusted_output    (divisor_long)
+    );
 
 // Extract the initial sign of the divisor.
 
@@ -82,7 +111,7 @@ module Divider_Integer_Signed
     wire divisor_sign;
 
     always @(*) begin
-        divisor_msb = divisor [WORD_WIDTH-1];
+        divisor_msb = divisor_long [WORD_WIDTH_LONG-1];
     end
 
     Register
@@ -105,7 +134,7 @@ module Divider_Integer_Signed
     reg divide_by_zero_load = 1'b0;
 
     always @(*) begin
-        divisor_is_zero = (divisor == WORD_ZERO);
+        divisor_is_zero = (divisor_long == WORD_ZERO_LONG);
     end
 
     Register
@@ -122,19 +151,19 @@ module Divider_Integer_Signed
         .data_out       (divide_by_zero)
     );
 
-// Store the divisor aside and shift it's LSB into the MSB of the
+// Store the divisor aside and shift its LSB into the MSB of the
 // remainder_increment at each division step. The initial load does the first
 // shift implicitly.
 
-    reg                     divisor_enable = 1'b0;
-    reg                     divisor_load   = 1'b0;
-    reg  [WORD_WIDTH-1:0]   divisor_selected = WORD_ZERO;
-    wire [WORD_WIDTH-1:0]   divisor_shifted;
+    reg                         divisor_enable = 1'b0;
+    reg                         divisor_load   = 1'b0;
+    reg  [WORD_WIDTH_LONG-1:0]  divisor_selected = WORD_ZERO_LONG;
+    wire [WORD_WIDTH_LONG-1:0]  divisor_shifted;
 
     Register
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .RESET_VALUE    (WORD_ZERO)
+        .WORD_WIDTH     (WORD_WIDTH_LONG),
+        .RESET_VALUE    (WORD_ZERO_LONG)
     )
     divisor_storage
     (
@@ -146,20 +175,20 @@ module Divider_Integer_Signed
     );
 
     always @(*) begin
-        divisor_selected = (divisor_load == 1'b1) ? {divisor_msb, divisor [WORD_WIDTH-1:1]} : {divisor_shifted [WORD_WIDTH-1], divisor_shifted [WORD_WIDTH-1:1]};
+        divisor_selected = (divisor_load == 1'b1) ? {divisor_msb, divisor_long [WORD_WIDTH_LONG-1:1]} : {divisor_shifted [WORD_WIDTH_LONG-1], divisor_shifted [WORD_WIDTH_LONG-1:1]};
     end
 
 // Remainder Increment
 
-    reg                     remainder_increment_load        = 1'b0;
-    reg                     remainder_increment_enable      = 1'b0;
-    reg  [WORD_WIDTH-1:0]   remainder_increment_selected    = WORD_ZERO;
-    wire [WORD_WIDTH-1:0]   remainder_increment;
+    reg                         remainder_increment_load        = 1'b0;
+    reg                         remainder_increment_enable      = 1'b0;
+    reg  [WORD_WIDTH_LONG-1:0]  remainder_increment_selected    = WORD_ZERO_LONG;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_increment;
 
     Register
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .RESET_VALUE    (WORD_ZERO)
+        .WORD_WIDTH     (WORD_WIDTH_LONG),
+        .RESET_VALUE    (WORD_ZERO_LONG)
     )
     remainder_increment_storage
     (
@@ -171,7 +200,7 @@ module Divider_Integer_Signed
     );
 
     always @(*) begin
-        remainder_increment_selected = (remainder_increment_load == 1'b1) ? {divisor [0], WORD_ZERO_SHORT} : {divisor_shifted [0], remainder_increment [WORD_WIDTH-1:1]};
+        remainder_increment_selected = (remainder_increment_load == 1'b1) ? {divisor_long [0], WORD_ZERO} : {divisor_shifted [0], remainder_increment [WORD_WIDTH_LONG-1:1]};
     end
 
 // Now, depending on the divisor sign, check the contents of divisor to see if
@@ -185,12 +214,29 @@ module Divider_Integer_Signed
     reg remainder_increment_valid = 1'b0;
 
     always @(*) begin
-        remainder_increment_sign  = remainder_increment [WORD_WIDTH-1];
-        divisor_all_sign_bits    = (divisor_sign == POSITIVE) ? (divisor_shifted == WORD_ZERO) : (divisor_shifted == WORD_ONES);
+        remainder_increment_sign  = remainder_increment [WORD_WIDTH_LONG-1];
+        divisor_all_sign_bits    = (divisor_sign == POSITIVE) ? (divisor_shifted == WORD_ZERO_LONG) : (divisor_shifted == WORD_ONES_LONG);
         remainder_increment_valid = (remainder_increment_sign == divisor_sign) && (divisor_all_sign_bits == 1'b1);
     end
 
 //### Dividend and Remainder
+
+    wire [WORD_WIDTH_LONG-1:0] dividend_long;
+
+    Width_Adjuster
+    #(
+        .WORD_WIDTH_IN  (WORD_WIDTH),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH_LONG)
+    )
+    dividend_extend
+    (
+        // It's possible some input bits are truncated away
+        // verilator lint_off UNUSED
+        .original_input     (dividend),
+        // verilator lint_on  UNUSED
+        .adjusted_output    (dividend_long)
+    );
 
 // Extract the initial sign of the dividend.
 
@@ -207,7 +253,7 @@ module Divider_Integer_Signed
         .clock          (clock),
         .clock_enable   (dividend_sign_load),
         .clear          (clear),
-        .data_in        (dividend [WORD_WIDTH-1]),
+        .data_in        (dividend_long [WORD_WIDTH_LONG-1]),
         .data_out       (dividend_sign)
     );
 
@@ -215,15 +261,16 @@ module Divider_Integer_Signed
 // division. We repeatedly add/subtract the remainder_increment unless the
 // remainder would become too small and flip its sign.
 
-    reg                     remainder_enable    = 1'b0;
-    reg                     remainder_load      = 1'b0;
-    reg  [WORD_WIDTH-1:0]   remainder_selected  = WORD_ZERO;
-    wire [WORD_WIDTH-1:0]   remainder_next;
+    reg                         remainder_enable    = 1'b0;
+    reg                         remainder_load      = 1'b0;
+    reg  [WORD_WIDTH_LONG-1:0]  remainder_selected  = WORD_ZERO_LONG;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_next;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_long;
 
     Register
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .RESET_VALUE    (WORD_ZERO)
+        .WORD_WIDTH     (WORD_WIDTH_LONG),
+        .RESET_VALUE    (WORD_ZERO_LONG)
     )
     remainder_storage
     (
@@ -231,11 +278,11 @@ module Divider_Integer_Signed
         .clock_enable   (remainder_enable),
         .clear          (clear),
         .data_in        (remainder_selected),
-        .data_out       (remainder)
+        .data_out       (remainder_long)
     );
 
     always @(*) begin
-        remainder_selected = (remainder_load == 1'b1) ? dividend : remainder_next;    
+        remainder_selected = (remainder_load == 1'b1) ? dividend_long : remainder_next;    
     end
 
 // Then apply the remainder_increment
@@ -250,13 +297,13 @@ module Divider_Integer_Signed
 
     Adder_Subtractor_Binary
     #(
-        .WORD_WIDTH (WORD_WIDTH)
+        .WORD_WIDTH (WORD_WIDTH_LONG)
     )
     remainder_calc
     (
         .add_sub    (remainder_add_sub), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A          (remainder),
+        .A          (remainder_long),
         .B          (remainder_increment),
         .sum        (remainder_next),
         // verilator lint_off PINCONNECTEMPTY
@@ -273,8 +320,23 @@ module Divider_Integer_Signed
     reg remainder_overshoot = 1'b0;
 
     always @(*) begin
-        remainder_overshoot = ((dividend_sign != remainder_next [WORD_WIDTH-1]) || (remainder_next_overflow == 1'b1)) && (remainder_next != WORD_ZERO);
+        remainder_overshoot = ((dividend_sign != remainder_next [WORD_WIDTH_LONG-1]) || (remainder_next_overflow == 1'b1)) && (remainder_next != WORD_ZERO_LONG);
     end
+
+    Width_Adjuster
+    #(
+        .WORD_WIDTH_IN  (WORD_WIDTH_LONG),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH)
+    )
+    remainder_shorten
+    (
+        // It's possible some input bits are truncated away
+        // verilator lint_off UNUSED
+        .original_input     (remainder_long),
+        // verilator lint_on  UNUSED
+        .adjusted_output    (remainder)
+    );
 
 
 //### Quotient
@@ -284,17 +346,17 @@ module Divider_Integer_Signed
 // 1 each calculation step, so we increment by decreasing multiples of 2 at
 // each division step.
 
-    reg                     quotient_increment_enable   = 1'b0;
-    reg                     quotient_increment_load     = 1'b0;
-    wire [WORD_WIDTH-1:0]   quotient_increment_reversed;
-    wire [WORD_WIDTH-1:0]   quotient_increment;
+    reg                         quotient_increment_enable   = 1'b0;
+    reg                         quotient_increment_load     = 1'b0;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_increment_reversed;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_increment;
 
     Register_Pipeline
     #(
         .WORD_WIDTH     (1),
-        .PIPE_DEPTH     (WORD_WIDTH),
+        .PIPE_DEPTH     (WORD_WIDTH_LONG),
         // concatenation of each stage initial/reset value
-        .RESET_VALUES   (WORD_ZERO)
+        .RESET_VALUES   (WORD_ZERO_LONG)
     )
     quotient_increment_storage
     (
@@ -302,7 +364,7 @@ module Divider_Integer_Signed
         .clock_enable   (quotient_increment_enable),
         .clear          (clear),
         .parallel_load  (quotient_increment_load),
-        .parallel_in    (WORD_ONE),
+        .parallel_in    (WORD_ONE_LONG),
         .parallel_out   (quotient_increment_reversed),
         .pipe_in        (1'b0),
         // verilator lint_off PINCONNECTEMPTY
@@ -316,7 +378,7 @@ module Divider_Integer_Signed
     Word_Reverser
     #(
         .WORD_WIDTH (1),
-        .WORD_COUNT (WORD_WIDTH)
+        .WORD_COUNT (WORD_WIDTH_LONG)
     )
     quotient_increment_shift_direction
     (
@@ -333,14 +395,15 @@ module Divider_Integer_Signed
         quotient_add_sub = (divisor_sign != dividend_sign) ? SUB : ADD;
     end
 
-    reg quotient_enable     = 1'b0;
-    reg quotient_clear      = 1'b0;
+    reg                         quotient_enable = 1'b0;
+    reg                         quotient_clear  = 1'b0;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_long;
 
     Accumulator_Binary
     #(
         .EXTRA_PIPE_STAGES  (0),
-        .WORD_WIDTH         (WORD_WIDTH),
-        .INITIAL_VALUE      (WORD_ZERO)
+        .WORD_WIDTH         (WORD_WIDTH_LONG),
+        .INITIAL_VALUE      (WORD_ZERO_LONG)
     )
     quotient_storage
     (
@@ -361,14 +424,14 @@ module Divider_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
 
 
-        .load_value         (WORD_ZERO),
+        .load_value         (WORD_ZERO_LONG),
         .load_valid         (1'b0),
         // verilator lint_off PINCONNECTEMPTY
         .load_done          (),
         // verilator lint_on  PINCONNECTEMPTY
 
 
-        .accumulated_value                  (quotient),
+        .accumulated_value                  (quotient_long),
         // verilator lint_off PINCONNECTEMPTY
         .accumulated_value_carry_out        (),
         .accumulated_value_carries          (),
@@ -376,6 +439,22 @@ module Divider_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
 
     );
+
+    Width_Adjuster
+    #(
+        .WORD_WIDTH_IN  (WORD_WIDTH_LONG),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH)
+    )
+    quotient_shorten
+    (
+        // It's possible some input bits are truncated away
+        // verilator lint_off UNUSED
+        .original_input     (quotient_long),
+        // verilator lint_on  UNUSED
+        .adjusted_output    (quotient)
+    );
+
 
 //## Control Path
 
