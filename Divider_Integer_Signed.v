@@ -262,9 +262,7 @@ module Divider_Integer_Signed
 // remainder would become too small and flip its sign.
 
     reg                         remainder_enable    = 1'b0;
-    reg                         remainder_load      = 1'b0;
     reg  [WORD_WIDTH_LONG-1:0]  remainder_selected  = WORD_ZERO_LONG;
-    wire [WORD_WIDTH_LONG-1:0]  remainder_next;
     wire [WORD_WIDTH_LONG-1:0]  remainder_long;
 
     Register
@@ -281,37 +279,63 @@ module Divider_Integer_Signed
         .data_out       (remainder_long)
     );
 
+    reg [WORD_WIDTH_LONG-1:0] remainder_next = WORD_ZERO_LONG;
+    reg remainder_load = 1'b0;
+
     always @(*) begin
         remainder_selected = (remainder_load == 1'b1) ? dividend_long : remainder_next;    
     end
 
 // Then apply the remainder_increment
 
-    reg remainder_add_sub = 1'b0;
-
-    always @(*) begin
-        remainder_add_sub = (divisor_sign != dividend_sign) ? ADD : SUB;
-    end
-
-    wire remainder_next_overflow;
+    wire [WORD_WIDTH_LONG-1:0] remainder_next_add;
+    wire remainder_next_overflow_add;
 
     Adder_Subtractor_Binary
     #(
         .WORD_WIDTH (WORD_WIDTH_LONG)
     )
-    remainder_calc
+    remainder_add
     (
-        .add_sub    (remainder_add_sub), // 0/1 -> A+B/A-B
+        .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
         .A          (remainder_long),
         .B          (remainder_increment),
-        .sum        (remainder_next),
+        .sum        (remainder_next_add),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out  (),
         .carries    (),
         // verilator lint_on  PINCONNECTEMPTY
-        .overflow   (remainder_next_overflow)
+        .overflow   (remainder_next_overflow_add)
     );
+
+    wire [WORD_WIDTH_LONG-1:0] remainder_next_sub;
+    wire remainder_next_overflow_sub;
+
+    Adder_Subtractor_Binary
+    #(
+        .WORD_WIDTH (WORD_WIDTH_LONG)
+    )
+    remainder_sub
+    (
+        .add_sub    (1'b1), // 0/1 -> A+B/A-B
+        .carry_in   (1'b0),
+        .A          (remainder_long),
+        .B          (remainder_increment),
+        .sum        (remainder_next_sub),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out  (),
+        .carries    (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .overflow   (remainder_next_overflow_sub)
+    );
+
+    reg remainder_next_overflow = 1'b0;
+
+    always @(*) begin
+        remainder_next          = (divisor_sign != dividend_sign) ? remainder_next_add          : remainder_next_sub;
+        remainder_next_overflow = (divisor_sign != dividend_sign) ? remainder_next_overflow_add : remainder_next_overflow_sub;
+    end
 
 // If the next division step would overshoot past zero and change the sign of
 // the remainder, meaning too much was added/subtracted, then this division
@@ -320,7 +344,7 @@ module Divider_Integer_Signed
     reg remainder_overshoot = 1'b0;
 
     always @(*) begin
-        remainder_overshoot = ((dividend_sign != remainder_next [WORD_WIDTH_LONG-1]) || (remainder_next_overflow == 1'b1)) && (remainder_next != WORD_ZERO_LONG);
+        remainder_overshoot = ((dividend_sign != remainder_next [WORD_WIDTH_LONG-1])) && (remainder_next != WORD_ZERO_LONG);
     end
 
     Width_Adjuster
