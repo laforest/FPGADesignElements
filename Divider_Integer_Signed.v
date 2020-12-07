@@ -123,7 +123,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (divisor_sign_load),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (divisor_msb),
         .data_out       (divisor_sign)
     );
@@ -146,7 +146,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (divide_by_zero_load),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (divisor_is_zero),
         .data_out       (divide_by_zero)
     );
@@ -169,7 +169,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (divisor_enable),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (divisor_selected),
         .data_out       (divisor_shifted)
     );
@@ -194,7 +194,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (remainder_increment_enable),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (remainder_increment_selected),
         .data_out       (remainder_increment)
     );
@@ -252,7 +252,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (dividend_sign_load),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (dividend_long [WORD_WIDTH_LONG-1]),
         .data_out       (dividend_sign)
     );
@@ -274,7 +274,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (remainder_enable),
-        .clear          (clear),
+        .clear          (1'b0),
         .data_in        (remainder_selected),
         .data_out       (remainder_long)
     );
@@ -289,7 +289,6 @@ module Divider_Integer_Signed
 // Then apply the remainder_increment
 
     wire [WORD_WIDTH_LONG-1:0] remainder_next_add;
-    wire remainder_next_overflow_add;
 
     Adder_Subtractor_Binary
     #(
@@ -305,12 +304,11 @@ module Divider_Integer_Signed
         // verilator lint_off PINCONNECTEMPTY
         .carry_out  (),
         .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
-        .overflow   (remainder_next_overflow_add)
     );
 
     wire [WORD_WIDTH_LONG-1:0] remainder_next_sub;
-    wire remainder_next_overflow_sub;
 
     Adder_Subtractor_Binary
     #(
@@ -326,15 +324,12 @@ module Divider_Integer_Signed
         // verilator lint_off PINCONNECTEMPTY
         .carry_out  (),
         .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
-        .overflow   (remainder_next_overflow_sub)
     );
 
-    reg remainder_next_overflow = 1'b0;
-
     always @(*) begin
-        remainder_next          = (divisor_sign != dividend_sign) ? remainder_next_add          : remainder_next_sub;
-        remainder_next_overflow = (divisor_sign != dividend_sign) ? remainder_next_overflow_add : remainder_next_overflow_sub;
+        remainder_next = (divisor_sign != dividend_sign) ? remainder_next_add : remainder_next_sub;
     end
 
 // If the next division step would overshoot past zero and change the sign of
@@ -344,7 +339,7 @@ module Divider_Integer_Signed
     reg remainder_overshoot = 1'b0;
 
     always @(*) begin
-        remainder_overshoot = ((dividend_sign != remainder_next [WORD_WIDTH_LONG-1])) && (remainder_next != WORD_ZERO_LONG);
+        remainder_overshoot = (dividend_sign != remainder_next [WORD_WIDTH_LONG-1]) && (remainder_next != WORD_ZERO_LONG);
     end
 
     Width_Adjuster
@@ -386,7 +381,7 @@ module Divider_Integer_Signed
     (
         .clock          (clock),
         .clock_enable   (quotient_increment_enable),
-        .clear          (clear),
+        .clear          (1'b0),
         .parallel_load  (quotient_increment_load),
         .parallel_in    (WORD_ONE_LONG),
         .parallel_out   (quotient_increment_reversed),
@@ -488,10 +483,9 @@ module Divider_Integer_Signed
 // -> DONE -> LOAD`. We don't handle the fourth, impossible case.
 
     localparam                      STATE_WIDTH     = 2;
-    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 'b00;
-    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 'b01;
-    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 'b10;
-    localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 'b11; // Never reached
+    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 'd0;
+    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 'd1;
+    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 'd2;
 
 // The running state bits, from which we derive the control outputs and the
 // internal control signals.
@@ -592,7 +586,7 @@ module Divider_Integer_Signed
 // Control the calculation step counter
 
     always @(*) begin
-        calculation_step_clear = (load_inputs == 1'b1) || (clear == 1'b1);
+        calculation_step_clear = (load_inputs == 1'b1);
         calculation_step_do    = (calculating == 1'b1);
     end
 
@@ -620,8 +614,8 @@ module Divider_Integer_Signed
     always @(*) begin
         quotient_increment_load   = (load_inputs == 1'b1);
         quotient_increment_enable = (load_inputs == 1'b1) || (calculating == 1'b1);
-        quotient_clear            = (load_inputs == 1'b1) || (clear == 1'b1);
-        quotient_enable           = (load_inputs == 1'b1) || (clear == 1'b1) || (calculation_step_valid == 1'b1);
+        quotient_clear            = (load_inputs == 1'b1);
+        quotient_enable           = (load_inputs == 1'b1) || (calculation_step_valid == 1'b1);
     end
 
 endmodule
