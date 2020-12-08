@@ -213,20 +213,53 @@ module Divider_Integer_Signed
         remainder_increment_selected = (remainder_increment_load == 1'b1) ? {divisor_long [0], WORD_ZERO} : {divisor_shifted [0], remainder_increment [WORD_WIDTH_LONG-1:1]};
     end
 
+// Let's pipeline this, to see...
+
+    reg remainder_increment_sign  = 1'b0;
+
+    always @(*) begin
+        remainder_increment_sign  = remainder_increment [WORD_WIDTH_LONG-1];
+    end
+
+    localparam DIV_REM_PIPE_WIDTH = WORD_WIDTH_LONG + 1;
+    localparam DIV_REM_PIPE_ZERO  = {DIV_REM_PIPE_WIDTH*PIPELINE_STAGES{1'b0}};
+
+    wire [WORD_WIDTH_LONG-1:0] divisor_shifted_pipelined;
+    wire                       remainder_increment_sign_pipelined;
+
+    Register_Pipeline
+    #(
+        .WORD_WIDTH     (DIV_REM_PIPE_WIDTH),
+        .PIPE_DEPTH     (PIPELINE_STAGES),
+        // concatenation of each stage initial/reset value
+        .RESET_VALUES   (DIV_REM_PIPE_ZERO)
+    )
+    instance_name
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (1'b0),
+        .parallel_load  (1'b0),
+        .parallel_in    (DIV_REM_PIPE_ZERO),
+        // verilator lint_off PINCONNECTEMPTY
+        .parallel_out   (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pipe_in        ({divisor_shifted,           remainder_increment_sign}),
+        .pipe_out       ({divisor_shifted_pipelined, remainder_increment_sign_pipelined})
+    );
+
 // Now, depending on the divisor sign, check the contents of divisor to see if
 // there are still non-sign bits in it, which means the remainder_increment is
 // invalid, and if the sign of the remainder_increment does not match the sign
 // of the divisor, which means we haven't yet shifted enough bits into the
 // remainder_increment to make it a valid number.
 
-    reg remainder_increment_sign  = 1'b0;
     reg divisor_all_sign_bits     = 1'b0;
     reg remainder_increment_valid = 1'b0;
 
     always @(*) begin
-        remainder_increment_sign  = remainder_increment [WORD_WIDTH_LONG-1];
-        divisor_all_sign_bits    = (divisor_sign == POSITIVE) ? (divisor_shifted == WORD_ZERO_LONG) : (divisor_shifted == WORD_ONES_LONG);
-        remainder_increment_valid = (remainder_increment_sign == divisor_sign) && (divisor_all_sign_bits == 1'b1);
+        divisor_all_sign_bits    = (divisor_sign == POSITIVE) ? (divisor_shifted_pipelined == WORD_ZERO_LONG) : (divisor_shifted_pipelined == WORD_ONES_LONG);
+        remainder_increment_valid = (remainder_increment_sign_pipelined == divisor_sign) && (divisor_all_sign_bits == 1'b1);
     end
 
 //### Dividend and Remainder
