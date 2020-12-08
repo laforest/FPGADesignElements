@@ -22,7 +22,8 @@
 
 module Divider_Integer_Signed
 #(
-    parameter WORD_WIDTH = 32
+    parameter WORD_WIDTH        = 8,
+    parameter PIPELINE_STAGES   = 2
 )
 (
     input  wire                         clock,
@@ -67,14 +68,22 @@ module Divider_Integer_Signed
     localparam WORD_ONE_LONG    = {{WORD_WIDTH_LONG-1{1'b0}},1'b1};
     localparam WORD_ONES_LONG   = {WORD_WIDTH_LONG{1'b1}};
 
+// For the register pipelines
+
+    localparam WORD_WIDTH_PIPE = WORD_WIDTH_LONG * PIPELINE_STAGES;
+    localparam WORD_ZERO_PIPE  = {WORD_WIDTH_PIPE{1'b0}};
+
+// Misc.
+
     localparam ADD              = 1'b0;
     localparam SUB              = 1'b1;
     localparam POSITIVE         = 1'b0;
     localparam NEGATIVE         = 1'b1;
 
-// Each division takes WORD_WIDTH+2 steps: 1 load, then WORD_WIDTH_LONG
-// division steps. So we set up a counter which goes from WORD_WIDTH_LONG-1 to
-// zero.
+// Each division takes (WORD_WIDTH*PIPELINE_STAGES)+2 steps: 1 load, then
+// WORD_WIDTH_LONG division steps, each taking PIPELINE_STAGES cycles, and one
+// cycle to read out. So we set up a counter which goes from WORD_WIDTH_LONG-1
+// to zero. The PIPELINE_STAGES will be tracked with a simple pulse delay.
 
     `include "clog2_function.vh"
 
@@ -128,7 +137,8 @@ module Divider_Integer_Signed
         .data_out       (divisor_sign)
     );
 
-// And report if we tried to divide by zero.
+// And report if we tried to divide by zero. Unlike the quotient/remainder,
+// this signal is always immediately valid.
 
     reg divisor_is_zero     = 1'b0;
     reg divide_by_zero_load = 1'b0;
@@ -279,62 +289,108 @@ module Divider_Integer_Signed
         .data_out       (remainder_long)
     );
 
-    reg [WORD_WIDTH_LONG-1:0] remainder_next = WORD_ZERO_LONG;
-    reg remainder_load = 1'b0;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_next;
+    reg                         remainder_load = 1'b0;
 
     always @(*) begin
         remainder_selected = (remainder_load == 1'b1) ? dividend_long : remainder_next;    
     end
 
-// Then apply the remainder_increment
+// Decide how we compute the remainder_next
 
-    wire [WORD_WIDTH_LONG-1:0] remainder_next_add;
-
-    Adder_Subtractor_Binary
-    #(
-        .WORD_WIDTH (WORD_WIDTH_LONG)
-    )
-    remainder_add
-    (
-        .add_sub    (1'b0), // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A          (remainder_long),
-        .B          (remainder_increment),
-        .sum        (remainder_next_add),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out  (),
-        .carries    (),
-        .overflow   ()
-        // verilator lint_on  PINCONNECTEMPTY
-    );
-
-    wire [WORD_WIDTH_LONG-1:0] remainder_next_sub;
-
-    Adder_Subtractor_Binary
-    #(
-        .WORD_WIDTH (WORD_WIDTH_LONG)
-    )
-    remainder_sub
-    (
-        .add_sub    (1'b1), // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A          (remainder_long),
-        .B          (remainder_increment),
-        .sum        (remainder_next_sub),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out  (),
-        .carries    (),
-        .overflow   ()
-        // verilator lint_on  PINCONNECTEMPTY
-    );
+    reg remainder_add_sub = 1'b0;
 
     always @(*) begin
-        remainder_next = (divisor_sign != dividend_sign) ? remainder_next_add : remainder_next_sub;
+        remainder_add_sub = (divisor_sign != dividend_sign) ? ADD : SUB;
     end
+
+// Pipeline the inputs to the Adder_Subtractor_Binary. We expect these
+// registers to forward-retime into the adder logic at least. Calculating
+// remainder_next and making decisions based on its value is the main critical
+// path of the whole design. 
+
+// Also carry a pulse along the pipeline to signal
+// when a calculation starts and ends.
+
+    localparam PIPE_WIDTH_REMAINDER = 1 + WORD_WIDTH_LONG + WORD_WIDTH_LONG;
+    localparam PIPE_WIDTH_REMAINDER_ZERO = {PIPE_WIDTH_REMAINDER*PIPELINE_STAGES{1'b0}};
+
+    wire                        remainder_add_sub_pipelined;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_long_pipelined;
+    wire [WORD_WIDTH_LONG-1:0]  remainder_increment_pipelined;
+
+    Register_Pipeline
+    #(
+        .WORD_WIDTH     (PIPE_WIDTH_REMAINDER),
+        .PIPE_DEPTH     (PIPELINE_STAGES),
+        // concatenation of each stage initial/reset value
+        .RESET_VALUES   (PIPE_WIDTH_REMAINDER_ZERO)
+    )
+    remainder_calc_pipeline
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (1'b0),
+        .parallel_load  (1'b0),
+        .parallel_in    (PIPE_WIDTH_REMAINDER_ZERO),
+        // verilator lint_off PINCONNECTEMPTY
+        .parallel_out   (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pipe_in        ({remainder_add_sub,           remainder_long,           remainder_increment}),
+        .pipe_out       ({remainder_add_sub_pipelined, remainder_long_pipelined, remainder_increment_pipelined})
+    );
+
+    localparam PIPELINE_STAGES_CALC         = PIPELINE_STAGES + 1;
+    localparam PIPELINE_STAGES_CALC_ZERO    = {PIPELINE_STAGES_CALC{1'b0}};
+
+    reg                         remainder_calc_start = 1'b0;
+    wire                        remainder_calc_end;
+
+    Register_Pipeline
+    #(
+        .WORD_WIDTH     (1),
+        .PIPE_DEPTH     (PIPELINE_STAGES_CALC),
+        // concatenation of each stage initial/reset value
+        .RESET_VALUES   (PIPELINE_STAGES_CALC_ZERO)
+    )
+    calc_pipeline
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (1'b0),
+        .parallel_load  (1'b0),
+        .parallel_in    (PIPELINE_STAGES_CALC_ZERO),
+        // verilator lint_off PINCONNECTEMPTY
+        .parallel_out   (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .pipe_in        (remainder_calc_start),
+        .pipe_out       (remainder_calc_end)
+    );
+
+// Then apply the remainder_increment
+
+    Adder_Subtractor_Binary
+    #(
+        .WORD_WIDTH (WORD_WIDTH_LONG)
+    )
+    remainder_calc
+    (
+        .add_sub    (remainder_add_sub_pipelined), // 0/1 -> A+B/A-B
+        .carry_in   (1'b0),
+        .A          (remainder_long_pipelined),
+        .B          (remainder_increment_pipelined),
+        .sum        (remainder_next),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out  (),
+        .carries    (),
+        .overflow   ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
 
 // If the next division step would overshoot past zero and change the sign of
 // the remainder, meaning too much was added/subtracted, then this division
-// step does nothing.
+// step does nothing. Landing on zero is the special case when the remainder
+// starts negative.
 
     reg remainder_overshoot = 1'b0;
 
@@ -358,7 +414,7 @@ module Divider_Integer_Signed
     );
 
 
-//### Quotient
+//### Quotient Increment
 
 // The quotient increment which is added/subtracted to/from the quotient each
 // time we could remove the divisor from the remainder.  Shift it right by
@@ -405,6 +461,8 @@ module Divider_Integer_Signed
         .words_out  (quotient_increment)
     );
 
+//### Quotient
+
 // Accumulate the quotient_increment into the quotient at each valid division
 // step.
 
@@ -415,48 +473,79 @@ module Divider_Integer_Signed
     end
 
     reg                         quotient_enable = 1'b0;
-    reg                         quotient_clear  = 1'b0;
+    reg  [WORD_WIDTH_LONG-1:0]  quotient_selected = WORD_ZERO_LONG;
     wire [WORD_WIDTH_LONG-1:0]  quotient_long;
 
-    Accumulator_Binary
+    Register
     #(
-        .EXTRA_PIPE_STAGES  (0),
-        .WORD_WIDTH         (WORD_WIDTH_LONG),
-        .INITIAL_VALUE      (WORD_ZERO_LONG)
+        .WORD_WIDTH     (WORD_WIDTH_LONG),
+        .RESET_VALUE    (WORD_ZERO_LONG)
     )
     quotient_storage
     (
-        .clock              (clock),
-        .clock_enable       (quotient_enable),
+        .clock          (clock),
+        .clock_enable   (quotient_enable),
+        .clear          (1'b0),
+        .data_in        (quotient_selected),
+        .data_out       (quotient_long)
+    );
 
-        .clear              (quotient_clear),
+    reg                         quotient_load = 1'b0;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_next;
+
+    always @(*) begin
+        quotient_selected = (quotient_load == 1'b1) ? WORD_ZERO_LONG : quotient_next;    
+    end
+
+// Pipeline the inputs to the Adder_Subtractor_Binary. We expect these
+// registers to forward-retime into the adder logic at least. 
+
+    localparam PIPE_WIDTH_QUOTIENT      = 1 + WORD_WIDTH_LONG + WORD_WIDTH_LONG;
+    localparam PIPE_WIDTH_QUOTIENT_ZERO = {PIPE_WIDTH_QUOTIENT*PIPELINE_STAGES{1'b0}};
+
+    wire                        quotient_add_sub_pipelined;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_long_pipelined;
+    wire [WORD_WIDTH_LONG-1:0]  quotient_increment_pipelined;
+
+    Register_Pipeline
+    #(
+        .WORD_WIDTH     (PIPE_WIDTH_QUOTIENT),
+        .PIPE_DEPTH     (PIPELINE_STAGES),
+        // concatenation of each stage initial/reset value
+        .RESET_VALUES   (PIPE_WIDTH_QUOTIENT_ZERO)
+    )
+    quotient_calc_pipeline
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (1'b0),
+        .parallel_load  (1'b0),
+        .parallel_in    (PIPE_WIDTH_QUOTIENT_ZERO),
         // verilator lint_off PINCONNECTEMPTY
-        .clear_done         (),
+        .parallel_out   (),
         // verilator lint_on  PINCONNECTEMPTY
+        .pipe_in        ({quotient_add_sub,           quotient_long,           quotient_increment}),
+        .pipe_out       ({quotient_add_sub_pipelined, quotient_long_pipelined, quotient_increment_pipelined})
+    );
 
-        .increment_carry_in (1'b0),
-        .increment_add_sub  (quotient_add_sub), // 0/1 --> +/-
-        .increment_value    (quotient_increment),
-        .increment_valid    (1'b1),
+// Then apply the quotient_increment
+
+    Adder_Subtractor_Binary
+    #(
+        .WORD_WIDTH (WORD_WIDTH_LONG)
+    )
+    quotient_calc
+    (
+        .add_sub    (quotient_add_sub_pipelined), // 0/1 -> A+B/A-B
+        .carry_in   (1'b0),
+        .A          (quotient_long_pipelined),
+        .B          (quotient_increment_pipelined),
+        .sum        (quotient_next),
         // verilator lint_off PINCONNECTEMPTY
-        .increment_done     (),
+        .carry_out  (),
+        .carries    (),
+        .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
-
-
-        .load_value         (WORD_ZERO_LONG),
-        .load_valid         (1'b0),
-        // verilator lint_off PINCONNECTEMPTY
-        .load_done          (),
-        // verilator lint_on  PINCONNECTEMPTY
-
-
-        .accumulated_value                  (quotient_long),
-        // verilator lint_off PINCONNECTEMPTY
-        .accumulated_value_carry_out        (),
-        .accumulated_value_carries          (),
-        .accumulated_value_signed_overflow  ()
-        // verilator lint_on  PINCONNECTEMPTY
-
     );
 
     Width_Adjuster
@@ -483,9 +572,10 @@ module Divider_Integer_Signed
 // -> DONE -> LOAD`. We don't handle the fourth, impossible case.
 
     localparam                      STATE_WIDTH     = 2;
-    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 'd0;
-    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 'd1;
-    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 'd2;
+    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 'b00;
+    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 'b01;
+    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 'b10;
+    localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 'b11; // Never reached.
 
 // The running state bits, from which we derive the control outputs and the
 // internal control signals.
@@ -564,7 +654,7 @@ module Divider_Integer_Signed
         load_inputs       = (in_ready  == 1'b1) && (in_valid  == 1'b1);
         read_outputs      = (out_valid == 1'b1) && (out_ready == 1'b1);
         calculating       = (state == STATE_CALC);
-        last_calculation  = (state == STATE_CALC) && (calculation_step == STEPS_ZERO);
+        last_calculation  = (state == STATE_CALC) && (calculation_step == STEPS_ZERO) && (remainder_calc_end == 1'b1);
     end
 
 // Define the running state machine transitions. There is no handling of erroneous states.
@@ -580,14 +670,35 @@ module Divider_Integer_Signed
     reg calculation_step_valid = 1'b0;
 
     always @(*) begin
-        calculation_step_valid = (remainder_overshoot == 1'b0) && (remainder_increment_valid == 1'b1) && (calculating == 1'b1);
+        calculation_step_valid = (remainder_overshoot == 1'b0) && (remainder_increment_valid == 1'b1) && (remainder_calc_end == 1'b1);
+    end
+
+// Start and stop the pipelined calculations by sending/blocking a pulse that
+// circulates along the pipeline until the last division step.
+
+    wire division_step_pulse;
+
+    Pulse_Generator
+    division_step
+    (
+        .clock              (clock),
+        .level_in           (calculating),
+        .pulse_posedge_out  (division_step_pulse),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+
+    always @(*) begin
+        remainder_calc_start = (division_step_pulse == 1'b1) || ((remainder_calc_end == 1'b1) && (last_calculation == 1'b0));
     end
 
 // Control the calculation step counter
 
     always @(*) begin
-        calculation_step_clear = (load_inputs == 1'b1);
-        calculation_step_do    = (calculating == 1'b1);
+        calculation_step_clear = (load_inputs        == 1'b1);
+        calculation_step_do    = (remainder_calc_end == 1'b1);
     end
 
 // Control the divisor and remainder increment.
@@ -595,7 +706,7 @@ module Divider_Integer_Signed
     always @(*) begin
         divide_by_zero_load         = (load_inputs    == 1'b1);
         divisor_load                = (load_inputs    == 1'b1);
-        divisor_enable              = (load_inputs    == 1'b1) || (calculating == 1'b1);
+        divisor_enable              = (load_inputs    == 1'b1) || (remainder_calc_end == 1'b1);
         divisor_sign_load           = (load_inputs    == 1'b1);
         remainder_increment_load    = (divisor_load   == 1'b1);
         remainder_increment_enable  = (divisor_enable == 1'b1);
@@ -613,8 +724,8 @@ module Divider_Integer_Signed
 
     always @(*) begin
         quotient_increment_load   = (load_inputs == 1'b1);
-        quotient_increment_enable = (load_inputs == 1'b1) || (calculating == 1'b1);
-        quotient_clear            = (load_inputs == 1'b1);
+        quotient_increment_enable = (load_inputs == 1'b1) || (remainder_calc_end == 1'b1);
+        quotient_load             = (load_inputs == 1'b1);
         quotient_enable           = (load_inputs == 1'b1) || (calculation_step_valid == 1'b1);
     end
 
