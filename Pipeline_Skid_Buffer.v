@@ -5,7 +5,8 @@
 // transfers without a combinational path between input and output, thus
 // pipelining the path.
 
-// A skid buffer is the smallest FIFO, with only two entries.  It is useful
+// A skid buffer is the smallest [Pipeline FIFO
+// Buffer](./Pipeline_FIFO_Buffer.html), with only two entries.  It is useful
 // when you need to pipeline the path between a sender and a receiver for
 // concurrency and/or timing, but not to smooth-out data rate mismatches.  It
 // also only requires two data registers, which at this scale is smaller than

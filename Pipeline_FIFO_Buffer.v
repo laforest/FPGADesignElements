@@ -7,6 +7,11 @@
 // input to output is 2 clock cycles. *Any FIFO depth is allowed, not only
 // powers-of-2.* Raising `clear` will return the FIFO to the empty state.
 
+// **NOTE**: This module is not suitable for pipelining long combinational
+// paths since it depends on a central buffer. If you need to pipeline a path
+// to improve timing rather than concurrency, use a [Skid Buffer
+// Pipeline](./Skid_Buffer_Pipeline.html) instead.
+
 // Since a FIFO buffer stores variable amounts of data, it will smooth out
 // irregularities in the transfer rates of the input and output interfaces,
 // and when used in pipeline loops, can store enough data to prevent

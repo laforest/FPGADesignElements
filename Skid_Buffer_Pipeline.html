@@ -1,0 +1,145 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Pipelines the path of a ready/valid handshake with zero or more [Skid Buffers](./Pipeline_Skid_Buffer.html) to control the propagation delay and increase the possible clock frequency. The latency from input to output is `PIPE_DEPTH` cycles. This module is a variation of the [Simple Register Pipeline](./Register_Pipeline_Simple.html).">
+<title>Skid Buffer Pipeline</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Skid_Buffer_Pipeline.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Skid Buffer Pipeline</h1>
+<p>Pipelines the path of a ready/valid handshake with zero or more <a href="./Pipeline_Skid_Buffer.html">Skid
+ Buffers</a> to control the propagation delay and
+ increase the possible clock frequency. The latency from input to output is
+ <code>PIPE_DEPTH</code> cycles. This module is a variation of the <a href="./Register_Pipeline_Simple.html">Simple Register
+ Pipeline</a>.</p>
+<p>Unlike a <a href="./Pipeline_FIFO_Buffer.html">Pipeline FIFO Buffer</a>, a Skid Buffer
+ Pipeline will not improve concurrency by absorbing any irregularities in
+ the transfer rates of the input and output interfaces: if one interface
+ stalls, the other interface will eventually see that stall.</p>
+<p><code>clear</code> sets all registers to zero. If <code>PIPE_DEPTH</code> is zero, the input
+ handshake ports becomes directly wired to the output handshake ports and no
+ logic is inferred.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Skid_Buffer_Pipeline.html">Skid_Buffer_Pipeline</a>
+#(
+    parameter WORD_WIDTH =  0,
+    parameter PIPE_DEPTH = -1
+)
+(
+    // If PIPE_DEPTH is zero, these are unused
+    // verilator lint_off UNUSED
+    input   wire                        clock,
+    input   wire                        clear,
+    // verilator lint_on  UNUSED
+    input   wire                        input_valid,
+    output  wire                        input_ready,
+    input   wire    [WORD_WIDTH-1:0]    input_data,
+
+    output  reg                         output_valid,
+    input   wire                        output_ready,
+    output  reg     [WORD_WIDTH-1:0]    output_data
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        output_valid = 1'b0;
+        output_data  = WORD_ZERO;
+    end
+
+    genvar i;
+    generate
+        if (PIPE_DEPTH == 0) begin
+            assign input_ready  = output_ready;
+            always @(*) begin
+                output_valid = input_valid;
+                output_data  = input_data;
+            end
+        end
+        else if (PIPE_DEPTH > 0) begin
+</pre>
+
+<p>We strip out first iteration of Skid Buffer instantiations to avoid having
+ to refer to index -1 in the generate loop, and also to connect to the input
+ handshake ports rather than the output of a previous Skid Buffer.</p>
+
+<pre>
+            wire                  valid_pipe [PIPE_DEPTH-1:0];
+            wire                  ready_pipe [PIPE_DEPTH-1:0];
+            wire [WORD_WIDTH-1:0] data_pipe  [PIPE_DEPTH-1:0];
+
+            <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
+            #(
+                .WORD_WIDTH     (WORD_WIDTH)
+            )
+            input_stage
+            (
+                .clock          (clock),
+                .clear          (clear),
+
+                .input_valid    (input_valid),
+                .input_ready    (input_ready),
+                .input_data     (input_data),
+
+                .output_valid   (valid_pipe[0]),
+                .output_ready   (ready_pipe[0]),
+                .output_data    (data_pipe [0])
+            );
+</pre>
+
+<p>Now repeat over the remainder of the pipeline stages, starting at stage 1,
+ connecting each pipeline stage to the output of the previous pipeline
+ stage.</p>
+
+<pre>
+            for (i=1; i < PIPE_DEPTH; i=i+1) begin: pipe_stages
+                <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH)
+                )
+                pipe_stage
+                (
+                    .clock          (clock),
+                    .clear          (clear),
+
+                    .input_valid    (valid_pipe[i-1]),
+                    .input_ready    (ready_pipe[i-1]),
+                    .input_data     (data_pipe [i-1]),
+
+                    .output_valid   (valid_pipe[i]),
+                    .output_ready   (ready_pipe[i]),
+                    .output_data    (data_pipe [i])
+                );
+            end
+</pre>
+
+<p>And finally, connect the output handshake ports of the last Skid Buffer to
+ the module output handshake ports.</p>
+
+<pre>
+            assign ready_pipe [PIPE_DEPTH-1] = output_ready;
+            always @(*) begin
+                output_valid = valid_pipe[PIPE_DEPTH-1];
+                output_data  = data_pipe [PIPE_DEPTH-1];
+            end
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

@@ -18,6 +18,10 @@
  pipelining the path to improve concurrency and/or timing. The latency from
  input to output is 2 clock cycles. <em>Any FIFO depth is allowed, not only
  powers-of-2.</em> Raising <code>clear</code> will return the FIFO to the empty state.</p>
+<p><strong>NOTE</strong>: This module is not suitable for pipelining long combinational
+ paths since it depends on a central buffer. If you need to pipeline a path
+ to improve timing rather than concurrency, use a <a href="./Skid_Buffer_Pipeline.html">Skid Buffer
+ Pipeline</a> instead.</p>
 <p>Since a FIFO buffer stores variable amounts of data, it will smooth out
  irregularities in the transfer rates of the input and output interfaces,
  and when used in pipeline loops, can store enough data to prevent
