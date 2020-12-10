@@ -1,0 +1,124 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Pipelines data words through a number of register stages. Common uses include pipeline alignment, and pipelining inputs so the registers can retime forward into logic to allow a faster clock.">
+<title>Register Pipeline Simple</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Register_Pipeline_Simple.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Register Pipeline (Simple)</h1>
+<p>Pipelines data words through a number of register stages. Common uses
+ include pipeline alignment, and pipelining inputs so the registers can
+ retime forward into logic to allow a faster clock.</p>
+<p>This module is a simplification of the <a href="./Register_Pipeline.html">Register
+ Pipeline</a>, which allows parallel input/output and
+ initial values other than zero, but does not support a <code>PIPE_DEPTH</code> of
+ zero.</p>
+<p>Each cycle <code>clock_enable</code> is high, the pipeline shifts by one from
+ <code>pipe_in</code> towards <code>pipe_out</code>. <code>clear</code> sets all registers to zero. If
+ <code>PIPE_DEPTH</code> is zero, <code>pipe_in</code> becomes directly wired to <code>pipe_out</code> and no
+ logic is inferred.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Register_Pipeline_Simple.html">Register_Pipeline_Simple</a>
+#(
+    parameter WORD_WIDTH =  0,
+    parameter PIPE_DEPTH = -1
+)
+(
+    // If PIPE_DEPTH is zero, these are unused
+    // verilator lint_off UNUSED
+    input   wire                        clock,
+    input   wire                        clock_enable,
+    input   wire                        clear,
+    // verilator lint_on  UNUSED
+    input   wire    [WORD_WIDTH-1:0]    pipe_in,
+    output  reg     [WORD_WIDTH-1:0]    pipe_out
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        pipe_out = WORD_ZERO;
+    end
+
+    genvar i;
+    generate
+        if (PIPE_DEPTH == 0) begin
+            always @(*) begin
+                pipe_out = pipe_in;
+            end
+        end
+        else if (PIPE_DEPTH > 0) begin
+</pre>
+
+<p>We strip out first iteration of Register instantiations to avoid having to
+ refer to index -1 in the generate loop, and also to connect to <code>pipe_in</code>
+ rather than the output of a previous register.</p>
+
+<pre>
+            wire [WORD_WIDTH-1:0] pipe [PIPE_DEPTH-1:0];
+
+            <a href="./Register.html">Register</a>
+            #(
+                .WORD_WIDTH     (WORD_WIDTH),
+                .RESET_VALUE    (WORD_ZERO)
+            )
+            input_stage
+            (
+                .clock          (clock),
+                .clock_enable   (clock_enable),
+                .clear          (clear),
+                .data_in        (pipe_in),
+                .data_out       (pipe[0])
+            );
+</pre>
+
+<p>Now repeat over the remainder of the pipeline stages, starting at stage 1,
+ connecting each pipeline stage to the output of the previous pipeline
+ stage.</p>
+
+<pre>
+            for (i=1; i < PIPE_DEPTH; i=i+1) begin: pipe_stages
+                <a href="./Register.html">Register</a>
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH),
+                    .RESET_VALUE    (WORD_ZERO)
+                )
+                pipe_stage
+                (
+                    .clock          (clock),
+                    .clock_enable   (clock_enable),
+                    .clear          (clear),
+                    .data_in        (pipe[i-1]),
+                    .data_out       (pipe[i])
+                );
+            end
+</pre>
+
+<p>And finally, connect the output of the last register to the module pipe output.</p>
+
+<pre>
+            always @(*) begin
+                pipe_out = pipe[PIPE_DEPTH-1];
+            end
+        end
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

@@ -11,6 +11,11 @@
 // MSB, or loads a new set of parallel values. **Load overrides shift**.
 // `pipe_in` feeds the LSB, and `pipe_out` read from the MSB.
 
+// **NOTE**: `PIPE_DEPTH` must be 1 or greater.  (*Supporting a depth of zero
+// would make this code far too messy and leave the parallel input/output
+// ports unconnected, which will raise CAD warnings. See the [Simple Register
+// Pipeline](./Register_Pipeline_Simple.html) instead.*)
+
 // Depending on how you parameterize and use it, a register pipeline can act
 // as a delay pipeline or a shift register:
 
@@ -23,11 +28,12 @@
 // `PIPE_DEPTH` bits through `pipe_in`, then read the data word on
 // `parallel_out`.
 
-// If no parallel loads are required, hardwire `parallel_load` to zero, and the
-// multiplexers will optimize away, if any, and you'll end up with a pure
-// shift register. Conversely, hardwire `parallel_load` to one, and tie off
-// the `pipe_in` input, and you'll end up with a conveniently packaged bank
-// of registers.
+// If no parallel loads are required, hardwire `parallel_load` to zero, and
+// the multiplexers will optimize away, if any, and you'll end up with a pure
+// shift register (but see the [Simple Register
+// Pipeline](./Register_Pipeline_Simple.html) if this is your main use-case).
+// Conversely, hardwire `parallel_load` to one, and tie off the `pipe_in`
+// input, and you'll end up with a conveniently packaged bank of registers.
 
 // The `RESET_VALUES` parameter allows each pipeline stage to start loaded
 // with a known initial value, which can simplify system startup. The pipeline
@@ -58,6 +64,12 @@ module Register_Pipeline
     input   wire    [WORD_WIDTH-1:0]    pipe_in,
     output  reg     [WORD_WIDTH-1:0]    pipe_out
 );
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        pipe_out = WORD_ZERO;
+    end
 
 // Each pipeline state is composed of a Multiplexer feeding a Register, so we
 // can select either the output of the previous Register, or the parallel load
