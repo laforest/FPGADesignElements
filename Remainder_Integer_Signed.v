@@ -237,17 +237,27 @@ module Remainder_Integer_Signed
 // Split out the remainder for eventual output (last `WORD_WIDTH` bits) and
 // the current remainder for calculation (first `WORD_WIDTH` bits).
 
-    reg [WORD_WIDTH-1:0] remainder_current = WORD_ZERO;
+    reg [WORD_WIDTH-1:0] remainder_current      = WORD_ZERO;
+    reg                  remainder_current_sign = 1'b0;
 
     always @(*) begin
-        remainder_current = remainder_internal [0 +: WORD_WIDTH];
-        remainder         = remainder_internal [1 +: WORD_WIDTH];
+        remainder_current       = remainder_internal [0 +: WORD_WIDTH];
+        remainder_current_sign  = remainder_current  [WORD_WIDTH-1];
+        remainder               = remainder_internal [1 +: WORD_WIDTH];
     end
+
+// Set the add/sub operation based on the relative signs of the remainder
+// (which initially sign-extends the dividend) and of the divisor.  If the
+// sign of the remainder changes, then the operation reverses, so as to change
+// direction back towards zero on the number line. EXCEPTION: if the sign
+// change is because the remainder went from negative to zero, then we have
+// already converged, so don't alter the operation, so later steps would
+// overshoot and thus be skipped.
 
     reg remainder_add_sub = ADD;
 
     always @(*) begin
-        remainder_add_sub = (dividend_sign == divisor_sign) ? SUB : ADD;
+        remainder_add_sub = (remainder_current_sign == divisor_sign) ? SUB : ADD;
     end
 
 // Compute the new remainder: new_remainder = `remainder_current` +/-
@@ -299,9 +309,8 @@ module Remainder_Integer_Signed
 // Otherwise this calculation step is OK, and we update the remainder.
 // EXCEPTION: If the new remainder is zero, then a sign change is OK.
 
-    reg remainder_current_sign  = 1'b0;
     reg remainder_new_sign      = 1'b0;
-
+ 
     always @(*) begin
         remainder_current_sign  = remainder_current [WORD_WIDTH-1];
         remainder_new_sign      = remainder_new     [WORD_WIDTH-1];
