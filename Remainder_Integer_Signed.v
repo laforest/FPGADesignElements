@@ -181,7 +181,6 @@ module Remainder_Integer_Signed
     reg                         remainder_enable    = 1'b0;
     reg                         remainder_load      = 1'b0;
     reg  [REMAINDER_WIDTH-1:0]  remainder_next      = REMAINDER_ZERO;
-    reg  [WORD_WIDTH-1:0]       remainder_calc      = WORD_ZERO;
     wire [REMAINDER_WIDTH-1:0]  remainder_loaded;
 
     Register_Pipeline
@@ -205,36 +204,42 @@ module Remainder_Integer_Signed
     );
 
     always @(*) begin
-        remainder_calc = remainder_loaded [0 +: WORD_WIDTH];
-        remainder      = remainder_loaded [1 +: WORD_WIDTH];
+        remainder = remainder_loaded [1 +: WORD_WIDTH];
     end
 
 // Now, run all stored data through a pipeline. We expect forward register
 // retiming to push the pipeline registers, if any, through the following
 // arithmetic and bit-reduction logic to reduce the critical path delay.
 
-    localparam REMAINDER_CALC_WIDTH = WORD_WIDTH + WORD_WIDTH + WORD_WIDTH;
+    localparam PIPELINE_WIDTH = WORD_WIDTH + REMAINDER_WIDTH + WORD_WIDTH;
 
-    wire [WORD_WIDTH-1:0]   dividend_loaded_pipelined;
-    wire [WORD_WIDTH-1:0]   remainder_calc_pipelined;
-    wire [WORD_WIDTH-1:0]   divisor_loaded_pipelined;
+    wire [WORD_WIDTH-1:0]       dividend_loaded_pipelined;
+    wire [REMAINDER_WIDTH-1:0]  remainder_loaded_pipelined;
+    wire [WORD_WIDTH-1:0]       divisor_loaded_pipelined;
 
     Register_Pipeline_Simple
     #(
-        .WORD_WIDTH (REMAINDER_CALC_WIDTH),
+        .WORD_WIDTH (PIPELINE_WIDTH),
         .PIPE_DEPTH (PIPELINE_STAGES)
     )
-    input_data_pipeline
+    calculation_pipeline
     (
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (1'b0),
-        .pipe_in        ({dividend_loaded,           remainder_calc,           divisor_loaded}),
-        .pipe_out       ({dividend_loaded_pipelined, remainder_calc_pipelined, divisor_loaded_pipelined})
+        .pipe_in        ({dividend_loaded,           remainder_loaded,           divisor_loaded}),
+        .pipe_out       ({dividend_loaded_pipelined, remainder_loaded_pipelined, divisor_loaded_pipelined})
     );
 
-// Compute the new remainder: new_remainder = `remainder_current` +/-
-// `divisor_loaded`.
+    reg [WORD_WIDTH-1:0] remainder_calc_pipelined   = WORD_ZERO;
+    //reg [WORD_WIDTH-1:0] remainder_output_pipelined = WORD_ZERO;
+
+    always @(*) begin
+        remainder_calc_pipelined   = remainder_loaded_pipelined [0 +: WORD_WIDTH];
+        //remainder_output_pipelined = remainder_loaded_pipelined [1 +: WORD_WIDTH];
+    end
+
+// Compute the new remainder: remainder_new = remainder_calc +/- divisor.
 
     reg divisor_loaded_pipelined_sign = 1'b0;
     reg remainder_calc_pipelined_sign = 1'b0;
@@ -266,21 +271,20 @@ module Remainder_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
     );
 
+    reg dividend_msb        = 1'b0;
+    reg remainder_new_sign  = 1'b0;
+
+    always @(*) begin
+        dividend_msb       = dividend_loaded_pipelined [WORD_WIDTH-1];
+        remainder_new_sign = remainder_new [WORD_WIDTH-1];
+        remainder_next     = (remainder_new_sign == remainder_calc_pipelined_sign) || (remainder_new == WORD_ZERO) ? {remainder_new, dividend_msb} : {remainder_calc_pipelined, dividend_msb};
+    end
+
 // When the dividend is all zero, then we have used up all the information in
 // it, and the current division step is the last one, giving us the final
 // remainder.
 
-    reg dividend_msb = 1'b0;
-
     always @(*) begin
-        dividend_msb   = dividend_loaded_pipelined [WORD_WIDTH-1];
-        remainder_next = {remainder_new, dividend_msb};
-    end
-
-    reg dividend_empty  = 1'b0;
-
-    always @(*) begin
-        dividend_empty = (dividend_loaded_pipelined == WORD_ZERO);
         dividend_next  = (dividend_loaded_pipelined << 1);
     end
 
@@ -289,6 +293,15 @@ module Remainder_Integer_Signed
     end
 
 //## Control Path
+
+// Each calculation takes `WORD_WIDTH` steps, from `WORD_WIDTH-1` to `0`, plus
+// one step to initially load the dividend and divisor. Thus, we need
+// a counter of the correct width.
+
+    localparam STEPS_WIDTH      = clog2(WORD_WIDTH);
+    localparam STEPS_INITIAL    = WORD_WIDTH - 1;
+    localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
+    localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
 
 // We need a pipelining counter so we save the result of a division step only
 // once the calculation has propagated through the whole pipeline.  Since the
@@ -334,6 +347,40 @@ module Remainder_Integer_Signed
         .data_in        (state_next),
         .data_out       (state)
     );
+
+// Count down WORD_WIDTH-1 calculation steps. Stops at zero, and reloads when
+// leaving STATE_LOAD.
+
+    reg                     calculation_step_clear  = 1'b0;
+    reg                     calculation_step_do     = 1'b0;
+    wire [STEPS_WIDTH-1:0]  calculation_step;
+
+    Counter_Binary
+    #(
+        .WORD_WIDTH     (STEPS_WIDTH),
+        .INCREMENT      (STEPS_ONE),
+        .INITIAL_COUNT  (STEPS_INITIAL [STEPS_WIDTH-1:0])
+    )
+    calculation_steps
+    (
+        .clock          (clock),
+        .clear          (calculation_step_clear),
+
+        .up_down        (1'b1),         // 0/1 -> up/down
+        .run            (calculation_step_do),
+
+        .load           (1'b0),
+        .load_count     (STEPS_ZERO),
+
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (calculation_step)
+    );
+
 
 // Count down PIPELINE_STAGES steps for each division step.
 
@@ -394,7 +441,7 @@ module Remainder_Integer_Signed
         read_control      = (control_valid == 1'b1) && (control_ready == 1'b1);
         calculating       = (state == STATE_CALC);
         step_done         = (read_control == 1'b1);
-        last_calculation  = (read_control == 1'b1) && (dividend_empty == 1'b1);
+        last_calculation  = (read_control == 1'b1) && (calculation_step == STEPS_ZERO);
     end
 
 // Define the running state machine transitions. There is no handling of erroneous states.
@@ -403,6 +450,13 @@ module Remainder_Integer_Signed
         state_next = (load_inputs       == 1'b1) ? STATE_CALC : state;
         state_next = (last_calculation  == 1'b1) ? STATE_DONE : state_next;
         state_next = (read_outputs      == 1'b1) ? STATE_LOAD : state_next;
+    end
+
+// Control the calculation step counter
+
+    always @(*) begin
+        calculation_step_clear = (load_inputs == 1'b1);
+        calculation_step_do    = (step_done   == 1'b1);
     end
 
 // Control the pipeline step counter
