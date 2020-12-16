@@ -79,7 +79,8 @@ module Remainder_Integer_Signed
     
     output reg                      control_valid,
     input  wire                     control_ready,
-    output reg                      step_ok
+    output reg                      add_sub,
+    output reg                      last_calculation
 );
 
     `include "clog2_function.vh"
@@ -87,27 +88,30 @@ module Remainder_Integer_Signed
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 
     initial begin
-        input_ready     = 1'b0;
-        output_valid    = 1'b0;
-        remainder       = WORD_ZERO;
-        divide_by_zero  = 1'b0;
-        control_valid   = 1'b0;
-        step_ok         = 1'b0;
+        input_ready      = 1'b0;
+        output_valid     = 1'b0;
+        remainder        = WORD_ZERO;
+        divide_by_zero   = 1'b0;
+        control_valid    = 1'b0;
+        add_sub          = 1'b0;
+        last_calculation = 1'b0;
     end
 
 // We need one extra bit in the remainder since the shift left always happens,
 // so the final result is shifted by one and we don't want to lose the MSB.
 // The correct subsets of this wider register are extracted further down.
 
-    localparam REMAINDER_WIDTH          = WORD_WIDTH + 1;
-    localparam REMAINDER_ZERO           = {REMAINDER_WIDTH{1'b0}}; 
+    localparam REMAINDER_WIDTH = WORD_WIDTH + 1;
+    localparam REMAINDER_ZERO  = {REMAINDER_WIDTH{1'b0}}; 
 
-    localparam ADD              = 1'b0;
-    localparam SUB              = 1'b1;
+// Let's encode the operation convention, to avoid typos.
+
+    localparam ADD = 1'b0;
+    localparam SUB = 1'b1;
 
 //## Data Path
 
-// Store the divisor and extract its sign and whether it is zero. These never
+// Store the divisor and extract whether it is zero. These never
 // change during division.
 
     reg                     divisor_enable = 1'b0;
@@ -127,13 +131,6 @@ module Remainder_Integer_Signed
         .data_out       (divisor_loaded)
     );
 
-    reg divisor_sign = 1'b0;
-
-    always @(*) begin
-        divisor_sign   =  divisor_loaded [WORD_WIDTH-1];
-        divide_by_zero = (divisor_loaded == WORD_ZERO);
-    end
-
 // Store the dividend and shift it left at each calculation step. We load the
 // dividend value shifted left by 1 during the load cycle as the next cycle is
 // the first cycle of calculation, and we need all the data ready.
@@ -141,7 +138,7 @@ module Remainder_Integer_Signed
     reg                     dividend_enable = 1'b0;
     reg                     dividend_load   = 1'b0;
     wire [WORD_WIDTH-1:0]   dividend_loaded;
-    reg                     dividend_msb    = 1'b0;
+    reg  [WORD_WIDTH-1:0]   dividend_next   = WORD_ZERO;
 
     Register_Pipeline
     #(
@@ -159,60 +156,33 @@ module Remainder_Integer_Signed
         // verilator lint_off PINCONNECTEMPTY
         .parallel_out   (),
         // verilator lint_on  PINCONNECTEMPTY
-        .pipe_in        (dividend_loaded << 1),
+        .pipe_in        (dividend_next),
         .pipe_out       (dividend_loaded)
     );
 
-    always @(*) begin
-        dividend_msb = dividend_loaded [WORD_WIDTH-1];
-    end
-
-// Store the initial sign of the dividend. Never changes after load.
-
-    reg  dividend_sign_at_load = 1'b0;
-
-    always @(*) begin
-        dividend_sign_at_load = dividend [WORD_WIDTH-1];
-    end
-
-    reg  dividend_sign_enable  = 1'b0;
-    wire dividend_sign;
-
-    Register
-    #(
-        .WORD_WIDTH     (1),
-        .RESET_VALUE    (1'b0)
-    )
-    dividend_sign_storage
-    (
-        .clock          (clock),
-        .clock_enable   (dividend_sign_enable),
-        .clear          (1'b0),
-        .data_in        (dividend_sign_at_load),
-        .data_out       (dividend_sign)
-    );
-
-// Store the remainder. Initialized with a zero or -1 (to sign-extend the
-// dividend) and the first MSB of the dividend at load time.  At each
-// calculation step, gets loaded with either the new remainder or the existing
-// remainder, both left-shifted by 1 with the LSB filled-in with the MSB of
-// the dividend.
+// Store the remainder. Initialized with a zero or -1 as a sign-extension of
+// the initial MSB of the dividend at load time.  At each calculation step,
+// gets loaded with the new remainder left-shifted by 1 with the LSB filled-in
+// with the current MSB of the dividend.
 
 // Must be 1 bit wider than the dividend, since the left-shift always happens
 // and we don't want to lose the MSB on the last step. This means we use the
 // last `WORD_WIDTH` bits as the remainder output, and the first `WORD_WIDTH`
 // bits for the new remainder calculations.
 
-    reg [REMAINDER_WIDTH-1:0] remainder_initial = REMAINDER_ZERO;
+    reg                         dividend_sign_at_load   = 1'b0;
+    reg [REMAINDER_WIDTH-1:0]   remainder_initial       = REMAINDER_ZERO;
 
     always @(*) begin
-        remainder_initial = {REMAINDER_WIDTH{dividend_sign_at_load}};
+        dividend_sign_at_load = dividend [WORD_WIDTH-1];
+        remainder_initial     = {REMAINDER_WIDTH{dividend_sign_at_load}};
     end
 
     reg                         remainder_enable    = 1'b0;
     reg                         remainder_load      = 1'b0;
     reg  [REMAINDER_WIDTH-1:0]  remainder_next      = REMAINDER_ZERO;
-    wire [REMAINDER_WIDTH-1:0]  remainder_internal;
+    reg  [WORD_WIDTH-1:0]       remainder_calc      = WORD_ZERO;
+    wire [REMAINDER_WIDTH-1:0]  remainder_loaded;
 
     Register_Pipeline
     #(
@@ -231,43 +201,22 @@ module Remainder_Integer_Signed
         .parallel_out   (),
         // verilator lint_on  PINCONNECTEMPTY
         .pipe_in        (remainder_next),
-        .pipe_out       (remainder_internal)
+        .pipe_out       (remainder_loaded)
     );
 
-// Split out the remainder for eventual output (last `WORD_WIDTH` bits) and
-// the current remainder for calculation (first `WORD_WIDTH` bits).
-
-    reg [WORD_WIDTH-1:0] remainder_current      = WORD_ZERO;
-    reg                  remainder_current_sign = 1'b0;
-
     always @(*) begin
-        remainder_current       = remainder_internal [0 +: WORD_WIDTH];
-        remainder_current_sign  = remainder_current  [WORD_WIDTH-1];
-        remainder               = remainder_internal [1 +: WORD_WIDTH];
+        remainder_calc = remainder_loaded [0 +: WORD_WIDTH];
+        remainder      = remainder_loaded [1 +: WORD_WIDTH];
     end
 
-// Set the add/sub operation based on the relative signs of the remainder
-// (which initially sign-extends the dividend) and of the divisor.  If the
-// sign of the remainder changes, then the operation reverses, so as to change
-// direction back towards zero on the number line. EXCEPTION: if the sign
-// change is because the remainder went from negative to zero, then we have
-// already converged, so don't alter the operation, so later steps would
-// overshoot and thus be skipped.
+// Now, run all stored data through a pipeline. We expect forward register
+// retiming to push the pipeline registers, if any, through the following
+// arithmetic and bit-reduction logic to reduce the critical path delay.
 
-    reg remainder_add_sub = ADD;
+    localparam REMAINDER_CALC_WIDTH = WORD_WIDTH + WORD_WIDTH + WORD_WIDTH;
 
-    always @(*) begin
-        remainder_add_sub = (remainder_current_sign == divisor_sign) ? SUB : ADD;
-    end
-
-// Compute the new remainder: new_remainder = `remainder_current` +/-
-// `divisor_loaded`, depending on the initial signs of the dividend and
-// divisor.
-
-    localparam REMAINDER_CALC_WIDTH = 1 + WORD_WIDTH + WORD_WIDTH;
-
-    wire                    remainder_add_sub_pipelined;
-    wire [WORD_WIDTH-1:0]   remainder_current_pipelined;
+    wire [WORD_WIDTH-1:0]   dividend_loaded_pipelined;
+    wire [WORD_WIDTH-1:0]   remainder_calc_pipelined;
     wire [WORD_WIDTH-1:0]   divisor_loaded_pipelined;
 
     Register_Pipeline_Simple
@@ -275,14 +224,27 @@ module Remainder_Integer_Signed
         .WORD_WIDTH (REMAINDER_CALC_WIDTH),
         .PIPE_DEPTH (PIPELINE_STAGES)
     )
-    remainder_new_calc_pipeline
+    input_data_pipeline
     (
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (1'b0),
-        .pipe_in        ({remainder_add_sub, remainder_current, divisor_loaded}),
-        .pipe_out       ({remainder_add_sub_pipelined, remainder_current_pipelined, divisor_loaded_pipelined})
+        .pipe_in        ({dividend_loaded,           remainder_calc,           divisor_loaded}),
+        .pipe_out       ({dividend_loaded_pipelined, remainder_calc_pipelined, divisor_loaded_pipelined})
     );
+
+// Compute the new remainder: new_remainder = `remainder_current` +/-
+// `divisor_loaded`.
+
+    reg divisor_loaded_pipelined_sign = 1'b0;
+    reg remainder_calc_pipelined_sign = 1'b0;
+    reg remainder_add_sub             = ADD;
+
+    always @(*) begin
+        divisor_loaded_pipelined_sign = divisor_loaded_pipelined [WORD_WIDTH-1];
+        remainder_calc_pipelined_sign = remainder_calc_pipelined [WORD_WIDTH-1];
+        remainder_add_sub = (remainder_calc_pipelined_sign == divisor_loaded_pipelined_sign) ? SUB : ADD;
+    end
 
     wire [WORD_WIDTH-1:0] remainder_new;
 
@@ -292,9 +254,9 @@ module Remainder_Integer_Signed
     )
     remainder_new_calc
     (
-        .add_sub    (remainder_add_sub_pipelined),   // 0/1 -> A+B/A-B
+        .add_sub    (remainder_add_sub),   // 0/1 -> A+B/A-B
         .carry_in   (1'b0),
-        .A          (remainder_current_pipelined),
+        .A          (remainder_calc_pipelined),
         .B          (divisor_loaded_pipelined),
         .sum        (remainder_new),
         // verilator lint_off PINCONNECTEMPTY
@@ -304,44 +266,35 @@ module Remainder_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-// We will need the signs of the current and new remainders to detect a change
-// in sign, which means the divisor was too large for the current remainder.
-// Otherwise this calculation step is OK, and we update the remainder.
-// EXCEPTION: If the new remainder is zero, then a sign change is OK.
+// When the dividend is all zero, then we have used up all the information in
+// it, and the current division step is the last one, giving us the final
+// remainder.
 
-    reg remainder_new_sign      = 1'b0;
- 
+    reg dividend_msb = 1'b0;
+
     always @(*) begin
-        remainder_current_sign  = remainder_current [WORD_WIDTH-1];
-        remainder_new_sign      = remainder_new     [WORD_WIDTH-1];
-        step_ok                 = (remainder_new_sign == remainder_current_sign) || (remainder_new == WORD_ZERO);
+        dividend_msb   = dividend_loaded_pipelined [WORD_WIDTH-1];
+        remainder_next = {remainder_new, dividend_msb};
     end
 
-// FIXME: Should we use remainder_current_pipelined instead?
-
-    reg [REMAINDER_WIDTH-1:0] remainder_updated   = REMAINDER_ZERO;
-    reg [REMAINDER_WIDTH-1:0] remainder_unchanged = REMAINDER_ZERO;
+    reg dividend_empty  = 1'b0;
 
     always @(*) begin
-        remainder_updated   = {remainder_new,     dividend_msb};
-        remainder_unchanged = {remainder_current, dividend_msb};
-        remainder_next      = (step_ok == 1'b1) ? remainder_updated : remainder_unchanged;
+        dividend_empty = (dividend_loaded_pipelined == WORD_ZERO);
+        dividend_next  = (dividend_loaded_pipelined << 1);
+    end
+
+    always @(*) begin
+        divide_by_zero = (divisor_loaded_pipelined == WORD_ZERO);
     end
 
 //## Control Path
 
-// Each calculation takes `WORD_WIDTH` steps, from `WORD_WIDTH-1` to `0`, plus
-// one step to initially load the dividend and divisor. Thus, we need
-// a counter of the correct width.
-
-    localparam STEPS_WIDTH      = clog2(WORD_WIDTH);
-    localparam STEPS_INITIAL    = WORD_WIDTH - 1;
-    localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
-    localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
-
-// We also need to control the calculation step counter with a secondary
-// pipelining counter so we step the calculation step counter only once the
-// calculation has propagated through the whole pipeline.
+// We need a pipelining counter so we save the result of a division step only
+// once the calculation has propagated through the whole pipeline.  Since the
+// pipeline depth can be zero, we have to do some contortions to avoid
+// clog2(0) and replications of length zero (which are not legal outside of
+// a larger concatenation).
 
     localparam PIPELINE_STEPS_WIDTH   = (PIPELINE_STAGES <  2) ? 1 : clog2(PIPELINE_STAGES);
     localparam PIPELINE_STEPS_INITIAL = (PIPELINE_STAGES == 0) ? 0 : PIPELINE_STAGES - 1;
@@ -382,40 +335,7 @@ module Remainder_Integer_Signed
         .data_out       (state)
     );
 
-// Count down WORD_WIDTH-1 calculation steps. Stops at zero, and reloads when
-// leaving STATE_LOAD.
-
-    reg                     calculation_step_clear  = 1'b0;
-    reg                     calculation_step_do     = 1'b0;
-    wire [STEPS_WIDTH-1:0]  calculation_step;
-
-    Counter_Binary
-    #(
-        .WORD_WIDTH     (STEPS_WIDTH),
-        .INCREMENT      (STEPS_ONE),
-        .INITIAL_COUNT  (STEPS_INITIAL [STEPS_WIDTH-1:0])
-    )
-    calculation_steps
-    (
-        .clock          (clock),
-        .clear          (calculation_step_clear),
-
-        .up_down        (1'b1),         // 0/1 -> up/down
-        .run            (calculation_step_do),
-
-        .load           (1'b0),
-        .load_count     (STEPS_ZERO),
-
-        .carry_in       (1'b0),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out      (),
-        .carries        (),
-        .overflow       (),
-        // verilator lint_on  PINCONNECTEMPTY
-        .count          (calculation_step)
-    );
-
-// Count down PIPELINE_STAGES steps for each calculation step.
+// Count down PIPELINE_STAGES steps for each division step.
 
     reg                             pipeline_step_clear  = 1'b0;
     reg                             pipeline_step_do     = 1'b0;
@@ -467,7 +387,6 @@ module Remainder_Integer_Signed
     reg read_control      = 1'b0; // When other computations acknowledge the calculation step.
     reg calculating       = 1'b0; // High while performing the division steps.
     reg step_done         = 1'b0; // High when a calculation exits the pipeline and is ack'ed by other computations.
-    reg last_calculation  = 1'b0; // High during the last calculation step.
 
     always @(*) begin
         load_inputs       = (input_ready   == 1'b1) && (input_valid   == 1'b1);
@@ -475,7 +394,7 @@ module Remainder_Integer_Signed
         read_control      = (control_valid == 1'b1) && (control_ready == 1'b1);
         calculating       = (state == STATE_CALC);
         step_done         = (read_control == 1'b1);
-        last_calculation  = (read_control == 1'b1) && (calculation_step == STEPS_ZERO);
+        last_calculation  = (read_control == 1'b1) && (dividend_empty == 1'b1);
     end
 
 // Define the running state machine transitions. There is no handling of erroneous states.
@@ -484,13 +403,6 @@ module Remainder_Integer_Signed
         state_next = (load_inputs       == 1'b1) ? STATE_CALC : state;
         state_next = (last_calculation  == 1'b1) ? STATE_DONE : state_next;
         state_next = (read_outputs      == 1'b1) ? STATE_LOAD : state_next;
-    end
-
-// Control the calculation step counter
-
-    always @(*) begin
-        calculation_step_clear = (load_inputs == 1'b1);
-        calculation_step_do    = (step_done   == 1'b1);
     end
 
 // Control the pipeline step counter
@@ -506,7 +418,6 @@ module Remainder_Integer_Signed
         divisor_enable       = (load_inputs == 1'b1);
         dividend_enable      = (load_inputs == 1'b1) || (step_done == 1'b1);
         dividend_load        = (load_inputs == 1'b1);
-        dividend_sign_enable = (load_inputs == 1'b1);
     end
 
 // Control the remainder storage
