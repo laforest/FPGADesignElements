@@ -418,8 +418,8 @@ module Remainder_Integer_Signed
 // clog2(0) and replications of length zero (which are not legal outside of
 // a larger concatenation).
 
-    localparam PIPELINE_STEPS_WIDTH   = (PIPELINE_STAGES <  2) ? 1 : clog2(PIPELINE_STAGES);
-    localparam PIPELINE_STEPS_INITIAL = (PIPELINE_STAGES == 0) ? 0 : PIPELINE_STAGES - 1;
+    localparam PIPELINE_STEPS_WIDTH   = clog2(PIPELINE_STAGES + 1);
+    localparam PIPELINE_STEPS_INITIAL = PIPELINE_STAGES + 1 - 1;
     localparam PIPELINE_STEPS_ZERO    = {PIPELINE_STEPS_WIDTH{1'b0}};
     localparam PIPELINE_STEPS_ONE     = {{PIPELINE_STEPS_WIDTH-1{1'b0}},1'b1};
 
@@ -567,7 +567,7 @@ module Remainder_Integer_Signed
 // Is the current division step valid?
 
     always @(*) begin
-        step_ok = (remainder_next_valid == 1'b1) && (remainder_increment_valid == 1'b1) && (calculating == 1'b1);
+        step_ok = (remainder_next_valid == 1'b1) && (remainder_increment_valid == 1'b1) && (calculating == 1'b1) && (step_done == 1'b1);
     end
 
 // Control the calculation step counter
@@ -589,7 +589,7 @@ module Remainder_Integer_Signed
     always @(*) begin
         divide_by_zero_load         = (first_calculation == 1'b1);
         divisor_load                = (load_inputs    == 1'b1);
-        divisor_enable              = (load_inputs    == 1'b1) || (calculating == 1'b1);
+        divisor_enable              = (load_inputs    == 1'b1) || ((calculating == 1'b1) && (step_done == 1'b1));
         divisor_sign_initial_load   = (load_inputs    == 1'b1);
         remainder_increment_load    = (divisor_load   == 1'b1);
         remainder_increment_enable  = (divisor_enable == 1'b1);
@@ -600,7 +600,7 @@ module Remainder_Integer_Signed
     always @(*) begin
         dividend_sign_initial_load  = (load_inputs == 1'b1);
         remainder_load              = (load_inputs == 1'b1);
-        remainder_enable            = (load_inputs == 1'b1) || (step_ok == 1'b1);
+        remainder_enable            = (load_inputs == 1'b1) || ((step_ok == 1'b1) && (step_done == 1'b1));
     end
 
 endmodule 
