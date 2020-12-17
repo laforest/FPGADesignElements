@@ -39,7 +39,7 @@
 
 module Remainder_Integer_Signed
 #(
-    parameter WORD_WIDTH        = 8,
+    parameter WORD_WIDTH        = 5,
     parameter PIPELINE_STAGES   = 0
 )
 (
@@ -418,7 +418,7 @@ module Remainder_Integer_Signed
 // clog2(0) and replications of length zero (which are not legal outside of
 // a larger concatenation).
 
-    localparam PIPELINE_STEPS_WIDTH   = clog2(PIPELINE_STAGES + 1);
+    localparam PIPELINE_STEPS_WIDTH   = (PIPELINE_STAGES == 0) ? 1 : clog2(PIPELINE_STAGES + 1);
     localparam PIPELINE_STEPS_INITIAL = PIPELINE_STAGES + 1 - 1;
     localparam PIPELINE_STEPS_ZERO    = {PIPELINE_STEPS_WIDTH{1'b0}};
     localparam PIPELINE_STEPS_ONE     = {{PIPELINE_STEPS_WIDTH-1{1'b0}},1'b1};
