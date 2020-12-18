@@ -284,6 +284,8 @@ module Remainder_Integer_Signed
         .adjusted_output    (remainder)
     );
 
+//### Pipeline
+
 // Now, run all stored data through a pipeline. We expect forward register
 // retiming to push the pipeline registers, if any, through the following
 // arithmetic and bit-reduction logic to reduce the critical path delay.
