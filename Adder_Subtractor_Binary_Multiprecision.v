@@ -31,7 +31,6 @@ module Adder_Subtractor_Binary_Multiprecision
     output  reg                         input_ready,
 
     input   wire                        add_sub,    // 0/1 -> A+B/A-B
-    input   wire                        carry_in,
     input   wire    [WORD_WIDTH-1:0]    A,
     input   wire    [WORD_WIDTH-1:0]    B,
 
@@ -54,6 +53,8 @@ module Adder_Subtractor_Binary_Multiprecision
     `include "./word_pad_function.vh"
     `include "./clog2_function.vh"
 
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
     localparam STEP_WORD_COUNT = word_count(WORD_WIDTH, STEP_WORD_WIDTH);
     localparam STEP_WORD_WIDTH_TOTAL = STEP_WORD_WIDTH * STEP_WORD_COUNT;
 
@@ -73,25 +74,27 @@ module Adder_Subtractor_Binary_Multiprecision
 
 // Store whether we add or sub, which remains constant until reloaded.
 
-    reg  load_add_sub = 1'b0;    
-    wire add_sub_loaded;
+//    reg  load_add_sub = 1'b0;    
+//    wire add_sub_loaded;
+//
+//    Register
+//    #(
+//        .WORD_WIDTH     (1),
+//        .RESET_VALUE    (1'b0)
+//    )
+//    add_sub_storage
+//    (
+//        .clock          (clock),
+//        .clock_enable   (load_add_sub),
+//        .clear          (1'b0),
+//        .data_in        (add_sub),
+//        .data_out       (add_sub_loaded)
+//    );
 
-    Register
-    #(
-        .WORD_WIDTH     (1),
-        .RESET_VALUE    (1'b0)
-    )
-    add_sub_storage
-    (
-        .clock          (clock),
-        .clock_enable   (load_add_sub),
-        .clear          (1'b0),
-        .data_in        (add_sub),
-        .data_out       (add_sub_loaded)
-    );
-
-// Store the initial carry-in, and update it at each calculation step with the
-// step carry-out.  After the final step, this is the final carry-out.
+// Set the initial carry_in to 1 (which matches the `add_sub` convention) if
+// subtracting to complete the negation of the inverted B operand, and update
+// it at each calculation step with the step carry-out.  After the final step,
+// this is the final carry-out.
 
     reg  load_carry_initial     = 1'b0;
     reg  load_carry_step        = 1'b0;
@@ -100,7 +103,7 @@ module Adder_Subtractor_Binary_Multiprecision
     wire step_carry_in;
 
     always @(*) begin
-        step_carry_selected = (load_carry_initial == 1'b1) ? carry_in : step_carry_out;
+        step_carry_selected = (load_carry_initial == 1'b1) ? add_sub : step_carry_out;
     end 
 
     Register
@@ -183,6 +186,15 @@ module Adder_Subtractor_Binary_Multiprecision
 
 //### Input Pipeline for B
 
+// Invert B if subtracting (the carry_in was set to match to make it
+// a negation).
+
+    reg [WORD_WIDTH-1:0] B_selected = WORD_ZERO;
+
+    always @(*) begin
+        B_selected = (add_sub == 1'b1) ? ~B : B;
+    end
+
 // Extend B to the total width of the pipeline. This may mean sign-extending.
 
     wire [STEP_WORD_WIDTH_TOTAL-1:0] B_extended;
@@ -195,7 +207,7 @@ module Adder_Subtractor_Binary_Multiprecision
     )
     B_extender
     (
-        .original_input     (B),
+        .original_input     (B_selected),
         .adjusted_output    (B_extended)
     );
 
@@ -241,7 +253,7 @@ module Adder_Subtractor_Binary_Multiprecision
         .pipe_out       (step_B)
     );
 
-//### Adder Logic
+//### Adder Logic (we only add, as B was negated before if subtracting)
 
 // Note: the carry_in and carry_out storage and wiring was defined earlier.
 
@@ -253,9 +265,9 @@ module Adder_Subtractor_Binary_Multiprecision
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH)
     )
-    step_adder_subtractor
+    step_adder
     (
-        .add_sub    (add_sub_loaded), // 0/1 -> A+B/A-B
+        .add_sub    (1'b0), // 0/1 -> A+B/A-B
         .carry_in   (step_carry_in),
         .A          (step_A),
         .B          (step_B),
@@ -495,16 +507,15 @@ module Adder_Subtractor_Binary_Multiprecision
 // Control the datapath
 
     always @(*) begin
-        load_add_sub        = (input_load   == 1'b1) || (read_and_load == 1'b1);
-        load_carry_initial  = (load_add_sub == 1'b1);
-        load_carry_step     = (load_add_sub == 1'b1) || (calculating == 1'b1);
-        load_A              = (load_add_sub == 1'b1);
-        load_B              = (load_add_sub == 1'b1);
-        load_step_sum       = (calculating  == 1'b1);
-        load_step_carries   = (calculating  == 1'b1);
-        load_step_overflow  = (calculating  == 1'b1);
-        step_load           = (load_add_sub == 1'b1);
+        load_carry_initial  = (input_load == 1'b1) || (read_and_load == 1'b1);
+        load_carry_step     = (load_carry_initial == 1'b1) || (calculating == 1'b1);
+        load_A              = (load_carry_initial == 1'b1);
+        load_B              = (load_carry_initial == 1'b1);
+        load_step_sum       = (calculating == 1'b1);
+        load_step_carries   = (calculating == 1'b1);
+        load_step_overflow  = (calculating == 1'b1);
         step_do             = (calculating  == 1'b1);
+        step_load           = (load_carry_initial == 1'b1);
     end
 
 endmodule
