@@ -7,9 +7,9 @@
 
 // Addition/subtraction is selected with `add_sub`: 0 for an add
 // (`A+B+carry_in`), and 1 for a subtract (`A-B-carry_in`). This assignment
-// conveniently matches the convention of sign bits. Note that the `overflow`
+// conveniently matches the convention of sign bits. *Note that the `overflow`
 // bit is only meaningful for signed numbers. For unsigned numbers, use
-// `carry_out` instead.
+// `carry_out` instead.*
 
 // On FPGAs, you are much better off letting the CAD tool infer the
 // add/subtract circuitry from the `+` or `-` operator itself, rather than
@@ -41,6 +41,7 @@ module Adder_Subtractor_Binary
 );
 
     localparam ZERO = {WORD_WIDTH{1'b0}};
+    localparam ONE  = {{WORD_WIDTH-1{1'b0}},1'b1};
 
     initial begin
         sum         = ZERO;
@@ -48,11 +49,13 @@ module Adder_Subtractor_Binary
         overflow    = 1'b0;
     end
 
-// Extend the `carry_in` to the *unsigned* extended word width, so we don't
-// have width mismatches nor rely on sign extension, which is full of
-// pitfalls, and would trigger useless warnings in the CAD tools.
+// Extend the `carry_in` to the extended word width, as both signed (0 or -1)
+// and unsigned (0 or 1), so we don't have width mismatches nor rely on sign
+// extension, which is full of pitfalls, and would trigger useless warnings in
+// the CAD tools.
 
-    wire [WORD_WIDTH-1:0] carry_in_extended;
+    wire [WORD_WIDTH-1:0] carry_in_extended_unsigned;
+    wire [WORD_WIDTH-1:0] carry_in_extended_signed;
 
     Width_Adjuster
     #(
@@ -60,35 +63,42 @@ module Adder_Subtractor_Binary
         .SIGNED         (0),
         .WORD_WIDTH_OUT (WORD_WIDTH)
     )
-    extend_carry_in
+    extend_carry_in_unsigned
     (
         .original_input     (carry_in),
-        .adjusted_output    (carry_in_extended)
+        .adjusted_output    (carry_in_extended_unsigned)
     );
 
-// Generate the 2's-complement negations of `B` and `carry_in_extended`. We do
-// this separately to have the negated terms available later for the
+    Width_Adjuster
+    #(
+        .WORD_WIDTH_IN  (1),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH)
+    )
+    extend_carry_in_signed
+    (
+        .original_input     (carry_in),
+        .adjusted_output    (carry_in_extended_signed)
+    );
+
+// Generate the 2's-complement negation of `B`, depending on `add_sub`. We do
+// this separately to have the negated `B` available later for the
 // calculations of the `carries` and of the `overflow`.
 
-    reg [WORD_WIDTH-1:0] B_negated                 = ZERO;
-    reg [WORD_WIDTH-1:0] carry_in_extended_negated = ZERO;
-
-    always @(*) begin
-        B_negated                 = -B;
-        carry_in_extended_negated = -carry_in_extended;
-    end
-
-// Then, select the addition terms, depending on the `add_sub` operation.
-
     reg [WORD_WIDTH-1:0] B_selected         = ZERO;
+    reg [WORD_WIDTH-1:0] negation_offset    = ZERO;
     reg [WORD_WIDTH-1:0] carry_in_selected  = ZERO;
 
     always @(*) begin
-        B_selected          = (add_sub == 1'b0) ? B                 : B_negated;
-        carry_in_selected   = (add_sub == 1'b0) ? carry_in_extended : carry_in_extended_negated;
+        B_selected          = (add_sub == 1'b0) ? B    : ~B;
+        negation_offset     = (add_sub == 1'b0) ? ZERO : ONE;
+        carry_in_selected   = (add_sub == 1'b0) ? carry_in_extended_unsigned : carry_in_extended_signed;
     end
 
-// And add as usual. Since the left-hand side is one bit wider to hold
+// And add as usual, with subtraction expressed as `A+((~B)+1)`, so as to
+// generate the correct `carries`.
+
+// Since the left-hand side is one bit wider to hold
 // `carry_out`, all other terms are implicitly extended to that width (see
 // Verilog LRM, IEEE 1364-2001, Section 4.4, "Expression bit lengths").
 // However, since I avoid implicit width extension as a way to reduce warnings
@@ -101,7 +111,7 @@ module Adder_Subtractor_Binary
 // calculation.
 
     always @(*) begin
-        {carry_out, sum} = {1'b0, A} + {1'b0, B_selected} + {1'b0, carry_in_selected};
+        {carry_out, sum} = {1'b0, A} + {1'b0, B_selected} + {1'b0, negation_offset} + {1'b0, carry_in_selected};
     end
 
 // Finally, recover the carry *into* each bit from the selected addition
