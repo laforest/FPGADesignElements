@@ -12,6 +12,9 @@
 // convention of sign bits. *Note that the `overflow` bit is only meaningful
 // for signed numbers. For unsigned numbers, use `carry_out` instead.*
 
+// Inputs are set with a ready/valid handshake, and can be updated after the
+// output handshake completes.
+
 `default_nettype none
 
 module Adder_Subtractor_Binary_Multiprecision
