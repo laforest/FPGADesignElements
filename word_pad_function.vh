@@ -31,10 +31,8 @@
 function integer word_pad;
     input integer bit_vector_width;
     input integer word_width;
-          integer raw_pad_width;
     begin
-        raw_pad_width = (bit_vector_width < word_width) ? word_width - bit_vector_width : bit_vector_width % word_width;
-        word_pad      = (raw_pad_width > 0) ? raw_pad_width : word_width;
+        word_pad = (bit_vector_width < word_width) ? word_width - bit_vector_width : word_width - (bit_vector_width % word_width);
     end
 endfunction
 
