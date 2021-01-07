@@ -87,6 +87,8 @@ module Remainder_Integer_Signed
 // with the minimum number of bits (4) to represent -8, we can only represent
 // up to +7)
 
+    localparam STEP_WORD_WIDTH_LONG = STEP_WORD_WIDTH + 1;
+
     localparam WORD_WIDTH_LONG  = WORD_WIDTH + 1;
 
     localparam WORD_ZERO_LONG   = {WORD_WIDTH_LONG{1'b0}};
@@ -324,7 +326,7 @@ module Remainder_Integer_Signed
     Adder_Subtractor_Binary_Multiprecision
     #(
         .WORD_WIDTH         (WORD_WIDTH_LONG),
-        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH_LONG)
     )
     remainder_calc
     (
@@ -529,8 +531,8 @@ module Remainder_Integer_Signed
 // Control the adder/subtractor
 
     always @(*) begin
-        remainder_input_valid  = (calculating == 1'b1);
-        remainder_output_ready = (calculating == 1'b1);
+        remainder_input_valid  = (calculating  == 1'b1);
+        remainder_output_ready = (read_control == 1'b1);
     end
 
 // Control the divisor and remainder increment.
