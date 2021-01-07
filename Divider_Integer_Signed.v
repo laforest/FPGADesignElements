@@ -5,8 +5,8 @@
 
 module Divider_Integer_Signed
 #(
-    parameter WORD_WIDTH            = 4,
-    parameter PIPELINE_STAGES_CALC  = 0,
+    parameter WORD_WIDTH            = 8,
+    parameter STEP_WORD_WIDTH       = 4,
     parameter PIPELINE_STAGES_SYNC  = 0
 )
 (
@@ -74,7 +74,7 @@ module Divider_Integer_Signed
     Remainder_Integer_Signed
     #(
         .WORD_WIDTH         (WORD_WIDTH),
-        .PIPELINE_STAGES    (PIPELINE_STAGES_CALC)
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
     )
     remainder_calc
     (
@@ -130,7 +130,7 @@ module Divider_Integer_Signed
     Quotient_Integer_Signed
     #(
         .WORD_WIDTH         (WORD_WIDTH),
-        .PIPELINE_STAGES    (PIPELINE_STAGES_CALC)
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
     )
     quotient_calc
     (

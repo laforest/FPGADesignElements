@@ -25,7 +25,7 @@
 module Quotient_Integer_Signed
 #(
     parameter WORD_WIDTH        = 8,
-    parameter PIPELINE_STAGES   = 0
+    parameter STEP_WORD_WIDTH   = 4
 )
 (
     input  wire                     clock,
@@ -187,38 +187,8 @@ module Quotient_Integer_Signed
     )
     quotient_shorten
     (
-        // It's possible some input bits are truncated away
-        // verilator lint_off UNUSED
         .original_input     (quotient_loaded),
-        // verilator lint_on  UNUSED
         .adjusted_output    (quotient)
-    );
-
-//### Pipeline
-
-// Now, run all stored data through a pipeline. We expect forward register
-// retiming to push the pipeline registers, if any, through the following
-// arithmetic logic to reduce the critical path delay.
-
-    localparam PIPELINE_WIDTH = 1 + 1 + WORD_WIDTH_LONG + WORD_WIDTH_LONG;
-
-    wire                        divisor_sign_loaded_pipelined;
-    wire                        dividend_sign_loaded_pipelined;
-    wire [WORD_WIDTH_LONG-1:0]  quotient_increment_pipelined;
-    wire [WORD_WIDTH_LONG-1:0]  quotient_loaded_pipelined;
-
-    Register_Pipeline_Simple
-    #(
-        .WORD_WIDTH (PIPELINE_WIDTH),
-        .PIPE_DEPTH (PIPELINE_STAGES)
-    )
-    calculation_pipeline
-    (
-        .clock          (clock),
-        .clock_enable   (1'b1),
-        .clear          (1'b0),
-        .pipe_in        ({divisor_sign_loaded,           dividend_sign_loaded,           quotient_increment,           quotient_loaded}),
-        .pipe_out       ({divisor_sign_loaded_pipelined, dividend_sign_loaded_pipelined, quotient_increment_pipelined, quotient_loaded_pipelined})
     );
 
 //### Quotient Calculation
@@ -226,20 +196,38 @@ module Quotient_Integer_Signed
     reg quotient_add_sub = 1'b0;
 
     always @(*) begin
-        quotient_add_sub = (divisor_sign_loaded_pipelined == dividend_sign_loaded_pipelined) ? ADD : SUB;
+        quotient_add_sub = (divisor_sign_loaded == dividend_sign_loaded) ? ADD : SUB;
     end
 
-    Adder_Subtractor_Binary
+    reg  quotient_input_valid = 1'b0;
+    // wire quotient_input_ready;
+    wire quotient_output_valid;
+    reg  quotient_output_ready = 1'b0;
+
+    Adder_Subtractor_Binary_Multiprecision
     #(
-        .WORD_WIDTH (WORD_WIDTH_LONG)
+        .WORD_WIDTH         (WORD_WIDTH_LONG),
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
     )
     quotient_calc
     (
-        .add_sub    (quotient_add_sub), // 0/1 -> A+B/A-B
-        .carry_in   (1'b0),
-        .A          (quotient_loaded_pipelined),
-        .B          (quotient_increment_pipelined),
-        .sum        (quotient_next),
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (clear),
+
+        .input_valid    (quotient_input_valid),
+        //verilator lint_off PINCONNECTEMPTY
+        .input_ready    (),
+        //verilator lint_on  PINCONNECTEMPTY
+
+        .add_sub        (quotient_add_sub), // 0/1 -> A+B/A-B
+        .A              (quotient_loaded),
+        .B              (quotient_increment),
+
+        .output_valid   (quotient_output_valid),
+        .output_ready   (quotient_output_ready),
+
+        .sum            (quotient_next),
         // verilator lint_off PINCONNECTEMPTY
         .carry_out  (),
         .carries    (),
@@ -249,40 +237,26 @@ module Quotient_Integer_Signed
 
 //## Control Path
 
-// Each calculation takes `WORD_WIDTH_LONG` steps, from `WORD_WIDTH_LONG-1` to `0`, plus
-// one step to initially load the dividend and divisor. Thus, we need
-// a counter of the correct width.
+// Each division takes `WORD_WIDTH_LONG` steps, from `WORD_WIDTH_LONG-1` to
+// `0`, plus one step to initially load the dividend and divisor. Thus, we
+// need a counter of the correct width.
 
     localparam STEPS_WIDTH      = clog2(WORD_WIDTH_LONG);
     localparam STEPS_INITIAL    = WORD_WIDTH_LONG - 1;
     localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
     localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
 
-// We need a pipelining counter so we save the result of a division step only
-// once the calculation has propagated through the whole pipeline.  Since the
-// pipeline depth can be zero, we have to do some contortions to avoid
-// clog2(0) and replications of length zero (which are not legal outside of
-// a larger concatenation).
-
-    localparam PIPELINE_STAGES_TOTAL  = PIPELINE_STAGES + 1;
-    localparam PIPELINE_STEPS_WIDTH   = (PIPELINE_STAGES_TOTAL == 1) ? 1 : clog2(PIPELINE_STAGES_TOTAL);
-    localparam PIPELINE_STEPS_INITIAL = PIPELINE_STAGES_TOTAL - 1;
-    localparam PIPELINE_STEPS_ZERO    = {PIPELINE_STEPS_WIDTH{1'b0}};
-    localparam PIPELINE_STEPS_ONE     = {{PIPELINE_STEPS_WIDTH-1{1'b0}},1'b1};
-
 // We denote state as two bits, with the following transitions:
 // LOAD -> CALC -> DONE -> LOAD -> ... 
 // We don't handle the fourth, impossible case.
-// We don't have a state for when a calculation step completes, as
-// PIPELINE_STAGES may be zero, so each cycle is a step.
 
 // FIXME: Why this encoding choice? Is it faster to decode? Easier to debug?
 
     localparam                      STATE_WIDTH     = 2;
-    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 'b00;
-    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 'b10;
-    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 'b11;
-    localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 'b01; // Never reached
+    localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 2'b00;
+    localparam [STATE_WIDTH-1:0]    STATE_CALC      = 2'b10;
+    localparam [STATE_WIDTH-1:0]    STATE_DONE      = 2'b11;
+    localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 2'b01; // Never reached
 
 // The state bits, from which we derive the control outputs and the internal
 // control signals.
@@ -337,47 +311,18 @@ module Quotient_Integer_Signed
         .count          (calculation_step)
     );
 
-// Count down PIPELINE_STAGES steps for each division step.
-
-    reg                             pipeline_step_clear  = 1'b0;
-    reg                             pipeline_step_do     = 1'b0;
-    wire [PIPELINE_STEPS_WIDTH-1:0] pipeline_step;
-
-    Counter_Binary
-    #(
-        .WORD_WIDTH     (PIPELINE_STEPS_WIDTH),
-        .INCREMENT      (PIPELINE_STEPS_ONE),
-        .INITIAL_COUNT  (PIPELINE_STEPS_INITIAL [PIPELINE_STEPS_WIDTH-1:0])
-    )
-    pipeline_steps
-    (
-        .clock          (clock),
-        .clear          (pipeline_step_clear),
-        .up_down        (1'b1),         // 0/1 -> up/down
-        .run            (pipeline_step_do),
-        .load           (1'b0),
-        .load_count     (PIPELINE_STEPS_ZERO),
-        .carry_in       (1'b0),
-        // verilator lint_off PINCONNECTEMPTY
-        .carry_out      (),
-        .carries        (),
-        .overflow       (),
-        // verilator lint_on  PINCONNECTEMPTY
-        .count          (pipeline_step)
-    );
-
 // First, the input and output handshakes. To avoid long combination paths,
 // ready and valid should not depend directly on eachother.
 
 // Accept inputs when empty (after results are read out) or frehsly
 // reset/cleared). Declare outputs valid when calculation is done.
-// Signal a new calculation step each time we pass through the pipeline (if
-// any).
+// Signal a new calculation step each time the addition/subtraction is
+// complete.
 
     always @(*) begin
         output_valid   = (state == STATE_DONE);
         input_ready    = (state == STATE_LOAD);
-        control_ready  = (state == STATE_CALC) && (pipeline_step == PIPELINE_STEPS_ZERO);
+        control_ready  = (state == STATE_CALC) && (quotient_output_valid == 1'b1);
     end
 
 // Then, define the basic interactions with and transformations within this
@@ -388,7 +333,7 @@ module Quotient_Integer_Signed
     reg read_outputs      = 1'b0; // When we read out the quotient.
     reg read_control      = 1'b0; // When we read in the calculation step status.
     reg calculating       = 1'b0; // High while performing the division steps.
-    reg step_done         = 1'b0; // High when a calculation exits the pipeline and is ack'ed by other computations.
+    reg step_done         = 1'b0; // High when an add/sub completes and is ack'ed by other computations.
     reg last_calculation  = 1'b0; // High during the last calculation step.
 
     always @(*) begin
@@ -415,11 +360,11 @@ module Quotient_Integer_Signed
         calculation_step_do    = (step_done   == 1'b1);
     end
 
-// Control the pipeline step counter
+// Control the adder/subtractor
 
     always @(*) begin
-        pipeline_step_clear = (step_done == 1'b1) || (clear == 1'b1);
-        pipeline_step_do    = (calculating == 1'b1) && (pipeline_step != PIPELINE_STEPS_ZERO);
+        quotient_input_valid  = (calculating == 1'b1);
+        quotient_output_ready = (calculating == 1'b1);
     end
 
 // Control the divisor and dividend signs
