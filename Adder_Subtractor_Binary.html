@@ -18,15 +18,16 @@
  <a href="./CarryIn_Binary.html">Carry-In Calculator</a> for their uses).</p>
 <p>Addition/subtraction is selected with <code>add_sub</code>: 0 for an add
  (<code>A+B+carry_in</code>), and 1 for a subtract (<code>A-B-carry_in</code>). This assignment
- conveniently matches the convention of sign bits. Note that the <code>overflow</code>
+ conveniently matches the convention of sign bits. <em>Note that the <code>overflow</code>
  bit is only meaningful for signed numbers. For unsigned numbers, use
- <code>carry_out</code> instead.</p>
+ <code>carry_out</code> instead.</em></p>
 <p>On FPGAs, you are much better off letting the CAD tool infer the
  add/subtract circuitry from the <code>+</code> or <code>-</code> operator itself, rather than
- structurally describing it in logic, as the latter may not get mapped to
- the fast, dedicated ripple-carry hardware. Wrapping all this into a module
- hides the width adjustments necessary to get a warning-free synthesis of
- carry logic, and enables correct carry and overflow calculations.</p>
+ structurally describing it in Boolean logic, as the latter may not get
+ mapped to the fast, dedicated ripple-carry hardware. Wrapping all this into
+ a module hides the width adjustments necessary to get a warning-free
+ synthesis of carry logic, and enables correct carry and overflow
+ calculations.</p>
 <p>Because we handle the carry bits ourselves and do everything through an
  unsigned addition, we don't depend on the tricky Verilog behaviour where
  all terms of an expression must be declared signed else the expression is
@@ -51,6 +52,7 @@ module <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
 );
 
     localparam ZERO = {WORD_WIDTH{1'b0}};
+    localparam ONE  = {{WORD_WIDTH-1{1'b0}},1'b1};
 
     initial begin
         sum         = ZERO;
@@ -59,12 +61,14 @@ module <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     end
 </pre>
 
-<p>Extend the <code>carry_in</code> to the <em>unsigned</em> extended word width, so we don't
- have width mismatches nor rely on sign extension, which is full of
- pitfalls, and would trigger useless warnings in the CAD tools.</p>
+<p>Extend the <code>carry_in</code> to the extended word width, as both signed (0 or -1)
+ and unsigned (0 or 1) words, so we don't have width mismatches nor rely on
+ sign extension, which is full of pitfalls, and would trigger useless
+ warnings in the CAD tools.</p>
 
 <pre>
-    wire [WORD_WIDTH-1:0] carry_in_extended;
+    wire [WORD_WIDTH-1:0] carry_in_extended_unsigned;
+    wire [WORD_WIDTH-1:0] carry_in_extended_signed;
 
     <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
@@ -72,53 +76,59 @@ module <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
         .SIGNED         (0),
         .WORD_WIDTH_OUT (WORD_WIDTH)
     )
-    extend_carry_in
+    extend_carry_in_unsigned
     (
         .original_input     (carry_in),
-        .adjusted_output    (carry_in_extended)
+        .adjusted_output    (carry_in_extended_unsigned)
+    );
+
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
+    #(
+        .WORD_WIDTH_IN  (1),
+        .SIGNED         (1),
+        .WORD_WIDTH_OUT (WORD_WIDTH)
+    )
+    extend_carry_in_signed
+    (
+        .original_input     (carry_in),
+        .adjusted_output    (carry_in_extended_signed)
     );
 </pre>
 
-<p>Generate the 2's-complement negations of <code>B</code> and <code>carry_in_extended</code>. We do
- this separately to have the negated terms available later for the
- calculations of the <code>carries</code> and of the <code>overflow</code>.</p>
-
-<pre>
-    reg [WORD_WIDTH-1:0] B_negated                 = ZERO;
-    reg [WORD_WIDTH-1:0] carry_in_extended_negated = ZERO;
-
-    always @(*) begin
-        B_negated                 = -B;
-        carry_in_extended_negated = -carry_in_extended;
-    end
-</pre>
-
-<p>Then, select the addition terms, depending on the <code>add_sub</code> operation.</p>
+<p>Depending on the value of <code>add_sub</code>, generate the bit-negation of <code>B</code> and
+ the necessary offset for <code>B</code>'s 2's-complement arithmetic negation, and
+ select the correct <code>carry_in</code> value. We do this separately to have the
+ negated <code>B</code> available later for the calculations of the <code>carries</code> and of
+ the <code>overflow</code>.</p>
 
 <pre>
     reg [WORD_WIDTH-1:0] B_selected         = ZERO;
+    reg [WORD_WIDTH-1:0] negation_offset    = ZERO;
     reg [WORD_WIDTH-1:0] carry_in_selected  = ZERO;
 
     always @(*) begin
-        B_selected          = (add_sub == 1'b0) ? B                 : B_negated;
-        carry_in_selected   = (add_sub == 1'b0) ? carry_in_extended : carry_in_extended_negated;
+        B_selected          = (add_sub == 1'b0) ? B    : ~B;
+        negation_offset     = (add_sub == 1'b0) ? ZERO : ONE;
+        carry_in_selected   = (add_sub == 1'b0) ? carry_in_extended_unsigned : carry_in_extended_signed;
     end
 </pre>
 
-<p>And add as usual. Since the left-hand side is one bit wider to hold
- <code>carry_out</code>, all other terms are implicitly extended to that width (see
- Verilog LRM, IEEE 1364-2001, Section 4.4, "Expression bit lengths").
- However, since I avoid implicit width extension as a way to reduce warnings
- and prevent bugs, let's prepend a zero to all the unsigned right-hand terms
- to make all widths match.</p>
+<p>And add as usual, with subtraction expressed as <code>A+((~B)+1)</code>, so as to
+ generate the correct <code>carries</code> for each bit position.</p>
+<p>Since the left-hand side is one bit wider to hold <code>carry_out</code>, all other
+ terms are implicitly extended to that width (see Verilog LRM, IEEE
+ 1364-2001, Section 4.4, "Expression bit lengths").  However, since I avoid
+ implicit width extension as a way to reduce warnings and prevent bugs,
+ let's prepend a zero to all the unsigned right-hand terms to make all
+ widths match and force a simple, unsigned addition.</p>
 <p>We could have done this more concisely by first widening all terms to
  <code>WORD_WIDTH+1</code>, then selecting addition/subtraction in one line, but we
- need the possibly negated terms later for the <code>carries</code> and <code>overflow</code>
+ need the possibly negated <code>B</code> later for the <code>carries</code> and <code>overflow</code>
  calculation.</p>
 
 <pre>
     always @(*) begin
-        {carry_out, sum} = {1'b0, A} + {1'b0, B_selected} + {1'b0, carry_in_selected};
+        {carry_out, sum} = {1'b0, A} + {1'b0, B_selected} + {1'b0, negation_offset} + {1'b0, carry_in_selected};
     end
 </pre>
 
@@ -141,8 +151,8 @@ module <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     );
 </pre>
 
-<p>And compute the signed overflow, when the carry into and out from the MSB
- do not agree.</p>
+<p>And compute the signed overflow, which happens when the carry into and out
+ from the MSB do not agree.</p>
 
 <pre>
     always @(*) begin

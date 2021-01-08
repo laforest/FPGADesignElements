@@ -1,16 +1,28 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Computes the signed quotient of the signed dividend and divisor, based on whether each [Remainder](./Remainder_Integer_Signed.html) addition/subtraction step is successful. Part of the [Signed Integer Divider](./Divider_Integer_Signed.html) module. **Not usable by itself.**">
+<title>Quotient Integer Signed</title>
+</head>
+<body>
 
-//# Signed Integer Quotient
+<p class="inline bordered"><b><a href="./Quotient_Integer_Signed.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
-// Computes the signed quotient of the signed dividend and divisor, based on
-// whether each [Remainder](./Remainder_Integer_Signed.html)
-// addition/subtraction step is successful. Part of the [Signed Integer
-// Divider](./Divider_Integer_Signed.html) module. **Not usable by itself.**
+<h1>Signed Integer Quotient</h1>
+<p>Computes the signed quotient of the signed dividend and divisor, based on
+ whether each <a href="./Remainder_Integer_Signed.html">Remainder</a>
+ addition/subtraction step is successful. Part of the <a href="./Divider_Integer_Signed.html">Signed Integer
+ Divider</a> module. <strong>Not usable by itself.</strong></p>
+<h2>Ports and Constants</h2>
 
-//## Ports and Constants
-
+<pre>
 `default_nettype none
 
-module Quotient_Integer_Signed
+module <a href="./Quotient_Integer_Signed.html">Quotient_Integer_Signed</a>
 #(
     parameter WORD_WIDTH        = 0,
     parameter STEP_WORD_WIDTH   = 0
@@ -42,31 +54,36 @@ module Quotient_Integer_Signed
         output_valid     = 1'b0;
         control_ready    = 1'b0;
     end
+</pre>
 
-// Some basic definitions to establish our two's-complement signed
-// representation.
+<p>Some basic definitions to establish our two's-complement signed
+ representation.</p>
 
+<pre>
     localparam ADD = 1'b0;
     localparam SUB = 1'b1;
+</pre>
 
-// We have to internally compute with one extra bit of range to match the
-// behaviour of the Remainder calculations.
+<p>We have to internally compute with one extra bit of range to match the
+ behaviour of the Remainder calculations.</p>
 
+<pre>
     localparam STEP_WORD_WIDTH_LONG = STEP_WORD_WIDTH + 1;
 
     localparam WORD_WIDTH_LONG  = WORD_WIDTH + 1;
     localparam WORD_ZERO_LONG   = {WORD_WIDTH_LONG{1'b0}};
     localparam WORD_ONE_LONG    = {{WORD_WIDTH_LONG-1{1'b0}},1'b1};
     localparam WORD_ONES_LONG   = {WORD_WIDTH_LONG{1'b1}};
+</pre>
 
-//## Datapath
+<h2>Datapath</h2>
+<h3>Divisor and Dividend Signs</h3>
 
-//### Divisor and Dividend Signs
-
+<pre>
     reg  divisor_sign_enable = 1'b0;
     wire divisor_sign_loaded;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -83,7 +100,7 @@ module Quotient_Integer_Signed
     reg  dividend_sign_enable = 1'b0;
     wire dividend_sign_loaded;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -96,19 +113,20 @@ module Quotient_Integer_Signed
         .data_in        (dividend_sign),
         .data_out       (dividend_sign_loaded)
     );
+</pre>
 
-//### Quotient Increment
+<h3>Quotient Increment</h3>
+<p>The quotient increment is added/subtracted to/from the quotient each time
+ we could remove the divisor from the remainder.  Shift it right by 1 each
+ calculation step, so we increment by decreasing multiples of 2 at each
+ division step.</p>
 
-// The quotient increment is added/subtracted to/from the quotient each time
-// we could remove the divisor from the remainder.  Shift it right by 1 each
-// calculation step, so we increment by decreasing multiples of 2 at each
-// division step.
-
+<pre>
     reg                         quotient_increment_enable   = 1'b0;
     reg                         quotient_increment_load     = 1'b0;
     wire [WORD_WIDTH_LONG-1:0]  quotient_increment_reversed;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (1),
         .PIPE_DEPTH     (WORD_WIDTH_LONG),
@@ -127,13 +145,15 @@ module Quotient_Integer_Signed
         .pipe_out       ()
         // verilator lint_on  PINCONNECTEMPTY
     );
+</pre>
 
-// The Register_Pipeline only shifts left, so let's reverse its parallel
-// output.
+<p>The Register_Pipeline only shifts left, so let's reverse its parallel
+ output.</p>
 
+<pre>
     wire [WORD_WIDTH_LONG-1:0]  quotient_increment;
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (1),
         .WORD_COUNT (WORD_WIDTH_LONG)
@@ -143,15 +163,17 @@ module Quotient_Integer_Signed
         .words_in   (quotient_increment_reversed),
         .words_out  (quotient_increment)
     );
+</pre>
 
-//### Quotient Storage
+<h3>Quotient Storage</h3>
 
+<pre>
     reg                         quotient_enable = 1'b0;
     reg                         quotient_clear  = 1'b0;
     wire [WORD_WIDTH_LONG-1:0]  quotient_next;
     wire [WORD_WIDTH_LONG-1:0]  quotient_loaded;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH_LONG),
         .RESET_VALUE    (WORD_ZERO_LONG)
@@ -165,7 +187,7 @@ module Quotient_Integer_Signed
         .data_out       (quotient_loaded)
     );
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH_LONG),
         .SIGNED         (1),
@@ -176,14 +198,15 @@ module Quotient_Integer_Signed
         .original_input     (quotient_loaded),
         .adjusted_output    (quotient)
     );
+</pre>
 
-//### Quotient Calculation
+<h3>Quotient Calculation</h3>
+<p>Add or subtract depending on the signs of the inputs. We don't need to
+ handle backpressure at the input handshake of the
+ <code>Adder_Subtractor_Binary_Multiprecision</code> since we don't try to start a new
+ operation until the previous one has completed and its results stored.</p>
 
-// Add or subtract depending on the signs of the inputs. We don't need to
-// handle backpressure at the input handshake of the
-// `Adder_Subtractor_Binary_Multiprecision` since we don't try to start a new
-// operation until the previous one has completed and its results stored.
-
+<pre>
     reg quotient_add_sub = 1'b0;
 
     always @(*) begin
@@ -194,7 +217,7 @@ module Quotient_Integer_Signed
     wire quotient_output_valid;
     reg  quotient_output_ready = 1'b0;
 
-    Adder_Subtractor_Binary_Multiprecision
+    <a href="./Adder_Subtractor_Binary_Multiprecision.html">Adder_Subtractor_Binary_Multiprecision</a>
     #(
         .WORD_WIDTH         (WORD_WIDTH_LONG),
         .STEP_WORD_WIDTH    (STEP_WORD_WIDTH_LONG)
@@ -224,29 +247,31 @@ module Quotient_Integer_Signed
         .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
     );
+</pre>
 
-//## Control Path
+<h2>Control Path</h2>
+<h3>States and Storage</h3>
+<p>We denote state as two bits, with the following transitions:
+ LOAD -&gt; CALC -&gt; DONE -&gt; LOAD -&gt; ... 
+ We don't handle the fourth, impossible case.
+ The state encoding is arbitrary.</p>
 
-//### States and Storage
-
-// We denote state as two bits, with the following transitions:
-// LOAD -> CALC -> DONE -> LOAD -> ... 
-// We don't handle the fourth, impossible case.
-// The state encoding is arbitrary.
-
+<pre>
     localparam                      STATE_WIDTH     = 2;
     localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 2'b00;
     localparam [STATE_WIDTH-1:0]    STATE_CALC      = 2'b10;
     localparam [STATE_WIDTH-1:0]    STATE_DONE      = 2'b11;
     localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 2'b01; // Never reached
+</pre>
 
-// The state bits, from which we derive the control outputs and the internal
-// control signals.
+<p>The state bits, from which we derive the control outputs and the internal
+ control signals.</p>
 
+<pre>
     reg  [STATE_WIDTH-1:0]  state_next = STATE_LOAD;
     wire [STATE_WIDTH-1:0]  state;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (STATE_WIDTH),
         .RESET_VALUE    (STATE_LOAD)
@@ -259,26 +284,29 @@ module Quotient_Integer_Signed
         .data_in        (state_next),
         .data_out       (state)
     );
+</pre>
 
-//### Calculation Steps
+<h3>Calculation Steps</h3>
+<p>Each division takes <code>WORD_WIDTH_LONG</code> steps, from <code>WORD_WIDTH_LONG-1</code> to
+ <code>0</code>, plus one step to initially load the dividend and divisor. Thus, we
+ need a counter of the correct width.</p>
 
-// Each division takes `WORD_WIDTH_LONG` steps, from `WORD_WIDTH_LONG-1` to
-// `0`, plus one step to initially load the dividend and divisor. Thus, we
-// need a counter of the correct width.
-
+<pre>
     localparam STEPS_WIDTH      = clog2(WORD_WIDTH_LONG);
     localparam STEPS_INITIAL    = WORD_WIDTH_LONG - 1;
     localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
     localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
+</pre>
 
-// Count down WORD_WIDTH_LONG-1 calculation steps. Stops at zero, and reloads
-// when leaving STATE_LOAD.
+<p>Count down WORD_WIDTH_LONG-1 calculation steps. Stops at zero, and reloads
+ when leaving STATE_LOAD.</p>
 
+<pre>
     reg                     calculation_step_clear  = 1'b0;
     reg                     calculation_step_do     = 1'b0;
     wire [STEPS_WIDTH-1:0]  calculation_step;
 
-    Counter_Binary
+    <a href="./Counter_Binary.html">Counter_Binary</a>
     #(
         .WORD_WIDTH     (STEPS_WIDTH),
         .INCREMENT      (STEPS_ONE),
@@ -303,22 +331,25 @@ module Quotient_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
         .count          (calculation_step)
     );
+</pre>
 
-//### Input/Output/Control Handshakes
+<h3>Input/Output/Control Handshakes</h3>
+<p>Accept inputs when empty (after results are read out) or frehsly
+ reset/cleared). Declare outputs valid when calculation is done.
+ Signal a new calculation step each time the addition/subtraction is
+ complete.</p>
 
-// Accept inputs when empty (after results are read out) or frehsly
-// reset/cleared). Declare outputs valid when calculation is done.
-// Signal a new calculation step each time the addition/subtraction is
-// complete.
-
+<pre>
     always @(*) begin
         output_valid   = (state == STATE_DONE);
         input_ready    = (state == STATE_LOAD);
         control_ready  = (state == STATE_CALC) && (quotient_output_valid == 1'b1);
     end
+</pre>
 
-//### Control Events
+<h3>Control Events</h3>
 
+<pre>
     reg load_inputs       = 1'b0; // When we load the dividend and divisor signs.
     reg read_outputs      = 1'b0; // When we read out the quotient.
     reg read_control      = 1'b0; // When we read in the calculation step status.
@@ -334,51 +365,57 @@ module Quotient_Integer_Signed
         step_done         = (read_control == 1'b1);
         last_calculation  = (read_control == 1'b1) && (calculation_step == STEPS_ZERO);
     end
+</pre>
 
-// Past this point, we should not refer directly to the FSM states or
-// inputs/outputs, but to these events which are combinations of states and
-// signals.
+<p>Past this point, we should not refer directly to the FSM states or
+ inputs/outputs, but to these events which are combinations of states and
+ signals.</p>
+<h3>State Transitions</h3>
+<p>There is no handling of erroneous states.</p>
 
-//### State Transitions
-
-// There is no handling of erroneous states.
-
+<pre>
     always @(*) begin
         state_next = (load_inputs       == 1'b1) ? STATE_CALC : state;
         state_next = (last_calculation  == 1'b1) ? STATE_DONE : state_next;
         state_next = (read_outputs      == 1'b1) ? STATE_LOAD : state_next;
     end
+</pre>
 
-//### Calculation Steps Control
+<h3>Calculation Steps Control</h3>
 
+<pre>
     always @(*) begin
         calculation_step_clear = (load_inputs == 1'b1) || (clear == 1'b1);
         calculation_step_do    = (step_done   == 1'b1);
     end
+</pre>
 
-//### Adder/Subtractor Control
+<h3>Adder/Subtractor Control</h3>
+<p>Let the Adder/Subtractor run independently, but read out its value only
+ when the control handshake (from the Remainder module) completes. This then
+ allows the Adder/Subtractor's input handshake to complete.</p>
 
-// Let the Adder/Subtractor run independently, but read out its value only
-// when the control handshake (from the Remainder module) completes. This then
-// allows the Adder/Subtractor's input handshake to complete.
-
+<pre>
     always @(*) begin
         quotient_input_valid  = (calculating  == 1'b1);
         quotient_output_ready = (read_control == 1'b1);
     end
+</pre>
 
-//### Input Storage Control
+<h3>Input Storage Control</h3>
 
+<pre>
     always @(*) begin
         divisor_sign_enable  = (load_inputs == 1'b1);
         dividend_sign_enable = (load_inputs == 1'b1);
     end
+</pre>
 
-//### Quotient and Increment Storage Control
+<h3>Quotient and Increment Storage Control</h3>
+<p>Store only an updated Quotient if the division step from the Remainder
+ module was OK (could successfully remove the divisor from the dividend).</p>
 
-// Store only an updated Quotient if the division step from the Remainder
-// module was OK (could successfully remove the divisor from the dividend).
-
+<pre>
     always @(*) begin
         quotient_increment_enable = (load_inputs == 1'b1) || (step_done == 1'b1);
         quotient_increment_load   = (load_inputs == 1'b1);
@@ -387,4 +424,11 @@ module Quotient_Integer_Signed
     end
 
 endmodule 
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
 

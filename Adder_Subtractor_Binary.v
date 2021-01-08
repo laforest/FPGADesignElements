@@ -13,10 +13,11 @@
 
 // On FPGAs, you are much better off letting the CAD tool infer the
 // add/subtract circuitry from the `+` or `-` operator itself, rather than
-// structurally describing it in logic, as the latter may not get mapped to
-// the fast, dedicated ripple-carry hardware. Wrapping all this into a module
-// hides the width adjustments necessary to get a warning-free synthesis of
-// carry logic, and enables correct carry and overflow calculations.
+// structurally describing it in Boolean logic, as the latter may not get
+// mapped to the fast, dedicated ripple-carry hardware. Wrapping all this into
+// a module hides the width adjustments necessary to get a warning-free
+// synthesis of carry logic, and enables correct carry and overflow
+// calculations.
 
 // Because we handle the carry bits ourselves and do everything through an
 // unsigned addition, we don't depend on the tricky Verilog behaviour where
@@ -50,9 +51,9 @@ module Adder_Subtractor_Binary
     end
 
 // Extend the `carry_in` to the extended word width, as both signed (0 or -1)
-// and unsigned (0 or 1), so we don't have width mismatches nor rely on sign
-// extension, which is full of pitfalls, and would trigger useless warnings in
-// the CAD tools.
+// and unsigned (0 or 1) words, so we don't have width mismatches nor rely on
+// sign extension, which is full of pitfalls, and would trigger useless
+// warnings in the CAD tools.
 
     wire [WORD_WIDTH-1:0] carry_in_extended_unsigned;
     wire [WORD_WIDTH-1:0] carry_in_extended_signed;
@@ -81,9 +82,11 @@ module Adder_Subtractor_Binary
         .adjusted_output    (carry_in_extended_signed)
     );
 
-// Generate the 2's-complement negation of `B`, depending on `add_sub`. We do
-// this separately to have the negated `B` available later for the
-// calculations of the `carries` and of the `overflow`.
+// Depending on the value of `add_sub`, generate the bit-negation of `B` and
+// the necessary offset for `B`'s 2's-complement arithmetic negation, and
+// select the correct `carry_in` value. We do this separately to have the
+// negated `B` available later for the calculations of the `carries` and of
+// the `overflow`.
 
     reg [WORD_WIDTH-1:0] B_selected         = ZERO;
     reg [WORD_WIDTH-1:0] negation_offset    = ZERO;
@@ -96,18 +99,18 @@ module Adder_Subtractor_Binary
     end
 
 // And add as usual, with subtraction expressed as `A+((~B)+1)`, so as to
-// generate the correct `carries`.
+// generate the correct `carries` for each bit position.
 
-// Since the left-hand side is one bit wider to hold
-// `carry_out`, all other terms are implicitly extended to that width (see
-// Verilog LRM, IEEE 1364-2001, Section 4.4, "Expression bit lengths").
-// However, since I avoid implicit width extension as a way to reduce warnings
-// and prevent bugs, let's prepend a zero to all the unsigned right-hand terms
-// to make all widths match.
+// Since the left-hand side is one bit wider to hold `carry_out`, all other
+// terms are implicitly extended to that width (see Verilog LRM, IEEE
+// 1364-2001, Section 4.4, "Expression bit lengths").  However, since I avoid
+// implicit width extension as a way to reduce warnings and prevent bugs,
+// let's prepend a zero to all the unsigned right-hand terms to make all
+// widths match and force a simple, unsigned addition.
 
 // We could have done this more concisely by first widening all terms to
 // `WORD_WIDTH+1`, then selecting addition/subtraction in one line, but we
-// need the possibly negated terms later for the `carries` and `overflow`
+// need the possibly negated `B` later for the `carries` and `overflow`
 // calculation.
 
     always @(*) begin
@@ -131,8 +134,8 @@ module Adder_Subtractor_Binary
         .carryin    (carries)
     );
 
-// And compute the signed overflow, when the carry into and out from the MSB
-// do not agree.
+// And compute the signed overflow, which happens when the carry into and out
+// from the MSB do not agree.
 
     always @(*) begin
         overflow = (carries [WORD_WIDTH-1] != carry_out);

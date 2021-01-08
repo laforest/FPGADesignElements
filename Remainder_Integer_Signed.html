@@ -1,34 +1,42 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Computes the signed remainder of the signed dividend and divisor, and uses the status of each iterated subtraction to control the [Quotient](./Quotient_Integer_Signed.html) module. Part of the [Signed Integer Divider](./Divider_Integer_Signed.html) module.  **Not really usable by itself.** But if you want to do so, be sure to short-circuit the control handshake interface.">
+<title>Remainder Integer Signed</title>
+</head>
+<body>
 
-//# Signed Integer Remainder
+<p class="inline bordered"><b><a href="./Remainder_Integer_Signed.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
-// Computes the signed remainder of the signed dividend and divisor, and uses
-// the status of each iterated subtraction to control the
-// [Quotient](./Quotient_Integer_Signed.html) module. Part of the [Signed
-// Integer Divider](./Divider_Integer_Signed.html) module.  **Not really
-// usable by itself.** But if you want to do so, be sure to short-circuit the
-// control handshake interface.
+<h1>Signed Integer Remainder</h1>
+<p>Computes the signed remainder of the signed dividend and divisor, and uses
+ the status of each iterated subtraction to control the
+ <a href="./Quotient_Integer_Signed.html">Quotient</a> module. Part of the <a href="./Divider_Integer_Signed.html">Signed
+ Integer Divider</a> module.  <strong>Not really
+ usable by itself.</strong> But if you want to do so, be sure to short-circuit the
+ control handshake interface.</p>
+<h2>Interface</h2>
+<p>The calculation starts after any pending results have been read out by the
+ output ready/valid handshake, and an input ready/valid handshake provides
+ a new dividend and divisor. Each calculation step is synchronized with the
+ Quotient module through a control handshake.</p>
+<h2>Theory of Operation</h2>
+<p>Think of the <code>dividend</code> and <code>divisor</code> as points along a number line.
+ Depending on their initial signs, we will iteratively add or subtract the
+ largest possible multiple of <code>divisor</code> to/from the <code>dividend</code> as necessary
+ <em>to bring the <code>dividend</code> towards zero without passing zero</em>. No initial
+ calculations of absolute values or final sign corrections are necessary,
+ which saves a lot of hardware and cycles.</p>
+<h2>Ports and Constants</h2>
 
-//## Interface
-
-// The calculation starts after any pending results have been read out by the
-// output ready/valid handshake, and an input ready/valid handshake provides
-// a new dividend and divisor. Each calculation step is synchronized with the
-// Quotient module through a control handshake.
-
-//## Theory of Operation
-
-// Think of the `dividend` and `divisor` as points along a number line.
-// Depending on their initial signs, we will iteratively add or subtract the
-// largest possible multiple of `divisor` to/from the `dividend` as necessary
-// *to bring the `dividend` towards zero without passing zero*. No initial
-// calculations of absolute values or final sign corrections are necessary,
-// which saves a lot of hardware and cycles.
-
-//## Ports and Constants
-
+<pre>
 `default_nettype none
 
-module Remainder_Integer_Signed
+module <a href="./Remainder_Integer_Signed.html">Remainder_Integer_Signed</a>
 #(
     parameter WORD_WIDTH        = 0,
     parameter STEP_WORD_WIDTH   = 0
@@ -62,41 +70,48 @@ module Remainder_Integer_Signed
         control_valid    = 1'b0;
         step_ok          = 1'b0;
     end
+</pre>
 
-// Some basic definitions to establish our two's-complement signed
-// representation.
+<p>Some basic definitions to establish our two's-complement signed
+ representation.</p>
 
+<pre>
     localparam ADD              = 1'b0;
     localparam SUB              = 1'b1;
     localparam POSITIVE         = 1'b0;
     localparam NEGATIVE         = 1'b1;
+</pre>
 
-// We have to internally compute with one extra bit of range to allow the
-// minimum signed number to be expressible as an unsigned number. Else, we
-// cannot subtract any multiple of itself from this minimum signed number.
-// For example, `-8 / 1` needs to add `+8` to the remainder to reach
-// a remainder of `0`, and with the minimum number of bits (4) to represent
-// `-8`, we can only represent up to `+7`.
+<p>We have to internally compute with one extra bit of range to allow the
+ minimum signed number to be expressible as an unsigned number. Else, we
+ cannot subtract any multiple of itself from this minimum signed number.
+ For example, <code>-8 / 1</code> needs to add <code>+8</code> to the remainder to reach
+ a remainder of <code>0</code>, and with the minimum number of bits (4) to represent
+ <code>-8</code>, we can only represent up to <code>+7</code>.</p>
 
+<pre>
     localparam WORD_WIDTH_LONG  = WORD_WIDTH + 1;
     localparam WORD_ZERO_LONG   = {WORD_WIDTH_LONG{1'b0}};
     localparam WORD_ONE_LONG    = {{WORD_WIDTH_LONG-1{1'b0}},1'b1};
     localparam WORD_ONES_LONG   = {WORD_WIDTH_LONG{1'b1}};
+</pre>
 
-// We must then also increase the step word width by one to avoid an
-// unnecessary extra calculation step. See the [Multiprecision
-// Adder/Subtractor](./Adder_Subtractor_Binary_Multiprecision.html) module for
-// details.
+<p>We must then also increase the step word width by one to avoid an
+ unnecessary extra calculation step. See the <a href="./Adder_Subtractor_Binary_Multiprecision.html">Multiprecision
+ Adder/Subtractor</a> module for
+ details.</p>
 
+<pre>
     localparam STEP_WORD_WIDTH_LONG = STEP_WORD_WIDTH + 1;
+</pre>
 
-//## Data Path
+<h2>Data Path</h2>
+<h3>Divisor Storage and Shifting</h3>
 
-//### Divisor Storage and Shifting
-
+<pre>
     wire [WORD_WIDTH_LONG-1:0] divisor_long;
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -107,13 +122,15 @@ module Remainder_Integer_Signed
         .original_input     (divisor),
         .adjusted_output    (divisor_long)
     );
+</pre>
 
-// Extract and store the initial sign of the divisor.
+<p>Extract and store the initial sign of the divisor.</p>
 
+<pre>
     reg  divisor_sign_initial_load = 1'b0;
     wire divisor_sign_initial;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -126,15 +143,16 @@ module Remainder_Integer_Signed
         .data_in        (divisor_long [WORD_WIDTH_LONG-1]),
         .data_out       (divisor_sign_initial)
     );
+</pre>
 
-// Store the divisor aside and shift its LSB into the MSB of the
-// remainder_increment at each division step, while sign-extending the
-// divisor. The initial load does the first shift implicitly.
+<p>Store the divisor aside and shift its LSB into the MSB of the
+ remainder_increment at each division step, while sign-extending the
+ divisor. The initial load does the first shift implicitly.</p>
+<p><strong>NOTE:</strong> We do the signed shift right manually rather than use the Verilog
+ operator "&gt;&gt;&gt;" since that would need us to declare <code>divisor_long</code>, and only
+ it, as signed, which is asking for unexpected bugs.</p>
 
-// **NOTE:** We do the signed shift right manually rather than use the Verilog
-// operator ">>>" since that would need us to declare `divisor_long`, and only
-// it, as signed, which is asking for unexpected bugs.
-
+<pre>
     reg                         divisor_enable  = 1'b0;
     reg                         divisor_load    = 1'b0;
     wire [WORD_WIDTH_LONG-1:0]  divisor_loaded;
@@ -145,7 +163,7 @@ module Remainder_Integer_Signed
         divisor_initial = {divisor_long [WORD_WIDTH_LONG-1], divisor_long [WORD_WIDTH_LONG-1:1]};
     end
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH_LONG),
         .PIPE_DEPTH     (1),
@@ -164,11 +182,12 @@ module Remainder_Integer_Signed
         .pipe_in        (divisor_next),
         .pipe_out       (divisor_loaded)
     );
+</pre>
 
-//### Remainder Increment Storage and Shifting
+<h3>Remainder Increment Storage and Shifting</h3>
+<p>The initial shift into the MSB is done at load.</p>
 
-// The initial shift into the MSB is done at load.
-
+<pre>
     reg                         remainder_increment_enable  = 1'b0;
     reg                         remainder_increment_load    = 1'b0;
     wire [WORD_WIDTH_LONG-1:0]  remainder_increment_loaded;
@@ -179,7 +198,7 @@ module Remainder_Integer_Signed
         remainder_increment_initial = {divisor_long [0], WORD_ZERO};
     end
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH_LONG),
         .PIPE_DEPTH     (1),
@@ -198,12 +217,14 @@ module Remainder_Integer_Signed
         .pipe_in        (remainder_increment_next),
         .pipe_out       (remainder_increment_loaded)
     );
+</pre>
 
-//### Dividend Sign Storage
+<h3>Dividend Sign Storage</h3>
 
+<pre>
     wire [WORD_WIDTH_LONG-1:0] dividend_long;
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -217,13 +238,15 @@ module Remainder_Integer_Signed
         // verilator lint_on  UNUSED
         .adjusted_output    (dividend_long)
     );
+</pre>
 
-// Extract the initial sign of the dividend.
+<p>Extract the initial sign of the dividend.</p>
 
+<pre>
     reg  dividend_sign_initial_load = 1'b0;
     wire dividend_sign_initial;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -236,19 +259,20 @@ module Remainder_Integer_Signed
         .data_in        (dividend_long [WORD_WIDTH_LONG-1]),
         .data_out       (dividend_sign_initial)
     );
+</pre>
 
-//### Remainder Storage and Shifting
+<h3>Remainder Storage and Shifting</h3>
+<p>The <code>dividend</code> (numerator of a fraction) is stored as the <code>remainder</code> of
+ the division. We repeatedly add/subtract the <code>remainder_increment</code> unless
+ the <code>remainder</code> would become too small and flip its sign.</p>
 
-// The `dividend` (numerator of a fraction) is stored as the `remainder` of
-// the division. We repeatedly add/subtract the `remainder_increment` unless
-// the `remainder` would become too small and flip its sign.
-    
+<pre>
     reg                         remainder_enable = 1'b0;
     reg                         remainder_load   = 1'b0;
     wire [WORD_WIDTH_LONG-1:0]  remainder_loaded;
     wire [WORD_WIDTH_LONG-1:0]  remainder_next;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (WORD_WIDTH_LONG),
         .PIPE_DEPTH     (1),
@@ -268,7 +292,7 @@ module Remainder_Integer_Signed
         .pipe_out       (remainder_loaded)
     );
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH_LONG),
         .SIGNED         (1),
@@ -279,23 +303,26 @@ module Remainder_Integer_Signed
         .original_input     (remainder_loaded),
         .adjusted_output    (remainder)
     );
+</pre>
 
-//### Remainder Calculations
+<h3>Remainder Calculations</h3>
+<p>Shift the LSB of the divisor into the MSB of the remainder_increment.
+ Shifts are signed, and done manually to avoid Verilog pitfalls.</p>
 
-// Shift the LSB of the divisor into the MSB of the remainder_increment.
-// Shifts are signed, and done manually to avoid Verilog pitfalls.
-
+<pre>
     always @(*) begin
         divisor_next             = {divisor_loaded [WORD_WIDTH_LONG-1], divisor_loaded [WORD_WIDTH_LONG-1:1]};
         remainder_increment_next = {divisor_loaded [0], remainder_increment_loaded [WORD_WIDTH_LONG-1:1]};
     end
+</pre>
 
-// Now, depending on the divisor sign, check the contents of divisor to see if
-// there are still non-sign bits in it, which means the remainder_increment is
-// invalid, and check if the sign of the remainder_increment does not match
-// the sign of the divisor, which means we also haven't yet shifted enough
-// bits into the remainder_increment to make it a valid number.
+<p>Now, depending on the divisor sign, check the contents of divisor to see if
+ there are still non-sign bits in it, which means the remainder_increment is
+ invalid, and check if the sign of the remainder_increment does not match
+ the sign of the divisor, which means we also haven't yet shifted enough
+ bits into the remainder_increment to make it a valid number.</p>
 
+<pre>
     reg remainder_increment_sign  = 1'b0;
     reg divisor_all_sign_bits     = 1'b0;
     reg remainder_increment_valid = 1'b0;
@@ -305,9 +332,11 @@ module Remainder_Integer_Signed
         divisor_all_sign_bits     = (divisor_sign_initial == POSITIVE) ? (divisor_loaded == WORD_ZERO_LONG) : (divisor_loaded == WORD_ONES_LONG);
         remainder_increment_valid = (remainder_increment_sign == divisor_sign_initial) && (divisor_all_sign_bits == 1'b1);
     end
+</pre>
 
-// Then apply the remainder_increment to the remainder
+<p>Then apply the remainder_increment to the remainder</p>
 
+<pre>
     reg remainder_add_sub = 1'b0;
 
     always @(*) begin
@@ -321,7 +350,7 @@ module Remainder_Integer_Signed
 
     wire remainder_next_overflow;
 
-    Adder_Subtractor_Binary_Multiprecision
+    <a href="./Adder_Subtractor_Binary_Multiprecision.html">Adder_Subtractor_Binary_Multiprecision</a>
     #(
         .WORD_WIDTH         (WORD_WIDTH_LONG),
         .STEP_WORD_WIDTH    (STEP_WORD_WIDTH_LONG)
@@ -351,24 +380,27 @@ module Remainder_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
         .overflow   (remainder_next_overflow)
     );
+</pre>
 
-// If the next division step would overshoot past zero and change the sign of
-// the remainder, meaning too much was added/subtracted, then this division
-// step does nothing.
+<p>If the next division step would overshoot past zero and change the sign of
+ the remainder, meaning too much was added/subtracted, then this division
+ step does nothing.</p>
 
+<pre>
     reg remainder_next_valid = 1'b0;
 
     always @(*) begin
         remainder_next_valid = ((remainder_next [WORD_WIDTH_LONG-1] == dividend_sign_initial) && (remainder_next_overflow == 1'b0)) || (remainder_next == WORD_ZERO_LONG);
     end
+</pre>
 
-// And report if we tried to divide by zero. We do this after the pipeline
-// since it's a reduction operation. We can load this at the end of the first
-// calculation step.
+<p>And report if we tried to divide by zero. We do this after the pipeline
+ since it's a reduction operation. We can load this at the end of the first
+ calculation step.</p>
+<p>We have to reconstruct the initially loaded divisor by undoing the first
+ shift into the remainder increment at load time.</p>
 
-// We have to reconstruct the initially loaded divisor by undoing the first
-// shift into the remainder increment at load time.
-
+<pre>
     reg divisor_is_zero     = 1'b0;
     reg divide_by_zero_load = 1'b0;
 
@@ -376,7 +408,7 @@ module Remainder_Integer_Signed
         divisor_is_zero = ({divisor_loaded [0 +: WORD_WIDTH], remainder_increment_loaded [WORD_WIDTH_LONG-1]} == WORD_ZERO_LONG);
     end
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -389,29 +421,31 @@ module Remainder_Integer_Signed
         .data_in        (divisor_is_zero),
         .data_out       (divide_by_zero)
     );
+</pre>
 
-//## Control Path
+<h2>Control Path</h2>
+<h3>States and Storage</h3>
+<p>We denote state as two bits, with the following transitions:
+ LOAD -&gt; CALC -&gt; DONE -&gt; LOAD -&gt; ... 
+ We don't handle the fourth, impossible case.
+ The state encoding is arbitrary.</p>
 
-//### States and Storage
-
-// We denote state as two bits, with the following transitions:
-// LOAD -> CALC -> DONE -> LOAD -> ... 
-// We don't handle the fourth, impossible case.
-// The state encoding is arbitrary.
-
+<pre>
     localparam                      STATE_WIDTH     = 2;
     localparam [STATE_WIDTH-1:0]    STATE_LOAD      = 2'b00;
     localparam [STATE_WIDTH-1:0]    STATE_CALC      = 2'b10;
     localparam [STATE_WIDTH-1:0]    STATE_DONE      = 2'b11;
     localparam [STATE_WIDTH-1:0]    STATE_ERROR     = 2'b01; // Never reached
+</pre>
 
-// The state bits, from which we derive the control outputs and the internal
-// control signals.
+<p>The state bits, from which we derive the control outputs and the internal
+ control signals.</p>
 
+<pre>
     reg  [STATE_WIDTH-1:0]  state_next = STATE_LOAD;
     wire [STATE_WIDTH-1:0]  state;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (STATE_WIDTH),
         .RESET_VALUE    (STATE_LOAD)
@@ -424,26 +458,29 @@ module Remainder_Integer_Signed
         .data_in        (state_next),
         .data_out       (state)
     );
+</pre>
 
-///### Calculation Steps
+<h3>Calculation Steps</h3>
+<p>Each division takes <code>WORD_WIDTH_LONG</code> steps, from <code>WORD_WIDTH_LONG-1</code> to <code>0</code>, plus
+ one step to initially load the dividend and divisor. Thus, we need
+ a counter of the correct width.</p>
 
-// Each division takes `WORD_WIDTH_LONG` steps, from `WORD_WIDTH_LONG-1` to `0`, plus
-// one step to initially load the dividend and divisor. Thus, we need
-// a counter of the correct width.
-
+<pre>
     localparam STEPS_WIDTH      = clog2(WORD_WIDTH_LONG);
     localparam STEPS_INITIAL    = WORD_WIDTH_LONG - 1;
     localparam STEPS_ZERO       = {STEPS_WIDTH{1'b0}};
     localparam STEPS_ONE        = {{STEPS_WIDTH-1{1'b0}},1'b1};
+</pre>
 
-// Count down WORD_WIDTH-1 calculation steps. Stops at zero, and reloads when
-// leaving STATE_LOAD.
+<p>Count down WORD_WIDTH-1 calculation steps. Stops at zero, and reloads when
+ leaving STATE_LOAD.</p>
 
+<pre>
     reg                     calculation_step_clear  = 1'b0;
     reg                     calculation_step_do     = 1'b0;
     wire [STEPS_WIDTH-1:0]  calculation_step;
 
-    Counter_Binary
+    <a href="./Counter_Binary.html">Counter_Binary</a>
     #(
         .WORD_WIDTH     (STEPS_WIDTH),
         .INCREMENT      (STEPS_ONE),
@@ -468,21 +505,24 @@ module Remainder_Integer_Signed
         // verilator lint_on  PINCONNECTEMPTY
         .count          (calculation_step)
     );
+</pre>
 
-//### Input/Output/Control Handshakes
+<h3>Input/Output/Control Handshakes</h3>
+<p>Accept inputs when empty (after results are read out) or frehsly
+ reset/cleared). Declare outputs valid when calculation is done.  Perform
+ a control handshake each time the addition/subtraction is complete.</p>
 
-// Accept inputs when empty (after results are read out) or frehsly
-// reset/cleared). Declare outputs valid when calculation is done.  Perform
-// a control handshake each time the addition/subtraction is complete.
-
+<pre>
     always @(*) begin
         output_valid   = (state == STATE_DONE);
         input_ready    = (state == STATE_LOAD);
         control_valid  = (state == STATE_CALC) && (remainder_output_valid == 1'b1);
     end
+</pre>
 
-//### Control Events
+<h3>Control Events</h3>
 
+<pre>
     reg load_inputs       = 1'b0; // When we load the dividend and divisor.
     reg read_outputs      = 1'b0; // When we read out the remainder.
     reg read_control      = 1'b0; // When other computations acknowledge the calculation step.
@@ -500,44 +540,51 @@ module Remainder_Integer_Signed
         first_calculation = (read_control == 1'b1) && (calculation_step == STEPS_INITIAL [STEPS_WIDTH-1:0]);
         last_calculation  = (read_control == 1'b1) && (calculation_step == STEPS_ZERO);
     end
+</pre>
 
-// Past this point, we should not refer directly to the FSM states,
-// but to these events which are combinations of states and signals.
+<p>Past this point, we should not refer directly to the FSM states,
+ but to these events which are combinations of states and signals.</p>
+<h3>State Transitions</h3>
+<p>There is no handling of erroneous states.</p>
 
-//### State Transitions
-
-// There is no handling of erroneous states.
-
+<pre>
     always @(*) begin
         state_next = (load_inputs       == 1'b1) ? STATE_CALC : state;
         state_next = (last_calculation  == 1'b1) ? STATE_DONE : state_next;
         state_next = (read_outputs      == 1'b1) ? STATE_LOAD : state_next;
     end
+</pre>
 
-//### Calculation Step Status
+<h3>Calculation Step Status</h3>
+<p>Signal to the Quotient module if this calculation step was valid. </p>
 
-// Signal to the Quotient module if this calculation step was valid. 
-
+<pre>
     always @(*) begin
         step_ok = (remainder_next_valid == 1'b1) && (remainder_increment_valid == 1'b1) && (calculating == 1'b1) && (step_done == 1'b1);
     end
+</pre>
 
-//### Calculation Step Control
+<h3>Calculation Step Control</h3>
 
+<pre>
     always @(*) begin
         calculation_step_clear = (load_inputs == 1'b1) || (clear == 1'b1);
         calculation_step_do    = (step_done   == 1'b1);
     end
+</pre>
 
-// Adder/Subtractor Control
+<p>Adder/Subtractor Control</p>
 
+<pre>
     always @(*) begin
         remainder_input_valid  = (calculating  == 1'b1);
         remainder_output_ready = (read_control == 1'b1);
     end
+</pre>
 
-// Divisor and Remainder Increment Control
+<p>Divisor and Remainder Increment Control</p>
 
+<pre>
     always @(*) begin
         divide_by_zero_load         = (first_calculation == 1'b1);
         divisor_load                = (load_inputs    == 1'b1);
@@ -546,9 +593,11 @@ module Remainder_Integer_Signed
         remainder_increment_load    = (divisor_load   == 1'b1);
         remainder_increment_enable  = (divisor_enable == 1'b1);
     end
+</pre>
 
-// Dividend and the Remainder Control
+<p>Dividend and the Remainder Control</p>
 
+<pre>
     always @(*) begin
         dividend_sign_initial_load  = (load_inputs == 1'b1);
         remainder_load              = (load_inputs == 1'b1);
@@ -556,4 +605,11 @@ module Remainder_Integer_Signed
     end
 
 endmodule 
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
 

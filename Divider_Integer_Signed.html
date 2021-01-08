@@ -1,0 +1,278 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Calculates the signed integer `quotient` and `remainder` of the signed integer `dividend` and `divisor`. This divider can handle large integers (e.g. 128 bits), without impacting clock speed, at the expense of extra latency.">
+<title>Divider Integer Signed</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Divider_Integer_Signed.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Signed Integer Divider</h1>
+<p>Calculates the signed integer <code>quotient</code> and <code>remainder</code> of the signed
+ integer <code>dividend</code> and <code>divisor</code>. This divider can handle large integers
+ (e.g. 128 bits), without impacting clock speed, at the expense of extra
+ latency.</p>
+<h2>Example Values</h2>
+<p><pre>
+  22 /   7 =  3 rem  1
+ -22 /   7 = -3 rem -1
+  22 /  -7 = -3 rem  1
+ -22 /  -7 =  3 rem -1
+   7 /  22 =  0 rem  7
+  -7 / -22 =  0 rem -7
+  -7 /  22 =  0 rem -7
+   7 / -22 =  0 rem  7
+   0 /   0 = -1 rem  0 (raises divide_by_zero)
+  22 /   0 = -1 rem 22 (raises divide_by_zero)
+ -22 /   0 =  1 rem 22 (raises divide_by_zero)</pre></p>
+<h2>Algorithm</h2>
+<p>This module implements division as iterated conditional subtraction of
+ multiples of the <code>divisor</code> from the <code>dividend</code>, just as one would do
+ manually on paper. The algorithm is described in more detail inside the
+ <a href="./Remainder_Integer_Signed.html">Remainder</a> and
+ <a href="./Quotient_Integer_Signed.html">Quotient</a> modules.</p>
+<p>Iterated subtraction is not the fastest algorithm, but all faster
+ algorithms depend on multiplication, which requires a quadratically
+ increasing amount of multiplication hardware as the bit width increases.</p>
+<h2>Architecture</h2>
+<p>The Remainder and Quotient modules synchronize each division step
+ calculation through a <a href="./Skid_Buffer_Pipeline.html">Skid Buffer Pipeline</a>
+ and coordinate the start and end of their calculations with <a href="./Pipeline_Fork_Eager.html">Pipeline
+ Fork</a> and <a href="./Pipeline_Join.html">Pipeline Join</a>
+ modules. Each division step addition/subtraction is done using
+ a <a href="./Adder_Subtractor_Binary_Multiprecision.html">Multiprecision
+ Adder/Subtractor</a> to avoid
+ excessive area and carry-chain critical paths.  This division of work
+ allows buffering control and data as necessary to maintain a high clock
+ frequency.</p>
+<h2>Operation</h2>
+<p>Start a division by completing the input ready/valid handshake, and read
+ out the results by completing the output handshake. Set <code>WORD_WIDTH</code> to the
+ width of your integers, and <code>STEP_WORD_WIDTH</code> to an <em>equal or smaller
+ number</em>, which will be the width of the internal adder/subtractors.  If the
+ area is too large, or the carry-chains form the critical path, decrease
+ <code>STEP_WORD_WIDTH</code>, which will proportionately decrease the area and the
+ carry-chain length, and increase the latency.  If control between Remainder
+ and Quotient calculations becomes the critical path, increase
+ <code>PIPELINE_STAGES_SYNC</code>, which has a negligible impact on area and
+ moderately increases latency.</p>
+<h2>Latency</h2>
+<p>The latency is <em>approximately</em> equal to <code>WORD_WIDTH / STEP_WORD_WIDTH</code>
+ cycles per bit, plus one cycle per bit for each <code>PIPELINE_STAGES_SYNC</code>,
+ plus one cycle overall for the input and output handshakes each.</p>
+<h2>Ports and Constants</h2>
+
+<pre>
+`default_nettype none
+
+module <a href="./Divider_Integer_Signed.html">Divider_Integer_Signed</a>
+#(
+    parameter WORD_WIDTH            = 0,
+    parameter STEP_WORD_WIDTH       = 0,
+    parameter PIPELINE_STAGES_SYNC  = 0
+)
+(
+    input  wire                     clock,
+    input  wire                     clear,
+
+    input  wire                     input_valid,
+    output wire                     input_ready,
+    input  wire [WORD_WIDTH-1:0]    dividend,
+    input  wire [WORD_WIDTH-1:0]    divisor,
+
+    output wire                     output_valid,
+    input  wire                     output_ready,
+    output wire [WORD_WIDTH-1:0]    quotient,
+    output wire [WORD_WIDTH-1:0]    remainder,
+    output wire                     divide_by_zero
+);
+
+    localparam UNIT_COUNT         = 2;
+    localparam TOTAL_INPUT_WIDTH  = WORD_WIDTH * UNIT_COUNT;
+    localparam TOTAL_OUTPUT_WIDTH = WORD_WIDTH + 1;
+</pre>
+
+<h2>Input Pipeline Fork</h2>
+<p>Buffers the input handshake and replicates it to the Remainder and Quotient
+ modules.</p>
+
+<pre>
+    wire input_valid_remainder;
+    wire input_ready_remainder;
+    wire input_valid_quotient;
+    wire input_ready_quotient;
+
+    wire [WORD_WIDTH-1:0] dividend_remainder;
+    wire [WORD_WIDTH-1:0] divisor_remainder;
+    wire [WORD_WIDTH-1:0] dividend_quotient;
+    wire [WORD_WIDTH-1:0] divisor_quotient;
+
+    <a href="./Pipeline_Fork_Eager.html">Pipeline_Fork_Eager</a>
+    #(
+        .WORD_WIDTH     (TOTAL_INPUT_WIDTH),
+        .OUTPUT_COUNT   (UNIT_COUNT)
+    )
+    write_to_units
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .input_valid    (input_valid),
+        .input_ready    (input_ready),
+        .input_data     ({dividend, divisor}),
+
+        .output_valid   ({input_valid_remainder, input_valid_quotient}),
+        .output_ready   ({input_ready_remainder, input_ready_quotient}),
+        .output_data    ({dividend_remainder, divisor_remainder, dividend_quotient, divisor_quotient})
+    );
+</pre>
+
+<h2>Remainder Calculation Unit</h2>
+<p>At each division step, the Remainder module signals to the Quotient module
+ if the current division step is OK (meaning: the current
+ addition/subtraction left a valid intermediate remainder), and so that the
+ Quotient should be updated. </p>
+
+<pre>
+    wire output_valid_remainder;
+    wire output_ready_remainder;
+    wire control_valid_remainder;
+    wire control_ready_remainder;
+
+    wire [WORD_WIDTH-1:0] remainder_internal;
+    wire                  divide_by_zero_internal;
+    wire                  step_ok_remainder;
+
+    <a href="./Remainder_Integer_Signed.html">Remainder_Integer_Signed</a>
+    #(
+        .WORD_WIDTH         (WORD_WIDTH),
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
+    )
+    remainder_calc
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .input_valid    (input_valid_remainder),
+        .input_ready    (input_ready_remainder),
+        .dividend       (dividend_remainder),
+        .divisor        (divisor_remainder),
+
+        .output_valid   (output_valid_remainder),
+        .output_ready   (output_ready_remainder),
+        .remainder      (remainder_internal),
+        .divide_by_zero (divide_by_zero_internal),
+
+        .control_valid  (control_valid_remainder),
+        .control_ready  (control_ready_remainder),
+        .step_ok        (step_ok_remainder)
+    );
+</pre>
+
+<h2>Calculation Synchronization Buffer</h2>
+<p>Since the Remainder and Quotient modules can get physically large, we need
+ to optionally buffer the control path between them.</p>
+
+<pre>
+    wire control_valid_quotient;
+    wire control_ready_quotient;
+    wire step_ok_quotient;
+
+    <a href="./Skid_Buffer_Pipeline.html">Skid_Buffer_Pipeline</a>
+    #(
+        .WORD_WIDTH     (1),
+        .PIPE_DEPTH     (PIPELINE_STAGES_SYNC)
+    )
+    buffer_sync
+    (
+        .clock          (clock),
+        .clear          (clear),
+        .input_valid    (control_valid_remainder),
+        .input_ready    (control_ready_remainder),
+        .input_data     (step_ok_remainder),
+
+        .output_valid   (control_valid_quotient),
+        .output_ready   (control_ready_quotient),
+        .output_data    (step_ok_quotient)
+    );
+</pre>
+
+<h2>Quotient Calculation Unit</h2>
+
+<pre>
+    wire output_valid_quotient;
+    wire output_ready_quotient;
+
+    wire [WORD_WIDTH-1:0] quotient_internal;
+
+    <a href="./Quotient_Integer_Signed.html">Quotient_Integer_Signed</a>
+    #(
+        .WORD_WIDTH         (WORD_WIDTH),
+        .STEP_WORD_WIDTH    (STEP_WORD_WIDTH)
+    )
+    quotient_calc
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .input_valid    (input_valid_quotient),
+        .input_ready    (input_ready_quotient),
+        .dividend_sign  (dividend_quotient [WORD_WIDTH-1]),
+        .divisor_sign   (divisor_quotient  [WORD_WIDTH-1]),
+
+        .output_valid   (output_valid_quotient),
+        .output_ready   (output_ready_quotient),
+        .quotient       (quotient_internal),
+
+        .control_valid  (control_valid_quotient),
+        .control_ready  (control_ready_quotient),
+        .step_ok        (step_ok_quotient)
+    );
+</pre>
+
+<h2>Output Pipeline Join</h2>
+<p>Synchronizes and buffers the output handshakes of the Remainder and
+ Quotient modules into the output handshake.</p>
+<p>A <code>dummy</code> signal is necessary since we have to use the same data width for
+ all handshakes, and the Quotient output is short one bit. The dummy wire,
+ and its associated logic, are not connected to any destination and so will
+ optimize away. (This may raise a warning in your CAD tools.)</p>
+
+<pre>
+    // verilator lint_off UNUSED
+    wire dummy;
+    // verilator lint_on  UNUSED
+
+    <a href="./Pipeline_Join.html">Pipeline_Join</a>
+    #(
+        .WORD_WIDTH     (TOTAL_OUTPUT_WIDTH),
+        .INPUT_COUNT    (UNIT_COUNT)
+    )
+    read_from_units
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .input_valid    ({output_valid_remainder, output_valid_quotient}),
+        .input_ready    ({output_ready_remainder, output_ready_quotient}),
+        .input_data     ({remainder_internal, divide_by_zero_internal, quotient_internal, 1'b0}),
+
+        .output_valid   (output_valid),
+        .output_ready   (output_ready),
+        .output_data    ({remainder, divide_by_zero, quotient, dummy})
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

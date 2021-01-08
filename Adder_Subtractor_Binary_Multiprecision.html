@@ -1,39 +1,47 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A signed binary integer adder/subtractor, which does arithmetic over `WORD_WIDTH` words as a sequence of smaller `STEP_WORD_WIDTH` operations to save area and increase operating speed at the price of extra latency.">
+<title>Adder Subtractor Binary Multiprecision</title>
+</head>
+<body>
 
-//# Multiprecision Binary Integer Adder/Subtractor
+<p class="inline bordered"><b><a href="./Adder_Subtractor_Binary_Multiprecision.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
-// A signed binary integer adder/subtractor, which does arithmetic over
-// `WORD_WIDTH` words as a sequence of smaller `STEP_WORD_WIDTH` operations to
-// save area and increase operating speed at the price of extra latency.
+<h1>Multiprecision Binary Integer Adder/Subtractor</h1>
+<p>A signed binary integer adder/subtractor, which does arithmetic over
+ <code>WORD_WIDTH</code> words as a sequence of smaller <code>STEP_WORD_WIDTH</code> operations to
+ save area and increase operating speed at the price of extra latency.</p>
+<p>The main use of this circuit is to avoid CAD problems which can emerge at
+ large integer bit widths (e.g.: 128 bits): the area of added pipeline
+ registers would become quite large, and the CAD tools can fail to retime
+ them completely into the extra-wide adder logic, thus failing to reach
+ a high operating frequency and slowing down the rest of the system.  <em>There
+ are notes in the code which point out the critical paths you can expect to
+ see (or not).</em></p>
+<p>Also, if we don't need a result every cycle, regular pipelining is
+ wasteful: it unnecessarily duplicates the input/output data storage, and
+ makes poor use of the adder/subtractor logic (e.g.: the least-significant
+ bits are used once, then sit idle for multiple cycles while the higher bits
+ are computed).</p>
+<p>Since the result latency depends on the ratio of <code>WORD_WIDTH</code> to
+ <code>STEP_WORD_WIDTH</code> and whether that ratio is a whole integer, the inputs are
+ set with a ready/valid handshake, and can be updated after the output
+ handshake completes.</p>
+<p>Addition/subtraction is selected with <code>add_sub</code>: 0 for an add (<code>A+B</code>), and
+ 1 for a subtract (<code>A-B</code>). This assignment conveniently matches the
+ convention of sign bits. <em>Note that the <code>overflow</code> bit is only meaningful
+ for signed numbers. For unsigned numbers, use <code>carry_out</code> instead.</em></p>
+<h2>Ports and Constants</h2>
 
-// The main use of this circuit is to avoid CAD problems which can emerge at
-// large integer bit widths (e.g.: 128 bits): the area of added pipeline
-// registers would become quite large, and the CAD tools can fail to retime
-// them completely into the extra-wide adder logic, thus failing to reach
-// a high operating frequency and slowing down the rest of the system.  *There
-// are notes in the code which point out the critical paths you can expect to
-// see (or not).*
-
-// Also, if we don't need a result every cycle, regular pipelining is
-// wasteful: it unnecessarily duplicates the input/output data storage, and
-// makes poor use of the adder/subtractor logic (e.g.: the least-significant
-// bits are used once, then sit idle for multiple cycles while the higher bits
-// are computed).
-
-// Since the result latency depends on the ratio of `WORD_WIDTH` to
-// `STEP_WORD_WIDTH` and whether that ratio is a whole integer, the inputs are
-// set with a ready/valid handshake, and can be updated after the output
-// handshake completes.
-
-// Addition/subtraction is selected with `add_sub`: 0 for an add (`A+B`), and
-// 1 for a subtract (`A-B`). This assignment conveniently matches the
-// convention of sign bits. *Note that the `overflow` bit is only meaningful
-// for signed numbers. For unsigned numbers, use `carry_out` instead.*
-
-//## Ports and Constants
-
+<pre>
 `default_nettype none
 
-module Adder_Subtractor_Binary_Multiprecision
+module <a href="./Adder_Subtractor_Binary_Multiprecision.html">Adder_Subtractor_Binary_Multiprecision</a>
 #(
     parameter WORD_WIDTH        = 0,
     parameter STEP_WORD_WIDTH   = 0
@@ -71,44 +79,50 @@ module Adder_Subtractor_Binary_Multiprecision
     `include "./clog2_function.vh"
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+</pre>
 
-// Compute how many `STEP_WORD_WIDTH` words we will need to hold
-// a `WORD_WIDTH` input. The total width may end up larger, but we will
-// discard the extra bits at the end.
+<p>Compute how many <code>STEP_WORD_WIDTH</code> words we will need to hold
+ a <code>WORD_WIDTH</code> input. The total width may end up larger, but we will
+ discard the extra bits at the end.</p>
 
+<pre>
     localparam STEP_WORD_COUNT = word_count(WORD_WIDTH, STEP_WORD_WIDTH);
     localparam STEP_WORD_WIDTH_TOTAL = STEP_WORD_WIDTH * STEP_WORD_COUNT;
 
     localparam STEP_WORD_ZERO  = {STEP_WORD_WIDTH{1'b0}};
     localparam STEP_TOTAL_ZERO = {STEP_WORD_WIDTH_TOTAL{1'b0}};
+</pre>
 
-// How many pad bits at the end of the last step word?  Re-adjust to zero (see
-// [Word Pad](./word_pad_function.html) for why) since we don't construct
-// a pad here, only index to its position in the last step word.    
+<p>How many pad bits at the end of the last step word?  Re-adjust to zero (see
+ <a href="./word_pad_function.html">Word Pad</a> for why) since we don't construct
+ a pad here, only index to its position in the last step word.    </p>
 
+<pre>
     localparam PAD_WIDTH_RAW   = word_pad(WORD_WIDTH, STEP_WORD_WIDTH);
     localparam PAD_WIDTH       = (PAD_WIDTH_RAW == STEP_WORD_WIDTH) ? 0 : PAD_WIDTH_RAW;
+</pre>
 
-// We must add a bit of width to the step counter to deal with the special
-// case where `STEP_WORD_WIDTH` equals `WORD_WIDTH`, so the `STEP_WORD_COUNT`
-// is 1, and thus the counter would be of width zero, which is impossible.
-// The overhead is insignificant and grows logarithmically at worst.
+<p>We must add a bit of width to the step counter to deal with the special
+ case where <code>STEP_WORD_WIDTH</code> equals <code>WORD_WIDTH</code>, so the <code>STEP_WORD_COUNT</code>
+ is 1, and thus the counter would be of width zero, which is impossible.
+ The overhead is insignificant and grows logarithmically at worst.</p>
 
+<pre>
     localparam STEP_COUNT_WIDTH   = clog2(STEP_WORD_COUNT) + 1;
     localparam STEP_COUNT_INITIAL = STEP_WORD_COUNT - 1;
     localparam STEP_ONE           = {{STEP_COUNT_WIDTH-1{1'b0}},1'b1};
     localparam STEP_ZERO          = {STEP_COUNT_WIDTH{1'b0}};
+</pre>
 
-//## Datapath
+<h2>Datapath</h2>
+<h3>Carry Bit Storage</h3>
+<p>Set the initial <code>step_carry_in</code> into the step adder/subtractor to 1 (which
+ matches the <code>add_sub</code> convention) if subtracting to complete the negation
+ of the inverted <code>B</code> operand, and update it at each calculation step with the
+ <code>step_carry_out</code>.  The final <code>carry_out</code> is calculated later, and depends on
+ the <code>PAD_WIDTH</code>.</p>
 
-//### Carry Bit Storage
-
-// Set the initial `step_carry_in` into the step adder/subtractor to 1 (which
-// matches the `add_sub` convention) if subtracting to complete the negation
-// of the inverted `B` operand, and update it at each calculation step with the
-// `step_carry_out`.  The final `carry_out` is calculated later, and depends on
-// the `PAD_WIDTH`.
-
+<pre>
     reg  load_carry_initial     = 1'b0;
     reg  load_carry_step        = 1'b0;
     reg  step_carry_selected    = 1'b0;
@@ -119,7 +133,7 @@ module Adder_Subtractor_Binary_Multiprecision
         step_carry_selected = (load_carry_initial == 1'b1) ? add_sub : step_carry_out;
     end 
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (1),
         .RESET_VALUE    (1'b0)
@@ -132,14 +146,15 @@ module Adder_Subtractor_Binary_Multiprecision
         .data_in        (step_carry_selected),
         .data_out       (step_carry_in)
     );
+</pre>
 
-//### Input Pipeline for A
+<h3>Input Pipeline for A</h3>
+<p>Extend A to the total width of the pipeline as a signed integer.</p>
 
-// Extend A to the total width of the pipeline as a signed integer.
-
+<pre>
     wire [STEP_WORD_WIDTH_TOTAL-1:0] A_extended;
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -150,13 +165,15 @@ module Adder_Subtractor_Binary_Multiprecision
         .original_input     (A),
         .adjusted_output    (A_extended)
     );
+</pre>
 
-// Word-reverse `A_extended` so the pipeline outputs the least significant
-// step word first.
+<p>Word-reverse <code>A_extended</code> so the pipeline outputs the least significant
+ step word first.</p>
 
+<pre>
     wire [STEP_WORD_WIDTH_TOTAL-1:0] A_reversed;
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH),
         .WORD_COUNT (STEP_WORD_COUNT)
@@ -166,14 +183,16 @@ module Adder_Subtractor_Binary_Multiprecision
         .words_in   (A_extended),
         .words_out  (A_reversed)
     );
+</pre>
 
-// Read `A_extended` into the pipeline, and feed it out one step word at
-// a time, from least to most-significant.
+<p>Read <code>A_extended</code> into the pipeline, and feed it out one step word at
+ a time, from least to most-significant.</p>
 
+<pre>
     reg                        load_A = 1'b0;
     wire [STEP_WORD_WIDTH-1:0] step_A;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (STEP_WORD_WIDTH),
         .PIPE_DEPTH     (STEP_WORD_COUNT),
@@ -192,31 +211,33 @@ module Adder_Subtractor_Binary_Multiprecision
         .pipe_in        (STEP_WORD_ZERO),
         .pipe_out       (step_A)
     );
+</pre>
 
-//### Input Pipeline for B
+<h3>Input Pipeline for B</h3>
+<p>Invert <code>B</code> if subtracting. The <code>step_carry_in</code> is already correctly
+ initialized to 1 to make it into a negation.</p>
+<p>We do the negation of <code>B</code> in this module instead of using the built-in
+ negation logic in the <code>Adder_Subtractor_Binary</code> sub-module because I could
+ not predict what logic would synthesize when subtracting, which is
+ internally be implemented as <code>A+((~B)+1)-carry_in</code>. So to be sure the logic
+ synthesizes predictably, I decided to remove <code>carry_in</code> as an input to this
+ module and use the internal <code>carry_storage</code> as part of the negation of <code>B</code>
+ when subtracting, which then implements as <code>A+((~B)+step_carry_in)</code>.</p>
 
-// Invert `B` if subtracting. The `step_carry_in` is already correctly
-// initialized to 1 to make it into a negation.
-
-// We do the negation of `B` in this module instead of using the built-in
-// negation logic in the `Adder_Subtractor_Binary` sub-module because I could
-// not predict what logic would synthesize when subtracting, which is
-// internally be implemented as `A+((~B)+1)-carry_in`. So to be sure the logic
-// synthesizes predictably, I decided to remove `carry_in` as an input to this
-// module and use the internal `carry_storage` as part of the negation of `B`
-// when subtracting, which then implements as `A+((~B)+step_carry_in)`.
-
+<pre>
     reg [WORD_WIDTH-1:0] B_selected = WORD_ZERO;
 
     always @(*) begin
         B_selected = (add_sub == 1'b1) ? ~B : B;
     end
+</pre>
 
-// Extend B to the total width of the pipeline as a signed integer.
+<p>Extend B to the total width of the pipeline as a signed integer.</p>
 
+<pre>
     wire [STEP_WORD_WIDTH_TOTAL-1:0] B_extended;
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (WORD_WIDTH),
         .SIGNED         (1),
@@ -227,13 +248,15 @@ module Adder_Subtractor_Binary_Multiprecision
         .original_input     (B_selected),
         .adjusted_output    (B_extended)
     );
+</pre>
 
-// Word-reverse `B_extended` so the pipeline outputs the least significant step
-// word first.
+<p>Word-reverse <code>B_extended</code> so the pipeline outputs the least significant step
+ word first.</p>
 
+<pre>
     wire [STEP_WORD_WIDTH_TOTAL-1:0] B_reversed;
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH),
         .WORD_COUNT (STEP_WORD_COUNT)
@@ -243,14 +266,16 @@ module Adder_Subtractor_Binary_Multiprecision
         .words_in   (B_extended),
         .words_out  (B_reversed)
     );
+</pre>
 
-// Read `B_extended` into the pipeline , and feed it out one step word at
-// a time, from least to most-significant.
+<p>Read <code>B_extended</code> into the pipeline , and feed it out one step word at
+ a time, from least to most-significant.</p>
 
+<pre>
     reg                        load_B = 1'b0;
     wire [STEP_WORD_WIDTH-1:0] step_B;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (STEP_WORD_WIDTH),
         .PIPE_DEPTH     (STEP_WORD_COUNT),
@@ -269,25 +294,24 @@ module Adder_Subtractor_Binary_Multiprecision
         .pipe_in        (STEP_WORD_ZERO),
         .pipe_out       (step_B)
     );
+</pre>
 
-//### Step Adder Logic 
+<h3>Step Adder Logic</h3>
+<p><em>NOTE: the <code>step_carry_in</code> and <code>step_carry_out</code> storage and wiring was
+ defined earlier.</em></p>
+<p>We cannot use the built-in <code>overflow</code> as if there are pad bits at the MSB
+ positions in the last step word, they will falsely disable the overflow and
+ carry-out bits. So we calculate the <code>overflow</code> and <code>carry_out</code> later in
+ this module, and the unused logic in <code>Adder_Subtractor_Binary</code> will
+ optimize away.</p>
+<p>The adder carry-chain should <em>never</em> be the critical path. If so, reduce
+ <code>STEP_WORD_WIDTH</code> as needed.</p>
 
-// *NOTE: the `step_carry_in` and `step_carry_out` storage and wiring was
-// defined earlier.*
-
-// We cannot use the built-in `overflow` as if there are pad bits at the MSB
-// positions in the last step word, they will falsely disable the overflow and
-// carry-out bits. So we calculate the `overflow` and `carry_out` later in
-// this module, and the unused logic in `Adder_Subtractor_Binary` will
-// optimize away.
-
-// The adder carry-chain should *never* be the critical path. If so, reduce
-// `STEP_WORD_WIDTH` as needed.
-
+<pre>
     wire [STEP_WORD_WIDTH-1:0] step_sum;
     wire [STEP_WORD_WIDTH-1:0] step_carries;
 
-    Adder_Subtractor_Binary
+    <a href="./Adder_Subtractor_Binary.html">Adder_Subtractor_Binary</a>
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH)
     )
@@ -304,18 +328,19 @@ module Adder_Subtractor_Binary_Multiprecision
         .overflow   ()
         // verilator lint_on  PINCONNECTEMPTY
     );
+</pre>
 
-//### Output Pipeline for Sum
+<h3>Output Pipeline for Sum</h3>
+<p>Store the <code>step_sum</code> word-by-word, then word-reverse it back to the
+ expected order so we can extract the least-significant <code>WORD_WIDTH</code> subset
+ which contains the result we want.</p>
 
-// Store the `step_sum` word-by-word, then word-reverse it back to the
-// expected order so we can extract the least-significant `WORD_WIDTH` subset
-// which contains the result we want.
-
+<pre>
     reg                              load_step_sum = 1'b0;
     wire [STEP_WORD_WIDTH_TOTAL-1:0] sum_reversed;
     wire [STEP_WORD_WIDTH_TOTAL-1:0] sum_restored;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (STEP_WORD_WIDTH),
         .PIPE_DEPTH     (STEP_WORD_COUNT),
@@ -335,7 +360,7 @@ module Adder_Subtractor_Binary_Multiprecision
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH),
         .WORD_COUNT (STEP_WORD_COUNT)
@@ -346,7 +371,7 @@ module Adder_Subtractor_Binary_Multiprecision
         .words_out  (sum_restored)
     );
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (STEP_WORD_WIDTH_TOTAL),
         .SIGNED         (1),
@@ -357,18 +382,19 @@ module Adder_Subtractor_Binary_Multiprecision
         .original_input     (sum_restored),
         .adjusted_output    (sum)
     );
+</pre>
 
-//### Output Pipeline for Carries
+<h3>Output Pipeline for Carries</h3>
+<p>Store the carries word-by-word, then word-reverse them back to the expected
+ order so we can extract the least-significant <code>WORD_WIDTH</code> subset which
+ contains the result we want.</p>
 
-// Store the carries word-by-word, then word-reverse them back to the expected
-// order so we can extract the least-significant `WORD_WIDTH` subset which
-// contains the result we want.
-
+<pre>
     reg                              load_step_carries = 1'b0;
     wire [STEP_WORD_WIDTH_TOTAL-1:0] carries_reversed;
     wire [STEP_WORD_WIDTH_TOTAL-1:0] carries_restored;
 
-    Register_Pipeline
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
     #(
         .WORD_WIDTH     (STEP_WORD_WIDTH),
         .PIPE_DEPTH     (STEP_WORD_COUNT),
@@ -388,7 +414,7 @@ module Adder_Subtractor_Binary_Multiprecision
         // verilator lint_on  PINCONNECTEMPTY
     );
 
-    Word_Reverser
+    <a href="./Word_Reverser.html">Word_Reverser</a>
     #(
         .WORD_WIDTH (STEP_WORD_WIDTH),
         .WORD_COUNT (STEP_WORD_COUNT)
@@ -399,7 +425,7 @@ module Adder_Subtractor_Binary_Multiprecision
         .words_out  (carries_restored)
     );
 
-    Width_Adjuster
+    <a href="./Width_Adjuster.html">Width_Adjuster</a>
     #(
         .WORD_WIDTH_IN  (STEP_WORD_WIDTH_TOTAL),
         .SIGNED         (0),
@@ -410,19 +436,19 @@ module Adder_Subtractor_Binary_Multiprecision
         .original_input     (carries_restored),
         .adjusted_output    (carries)
     );
+</pre>
 
-//### Overflow and Carry-Out Flags
+<h3>Overflow and Carry-Out Flags</h3>
+<p>We gather together the carries from the final <code>step_sum</code> (the most
+ significant word of the result) and the final <code>step_carry_in</code> (which now
+ holds the last <code>step_carry_out</code>), and select the correct carries, based on
+ the amount of padding in the last step word, to compute the <code>carry_out</code> and
+ the <code>overflow</code>. We have to handle all cases, including when there is no
+ padding when <code>STEP_WORD_WIDTH</code> exactly divides <code>WORD_WIDTH</code>.</p>
+<p>The wiring here is constant and only uses 2 bits, so it will never be
+ a critical path, regardless of the width of <code>all_carries</code>.</p>
 
-// We gather together the carries from the final `step_sum` (the most
-// significant word of the result) and the final `step_carry_in` (which now
-// holds the last `step_carry_out`), and select the correct carries, based on
-// the amount of padding in the last step word, to compute the `carry_out` and
-// the `overflow`. We have to handle all cases, including when there is no
-// padding when `STEP_WORD_WIDTH` exactly divides `WORD_WIDTH`.
-
-// The wiring here is constant and only uses 2 bits, so it will never be
-// a critical path, regardless of the width of `all_carries`.
-
+<pre>
     localparam ALL_CARRIES_WIDTH = 1 + STEP_WORD_WIDTH;
     localparam ALL_CARRIES_ZERO  = {ALL_CARRIES_WIDTH{1'b0}};
 
@@ -435,20 +461,19 @@ module Adder_Subtractor_Binary_Multiprecision
         carry_out       = all_carries [STEP_WORD_WIDTH - PAD_WIDTH];
         overflow        = (carry_out != last_carry_in);
     end
+</pre>
 
-//## Control Logic
+<h2>Control Logic</h2>
+<h3>States and Storage</h3>
+<p>We accept inputs in <code>STATE_LOAD</code>, compute in
+ <code>STATE_CALC</code>, and present the output in <code>STATE_DONE</code>. Once the results are
+ read out, we return to <code>STATE_LOAD</code>.</p>
+<p><em>NOTE: The state encoding is arbitrary. Also, control from <code>state_storage</code>
+ to the input/output pipelines will tend to be the critical path as
+ <code>WORD_WIDTH</code> gets larger due to physical distance and routing congestion,
+ depending on the target device and CAD tool.</em></p>
 
-//### States and Storage 
-
-// We accept inputs in `STATE_LOAD`, compute in
-// `STATE_CALC`, and present the output in `STATE_DONE`. Once the results are
-// read out, we return to `STATE_LOAD`.
-
-// *NOTE: The state encoding is arbitrary. Also, control from `state_storage`
-// to the input/output pipelines will tend to be the critical path as
-// `WORD_WIDTH` gets larger due to physical distance and routing congestion,
-// depending on the target device and CAD tool.*
-
+<pre>
     localparam STATE_WIDTH                   = 2;
     localparam [STATE_WIDTH-1:0] STATE_LOAD  = 2'b00;
     localparam [STATE_WIDTH-1:0] STATE_CALC  = 2'b01;
@@ -458,7 +483,7 @@ module Adder_Subtractor_Binary_Multiprecision
     wire [STATE_WIDTH-1:0] state;
     reg  [STATE_WIDTH-1:0] state_next = STATE_LOAD;
 
-    Register
+    <a href="./Register.html">Register</a>
     #(
         .WORD_WIDTH     (STATE_WIDTH),
         .RESET_VALUE    (STATE_LOAD)
@@ -471,17 +496,18 @@ module Adder_Subtractor_Binary_Multiprecision
         .data_in        (state_next),
         .data_out       (state)
     );
+</pre>
 
-//### Calculation Steps
+<h3>Calculation Steps</h3>
+<p>Count down the calculation steps until zero, which is how long we stay in
+ <code>STATE_CALC</code>.</p>
 
-// Count down the calculation steps until zero, which is how long we stay in
-// `STATE_CALC`.
-
+<pre>
     reg                         step_do     = 1'b0;
     reg                         step_load   = 1'b0;
     wire [STEP_COUNT_WIDTH-1:0] step;
 
-    Counter_Binary
+    <a href="./Counter_Binary.html">Counter_Binary</a>
     #(
         .WORD_WIDTH     (STEP_COUNT_WIDTH),
         .INCREMENT      (STEP_ONE),
@@ -513,9 +539,11 @@ module Adder_Subtractor_Binary_Multiprecision
     always @(*) begin
         step_done = (step == STEP_ZERO);
     end
+</pre>
 
-//### Input/Output Handshaking
+<h3>Input/Output Handshaking</h3>
 
+<pre>
     reg input_handshake_done  = 1'b0;
     reg output_handshake_done = 1'b0;
 
@@ -525,9 +553,11 @@ module Adder_Subtractor_Binary_Multiprecision
         input_handshake_done  = (input_ready  == 1'b1) && (input_valid  == 1'b1);
         output_handshake_done = (output_ready == 1'b1) && (output_valid == 1'b1);
     end
+</pre>
 
-//### Control Events
+<h3>Control Events</h3>
 
+<pre>
     reg input_load  = 1'b0; // Load of input operation and operands.
     reg calculating = 1'b0; // High while doing the calculation steps.
     reg last_calc   = 1'b0; // High during the last calculation step.
@@ -539,20 +569,23 @@ module Adder_Subtractor_Binary_Multiprecision
         last_calc   = (state == STATE_CALC) && (step_done             == 1'b1);
         output_read = (state == STATE_DONE) && (output_handshake_done == 1'b1);
     end
+</pre>
 
-// After this point, there should be no reference to inputs, outputs, or
-// states. All control logic must be expressed in terms of control events.
+<p>After this point, there should be no reference to inputs, outputs, or
+ states. All control logic must be expressed in terms of control events.</p>
+<h3>State Transitions</h3>
 
-//### State Transitions
-
+<pre>
     always @(*) begin
         state_next = (input_load  == 1'b1) ? STATE_CALC : state;
         state_next = (last_calc   == 1'b1) ? STATE_DONE : state_next;
         state_next = (output_read == 1'b1) ? STATE_LOAD : state_next;
     end
+</pre>
 
-//### Datapath Control Signals 
+<h3>Datapath Control Signals</h3>
 
+<pre>
     always @(*) begin
         load_carry_initial  = (input_load  == 1'b1);
         load_carry_step     = (input_load  == 1'b1) || (calculating == 1'b1);
@@ -565,4 +598,11 @@ module Adder_Subtractor_Binary_Multiprecision
     end
 
 endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
 

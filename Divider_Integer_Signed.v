@@ -1,12 +1,78 @@
 
 //# Signed Integer Divider
 
+// Calculates the signed integer `quotient` and `remainder` of the signed
+// integer `dividend` and `divisor`. This divider can handle large integers
+// (e.g. 128 bits), without impacting clock speed, at the expense of extra
+// latency.
+
+//## Example Values
+
+// <pre>
+//  22 /   7 =  3 rem  1
+// -22 /   7 = -3 rem -1
+//  22 /  -7 = -3 rem  1
+// -22 /  -7 =  3 rem -1
+//   7 /  22 =  0 rem  7
+//  -7 / -22 =  0 rem -7
+//  -7 /  22 =  0 rem -7
+//   7 / -22 =  0 rem  7
+//   0 /   0 = -1 rem  0 (raises divide_by_zero)
+//  22 /   0 = -1 rem 22 (raises divide_by_zero)
+// -22 /   0 =  1 rem 22 (raises divide_by_zero)</pre>
+
+//## Algorithm
+
+// This module implements division as iterated conditional subtraction of
+// multiples of the `divisor` from the `dividend`, just as one would do
+// manually on paper. The algorithm is described in more detail inside the
+// [Remainder](./Remainder_Integer_Signed.html) and
+// [Quotient](./Quotient_Integer_Signed.html) modules.
+
+// Iterated subtraction is not the fastest algorithm, but all faster
+// algorithms depend on multiplication, which requires a quadratically
+// increasing amount of multiplication hardware as the bit width increases.
+
+//## Architecture
+
+// The Remainder and Quotient modules synchronize each division step
+// calculation through a [Skid Buffer Pipeline](./Skid_Buffer_Pipeline.html)
+// and coordinate the start and end of their calculations with [Pipeline
+// Fork](./Pipeline_Fork_Eager.html) and [Pipeline Join](./Pipeline_Join.html)
+// modules. Each division step addition/subtraction is done using
+// a [Multiprecision
+// Adder/Subtractor](./Adder_Subtractor_Binary_Multiprecision.html) to avoid
+// excessive area and carry-chain critical paths.  This division of work
+// allows buffering control and data as necessary to maintain a high clock
+// frequency.
+
+//## Operation
+
+// Start a division by completing the input ready/valid handshake, and read
+// out the results by completing the output handshake. Set `WORD_WIDTH` to the
+// width of your integers, and `STEP_WORD_WIDTH` to an *equal or smaller
+// number*, which will be the width of the internal adder/subtractors.  If the
+// area is too large, or the carry-chains form the critical path, decrease
+// `STEP_WORD_WIDTH`, which will proportionately decrease the area and the
+// carry-chain length, and increase the latency.  If control between Remainder
+// and Quotient calculations becomes the critical path, increase
+// `PIPELINE_STAGES_SYNC`, which has a negligible impact on area and
+// moderately increases latency.
+
+//## Latency
+
+// The latency is *approximately* equal to `WORD_WIDTH / STEP_WORD_WIDTH`
+// cycles per bit, plus one cycle per bit for each `PIPELINE_STAGES_SYNC`,
+// plus one cycle overall for the input and output handshakes each.
+
+//## Ports and Constants
+
 `default_nettype none
 
 module Divider_Integer_Signed
 #(
-    parameter WORD_WIDTH            = 8,
-    parameter STEP_WORD_WIDTH       = 4,
+    parameter WORD_WIDTH            = 0,
+    parameter STEP_WORD_WIDTH       = 0,
     parameter PIPELINE_STAGES_SYNC  = 0
 )
 (
@@ -30,6 +96,9 @@ module Divider_Integer_Signed
     localparam TOTAL_OUTPUT_WIDTH = WORD_WIDTH + 1;
 
 //## Input Pipeline Fork
+
+// Buffers the input handshake and replicates it to the Remainder and Quotient
+// modules.
 
     wire input_valid_remainder;
     wire input_ready_remainder;
@@ -61,6 +130,11 @@ module Divider_Integer_Signed
     );
 
 //## Remainder Calculation Unit
+
+// At each division step, the Remainder module signals to the Quotient module
+// if the current division step is OK (meaning: the current
+// addition/subtraction left a valid intermediate remainder), and so that the
+// Quotient should be updated. 
 
     wire output_valid_remainder;
     wire output_ready_remainder;
@@ -97,6 +171,9 @@ module Divider_Integer_Signed
     );
 
 //## Calculation Synchronization Buffer
+
+// Since the Remainder and Quotient modules can get physically large, we need
+// to optionally buffer the control path between them.
 
     wire control_valid_quotient;
     wire control_ready_quotient;
@@ -151,7 +228,15 @@ module Divider_Integer_Signed
         .step_ok        (step_ok_quotient)
     );
 
-//# Output Pipeline Join
+//## Output Pipeline Join
+
+// Synchronizes and buffers the output handshakes of the Remainder and
+// Quotient modules into the output handshake.
+
+// A `dummy` signal is necessary since we have to use the same data width for
+// all handshakes, and the Quotient output is short one bit. The dummy wire,
+// and its associated logic, are not connected to any destination and so will
+// optimize away. (This may raise a warning in your CAD tools.)
 
     // verilator lint_off UNUSED
     wire dummy;
