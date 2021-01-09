@@ -296,6 +296,10 @@ module Remainder_Integer_Signed
 // the sign of the divisor, which means we also haven't yet shifted enough
 // bits into the remainder_increment to make it a valid number.
 
+// **NOTE:** The bit reduction when testing if the divisor only contains sign
+// bits may end up being a critical path (but a high-speed one). It's not
+// currently pipelinable without major control changes.
+
     reg remainder_increment_sign  = 1'b0;
     reg divisor_all_sign_bits     = 1'b0;
     reg remainder_increment_valid = 1'b0;
@@ -355,6 +359,10 @@ module Remainder_Integer_Signed
 // If the next division step would overshoot past zero and change the sign of
 // the remainder, meaning too much was added/subtracted, then this division
 // step does nothing.
+
+// **NOTE:** The bit reduction when testing if the remainder has reached zero
+// exactly may end up being a critical path (but a high-speed one). It's not
+// currently pipelinable without major control changes.
 
     reg remainder_next_valid = 1'b0;
 
