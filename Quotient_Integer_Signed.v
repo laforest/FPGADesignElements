@@ -192,7 +192,11 @@ module Quotient_Integer_Signed
 
     reg  quotient_input_valid  = 1'b0;
     wire quotient_output_valid;
+    // Veril*tor cannot quite anaylze this signals path across the hierarchy.
+    // This is not a synthesis bug.
+    // verilator lint_off UNOPTFLAT
     reg  quotient_output_ready = 1'b0;
+    // verilator lint_on  UNOPTFLAT
 
     Adder_Subtractor_Binary_Multiprecision
     #(
