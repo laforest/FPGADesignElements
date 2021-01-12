@@ -540,8 +540,8 @@ module Remainder_Integer_Signed
 // Adder/Subtractor Control
 
     always @(*) begin
-        remainder_input_valid  = (calculating  == 1'b1);
-        remainder_output_ready = (read_control == 1'b1);
+        remainder_input_valid  = (calculating   == 1'b1);
+        remainder_output_ready = (control_ready == 1'b1);
     end
 
 // Divisor and Remainder Increment Control

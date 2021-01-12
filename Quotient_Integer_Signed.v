@@ -363,8 +363,8 @@ module Quotient_Integer_Signed
 // allows the Adder/Subtractor's input handshake to complete.
 
     always @(*) begin
-        quotient_input_valid  = (calculating  == 1'b1);
-        quotient_output_ready = (read_control == 1'b1);
+        quotient_input_valid  = (calculating   == 1'b1);
+        quotient_output_ready = (control_valid == 1'b1);
     end
 
 //### Input Storage Control
