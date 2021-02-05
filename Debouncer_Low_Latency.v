@@ -14,9 +14,6 @@
 // Easy Pages"](http://www.ganssle.com/debouncing.htm).
 // * Horowitz' and Hill's *"The Art of Electronics"* also has some information
 // on signal integrity, measurement, and debouncing scattered throughout.
-// * Finally, Dan Gissequist's ["How to eliminate button bounces with digital
-// logic"](https://zipcpu.com/blog/2017/08/04/debouncing.html), goes over some
-// pitfalls and arrives to a similar design as shown here.
 
 //## A Warning About External Noise
 
