@@ -1,0 +1,95 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="This register samples an input with an incoming external clock, or updates an output with an outgoing internal clock. We use Verilog attributes to tell the CAD tool to place the register in I/O register locations at the edges of the FPGA, thus minimizing any skew.">
+<title>Register IO Single Ended</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Register_IO_Single_Ended.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>A Single-Ended Input/Output Register</h1>
+<p>This register samples an input with an incoming external clock, or updates
+ an output with an outgoing internal clock. We use Verilog attributes to
+ tell the CAD tool to place the register in I/O register locations at the
+ edges of the FPGA, thus minimizing any skew.</p>
+<p>This module is a specialization of the simple <a href="./Register.html">Synchronous
+ Register</a> module, since we must apply the attributes
+ directly to the HDL register and not the module as a whole. See the
+ Synchronous Register module for further documentation and discussion.</p>
+<p><strong>NOTE</strong>: <em>Under Vivado, using a <code>DONT_TOUCH</code> or <code>KEEP</code> attribute or
+ constraint on this module, or the <code>data_reg</code> register, will prevent the
+ <code>IOB</code> attribute from taking effect. Thus the register may end up not packed
+ into an IOB location.</em></p>
+<h2>Ports and Parameters</h2>
+
+<pre>
+`default_nettype none
+
+module <a href="./Register_IO_Single_Ended.html">Register_IO_Single_Ended</a>
+#(
+    parameter                   WORD_WIDTH  = 0,
+    parameter [WORD_WIDTH-1:0]  RESET_VALUE = 0
+)
+(
+    input   wire                        clock,
+    input   wire                        clock_enable,
+    input   wire                        clear,
+    input   wire    [WORD_WIDTH-1:0]    data_in,
+    output  reg     [WORD_WIDTH-1:0]    data_out
+);
+
+    // For simulation. Not driven by a clock.
+
+    initial begin
+        data_out = RESET_VALUE;
+    end
+</pre>
+
+<h2>Registers with attributes</h2>
+
+<pre>
+    // Quartus
+    (* useioff = 1 *)
+    // Vivado
+    (* IOB = "TRUE" *)
+
+    reg [WORD_WIDTH-1:0] data_reg = RESET_VALUE;
+</pre>
+
+<h2>Clocking, Reset, and Output</h2>
+<p>Here, we use the  "last assignment wins" idiom (See
+ <a href="./verilog.html#resets">Resets</a>) to implement reset.  This is also one
+ place where we cannot use ternary operators, else the last assignment for
+ clear (e.g.: <code>data_out &lt;= (clear == 1'b1) ? RESET_VALUE : data_out;</code>) would
+ override any previous assignment with the current value of <code>data_out</code> if
+ <code>clear</code> is not asserted!</p>
+
+<pre>
+    always @(posedge clock) begin
+        if (clock_enable == 1'b1) begin
+            data_reg <= data_in;
+        end
+
+        if (clear == 1'b1) begin
+            data_reg <= RESET_VALUE;
+        end
+    end
+
+    always @(*) begin
+        data_out = data_reg;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
