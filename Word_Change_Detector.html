@@ -1,0 +1,80 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Emits a pulse when one or more bits in the input word change.">
+<title>Word Change Detector</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Word_Change_Detector.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Word Change Detector</h1>
+<p>Emits a pulse when one or more bits in the input word change.</p>
+
+<pre>
+`default_nettype none
+
+module Word_Change_Detector
+#(
+    parameter WORD_WIDTH = 0
+)
+(
+    input   wire                        clock,
+    input   wire    [WORD_WIDTH-1:0]    input_word,
+    output  reg                         output_pulse
+);
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+
+    initial begin
+        output_pulse = 1'b0;
+    end
+</pre>
+
+<p>Any change on each bit of the input word will raise a pulse.</p>
+
+<pre>
+    wire [WORD_WIDTH-1:0] bit_change;
+
+    generate
+
+        genvar i;
+
+        for (i=0; i < WORD_WIDTH; i=i+1) begin : per_bit
+            <a href="./Pulse_Generator.html">Pulse_Generator</a>
+            bit_change_detector
+            (
+                .clock              (clock),
+                .level_in           (input_word[i]),
+                .pulse_anyedge_out  (bit_change[i]),
+                //verilator lint_off PINCONNECTEMPTY
+                .pulse_posedge_out  (),
+                .pulse_negedge_out  ()
+                //verilator lint_on  PINCONNECTEMPTY
+                
+            );
+        end
+
+    endgenerate
+</pre>
+
+<p>Reduce any number of pulses to one pulse.</p>
+
+<pre>
+    always @(*) begin
+        output_pulse = (bit_change != WORD_ZERO);
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
