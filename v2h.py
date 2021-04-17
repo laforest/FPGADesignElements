@@ -109,6 +109,8 @@ def add_file_links(line):
        where the filename matches the module name."""
     split_line = line.strip().split()
     for word in split_line:
+        # Remove extra characters to recognize include files
+        word = word.replace('"','').replace(".vh","")
         filename = "./" + word + ".html"
         link = """<a href="{0}">{1}</a>""".format(filename, word)
         if isfile(filename):
