@@ -75,7 +75,10 @@ module <a href="./Reset_Synchronizer.html">Reset_Synchronizer</a>
 )
 (
     input   wire    receiving_clock,
+    // Necessary since the reset may be also used synchronously in the originating clock domain.
+    // verilator lint_off SYNCASYNCNET
     input   wire    reset_in,
+    // verilator lint_on  SYNCASYNCNET
     output  reg     reset_out
 );
 
