@@ -160,6 +160,12 @@ correctly past 32 or 64 bits width, depending on the CAD tool. As a workaround,
 use concatenation and replication to create the value you need of the proper
 bit width.
 
+<p>Also note that localparam is not legal in the ports definition of a module
+definition. That's only in SystemVerilog. Thus, if you need a constant
+parameter for a port width or some other parameter calculation, you have to use
+a parameter, and leave a comment that it should not be set at module
+instantiation.
+
 <pre>
 // Unclear if extended with zeros or Xs past 32 or 64 bits
 localparam WORD_WIDTH = 72;
@@ -313,7 +319,7 @@ module Foo
     parameter INPUT_WIDTH = 0,
     parameter INPUT_COUNT = 0,
 
-    // Do not set at instantiation
+    // Do not set at instantiation (localparam only legal here in SystemVerilog)
     parameter TOTAL_WIDTH = INPUT_WIDTH * INPUT_COUNT,
     parameter CONST_WIDTH = `SOME_GLOBAL_WIDTH
 )
