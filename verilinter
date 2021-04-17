@@ -20,6 +20,6 @@ do
     echo "*** EXTRA CHECKS ***"
     echo
     grep -H -n "wire.*=" ${FILE} && echo "Found an initialization assignment to a wire. This can create multiple drivers."
-    grep -L "\`default_nettype.*none" ${FILE} || echo "Missing \"\`default_nettype none\" directive. This can hide undefined wires and variables."
+    grep -Lq "\`default_nettype.*none" ${FILE} || echo "Missing \"\`default_nettype none\" directive. This can hide undefined wires and variables."
 done
 
