@@ -66,9 +66,9 @@ module Adder_Subtractor_Binary_Multiprecision
         overflow        = 1'b0;
     end
 
-    `include "./word_count_function.vh"
-    `include "./word_pad_function.vh"
-    `include "./clog2_function.vh"
+    `include "word_count_function.vh"
+    `include "word_pad_function.vh"
+    `include "clog2_function.vh"
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
 
