@@ -7,7 +7,7 @@
 // This implementation relies on Verilog-specific behaviour and on the CAD
 // tool's ability to synthesize it. Thus, the code is concise, and the
 // resulting logic optimally small, but the exact synthesis and behaviour
-// under write-conflicts and out-of-bounds accesses is undefined. See the
+// for out-of-bounds accesses is undefined. See the
 // [structural implementation](./RAM_Multiported_LE_Structural.html) for
 // a version which is more independent of HDL behaviour and CAD tool
 // synthesis, and whose behaviour can be controlled and extended.
@@ -37,7 +37,9 @@
 // Concurrent reads and writes to the same address always returns the
 // currently stored data, not the data being written. The new written value
 // will be readable in the next cycle.  The result of concurrent writes to the
-// same address is undefined. Check your synthesis results.
+// same address follows a priority scheme due to the "last write wins"
+// behaviour of Verilog assignments. Thus, as implemented here, the highest
+// numbered write port writing to a given location wins.
 
 //## Parameters, Ports, and Constants
 
@@ -108,7 +110,7 @@ module RAM_Multiported_LE_Behavioural
 // understand it fully, and that is something to avoid when writing Verilog
 // code. Also, the synthesis of the implicit multiplexers and address decoders
 // is not evident from this code, nor controllable, and it would be difficult
-// to add more complex behaviour such as handling write conflicts. 
+// to add more complex behaviour such as different handling of write conflicts. 
 
 //## Write Ports
 
@@ -117,6 +119,7 @@ module RAM_Multiported_LE_Behavioural
     always @(posedge clock) begin
         for (i=0; i < WRITE_PORT_COUNT; i=i+1) begin: per_write_port
             if (write_enable[i] == 1'b1) begin
+                // Last write wins, so that resolves write conflicts: highest write port wins.
                 ram [write_address [ADDR_WIDTH*i +: ADDR_WIDTH]] <= write_data [WORD_WIDTH*i +: WORD_WIDTH];
             end
         end
