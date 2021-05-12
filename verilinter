@@ -19,7 +19,7 @@ do
     echo
     echo "*** EXTRA CHECKS ***"
     echo
-    grep -H -n "reg[^=]*;" ${FILE} && echo "Missing initialization for a declared register (non-port). This will introduce an X in simulation, or create incorrect startup state on FPGA."
+    grep -H -n "reg[^=]*[^]];" ${FILE} && echo "Missing initialization for a declared register (non-port). This will introduce an X in simulation, or create incorrect startup state on FPGA."
     grep -H -n "wire.*=" ${FILE} && echo "Found an initialization assignment to a wire. This can create multiple drivers."
     grep -Lq "\`default_nettype.*none" ${FILE} || echo "Missing \"\`default_nettype none\" directive. This can hide undefined wires and variables."
 done
