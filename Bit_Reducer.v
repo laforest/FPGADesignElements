@@ -67,8 +67,6 @@ module Bit_Reducer
     output  reg                         bit_out
 );
 
-    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
-
     initial begin
         bit_out = 1'b0;
     end
