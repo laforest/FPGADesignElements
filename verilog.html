@@ -525,6 +525,33 @@ always @(posedge clock) begin
 end
 </pre>
 
+<a name="loops"></a>
+
+<h4>Generate Blocks and For Loops</h4>
+
+<p>A generate block is used to iteratively or conditionally <b>instantiate</b>
+entire modules or always blocks inside of it. For iteration, the index variable
+must be a <code>genvar</code>, which should be declared inside the generate
+block for clarity and to avoid re-using it elsewhere. <em>A generate block does
+not enclose a genvar inside its scope.</em>
+
+<p>If you need to iteratively create assignments, such as replicating the same
+logic for multiple ports, then you do not need a generate block, and can use a
+for loop <b>inside</b> an always block. Doing it this way is also necessary
+sometimes if the logic may appear to cause conflicting updates to the same
+variables. Synthesis tools expect all such assignments to be inside the same
+always block, else the indeterminate scheduling of independent always blocks
+prevents synthesis, and would make simulation non-deterministic. The index
+variable of the for loop must be an <code>integer</code>, declared outside the
+for loop and never re-used elsewhere.
+
+<p><b>Do not re-use genvar or integer index variables, as this may not be
+simulatable.</b> For example, re-using index variables in Icarus led to
+strange, and silent, simulation failures where for loops ceased to function. I
+do not know if this is an Icarus bug, or a known behaviour of the Verilog
+simulation model. Thus, declare each index variable right before the for loop
+using it, and never re-use it again in any other for loop.
+
 <h2>Logic Design</h2>
 
 <a name="boolean"></a>
