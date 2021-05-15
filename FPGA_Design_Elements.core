@@ -1,5 +1,5 @@
 CAPI=2:
-name: ::Fpga_Design_Elements:1.0.0
+name: ::FPGA_Design_Elements:1.0.0
 description: The FPGA Design Elements are a reference library of fundamental digital logic design elements. Think of it as a hardware analog to the C Standard Library ("libc") and its documentation.
 
 fileset:
