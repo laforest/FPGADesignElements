@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# This script regenerates the FuseSoC local core file.
+# Run it when you've added/removed a Verilog file.
+
+COREFILE="./Fpga_Design_Elements.core"
+
+VERSION="1.0.0"
+
+output_include_files () {
+    include_files=$(find . -type f -name "*.vh" | sort)
+    for i in ${include_files}
+    do
+        i=$(basename $i)
+        echo "        - $i:"
+        echo "            is_include_file: true"
+    done
+}
+
+output_source_files () {
+    source_files=$(find . -type f -name "*.v" | sort)
+    for i in ${source_files}
+    do
+        i=$(basename $i)
+        echo "        - $i"
+    done
+}
+
+# First the common header to start a new file
+
+cat << EOF > ${COREFILE}
+CAPI=2:
+name: ::Fpga_Design_Elements:${VERSION}
+description: The FPGA Design Elements are a reference library of fundamental digital logic design elements. Think of it as a hardware analog to the C Standard Library ("libc") and its documentation.
+
+EOF
+
+# Then append the fileset
+
+cat << EOF >> ${COREFILE}
+fileset:
+    rtl:
+EOF
+
+output_include_files >> ${COREFILE}
+output_source_files  >> ${COREFILE}
+
+# And finally, append a close the fileset and generate a basic default target
+
+cat << EOF >> ${COREFILE}
+    file_type: VerilogSource
+
+targets:
+    default: &default
+        filesets:
+            - rtl
+
+EOF
+
+
