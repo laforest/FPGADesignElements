@@ -4,15 +4,7 @@
 // used concurrently, implemented using logic elements, as behaviourally
 // inferred and synthesized by the CAD tool.
 
-// This implementation relies on Verilog-specific behaviour and on the CAD
-// tool's ability to synthesize it. Thus, the code is concise, and the
-// resulting logic optimally small, but the exact synthesis and behaviour
-// for out-of-bounds accesses is undefined. See the
-// [structural implementation](./RAM_Multiported_LE_Structural.html) for
-// a version which is more independent of HDL behaviour and CAD tool
-// synthesis, and whose behaviour can be controlled and extended.
-
-//## Synthesis and Operation
+//## Scaling and Applications
 
 // This kind of multi-ported memory is not expected to map to underlying RAM
 // blocks, but it can support arbitrary numbers of read and write ports by
@@ -22,6 +14,27 @@
 // such as semaphores, small CPU register files, or storage for parallel
 // functional units, and is the building block of more efficient, larger
 // multi-ported memories.
+
+//## Limitations
+
+// This implementation relies on Verilog-specific behaviour and on the CAD
+// tool's ability to synthesize it. Thus, the code is concise, and the
+// resulting logic optimally small, but the exact synthesis and behaviour
+// for out-of-bounds accesses is undefined. See the
+// [structural implementation](./RAM_Multiported_LE_Structural.html) for
+// a version which is more independent of HDL behaviour and CAD tool
+// synthesis, and whose behaviour can be controlled and extended.
+
+//## Concurrency and Write Conflicts
+
+// Concurrent reads and writes to the same address always returns the
+// currently stored data, not the data being written. The new written value
+// will be readable in the next cycle.  The result of concurrent writes to the
+// same address follows a priority scheme due to the "last write wins"
+// behaviour of Verilog assignments. Thus, as implemented here, the highest
+// numbered write port writing to a given location wins.
+
+//## Synthesis Parameters
 
 // The `RAMSTYLE` parameter is still provided for cases where the CAD tool
 // might be able to map to RAM blocks, such as when `WRITE_PORT_COUNT` is 1.
@@ -34,12 +47,17 @@
 // location, or if the access will do nothing*. **Check your synthesis
 // results.**
 
-// Concurrent reads and writes to the same address always returns the
-// currently stored data, not the data being written. The new written value
-// will be readable in the next cycle.  The result of concurrent writes to the
-// same address follows a priority scheme due to the "last write wins"
-// behaviour of Verilog assignments. Thus, as implemented here, the highest
-// numbered write port writing to a given location wins.
+// The `SYNCHRONOUS_READ` parameter defines if the read ports are registered
+// (1) or combinational (0). In other words, if the read results are available
+// in the next cycle or the current one. There is the usual tradeoff in
+// latency versus clock speed here. Any other parameter value will cause
+// a synthesis error.
+
+// **NOTE**: when reads are combinational, the `read_enable` line functions as
+// an extra address line which maps the read output to a space where all
+// values are `INIT_VALUE`. This can be handy to signal "no value" situations
+// by using a magic number, or you can tie `read_enable` high to optimize away
+// that extra logic.
 
 //## Parameters, Ports, and Constants
 
@@ -62,6 +80,7 @@ module RAM_Multiported_LE_Behavioural
     parameter                       INIT_FILE           = "",
     parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0,
     parameter                       RAMSTYLE            = "",
+    parameter                       SYNCHRONOUS_READ    = 1,
 
     // Do not set at instantiation, except in IPI
     parameter TOTAL_READ_DATA  = WORD_WIDTH * READ_PORT_COUNT,
@@ -132,20 +151,35 @@ module RAM_Multiported_LE_Behavioural
 
 //## Read Ports
 
-    integer k, l;
-
-    always @(posedge clock) begin
-        for (k=0; k < READ_PORT_COUNT; k=k+1) begin: per_read_port
-            if (read_enable[k] == 1'b1) begin
-                read_data [WORD_WIDTH*k +: WORD_WIDTH] <= ram [read_address [ADDR_WIDTH*k +: ADDR_WIDTH]];
+    generate
+        if (SYNCHRONOUS_READ == 0) begin: async_read
+            integer k;
+            always @(*) begin
+                for (k=0; k < READ_PORT_COUNT; k=k+1) begin: per_read_port
+                    // Tie `read_enable` high if not meaningful when `SYNCHRONOUS_READ` is 0
+                    if (read_enable[k] == 1'b1) begin
+                        read_data [WORD_WIDTH*k +: WORD_WIDTH] = ram [read_address [ADDR_WIDTH*k +: ADDR_WIDTH]];
+                    end else begin
+                        read_data [WORD_WIDTH*k +: WORD_WIDTH] = INIT_VALUE;
+                    end
+                end
+            end
+        end else if (SYNCHRONOUS_READ == 1) begin: sync_read
+            integer k, l;
+            always @(posedge clock) begin
+                for (k=0; k < READ_PORT_COUNT; k=k+1) begin: per_read_port
+                    if (read_enable[k] == 1'b1) begin
+                        read_data [WORD_WIDTH*k +: WORD_WIDTH] <= ram [read_address [ADDR_WIDTH*k +: ADDR_WIDTH]];
+                    end
+                end
+                for (l=0; l < READ_PORT_COUNT; l=l+1) begin: per_read_reset
+                    if (clear == 1'b1) begin
+                        read_data [WORD_WIDTH*l +: WORD_WIDTH] <= INIT_VALUE;
+                    end
+                end
             end
         end
-        for (l=0; l < READ_PORT_COUNT; l=l+1) begin: per_read_reset
-            if (clear == 1'b1) begin
-                read_data [WORD_WIDTH*l +: WORD_WIDTH] <= INIT_VALUE;
-            end
-        end
-    end
+    endgenerate
 
 //## Memory Initialization
 

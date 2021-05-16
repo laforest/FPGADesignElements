@@ -4,16 +4,7 @@
 // used concurrently, implemented using logic elements, structurally described
 // using decoders and multiplexers.
 
-// This implementation describes the logic in a structural manner, built from
-// known sub-modules which can all be directly ported to any other HDL, rather
-// than depend on Verilog-specific features as in the [behavioural
-// implementation](./RAM_Multiported_LE_Behavioural.html), at the cost of
-// larger logic (but the same number of registers). The structural
-// implementation also makes the operation under write-conflicts and
-// out-of-bounds accesses well-defined, and easy to change as necessary for
-// your application. 
-
-//## Synthesis and Operation
+//## Scaling and Applications
 
 // This kind of multi-ported memory is not expected to map to underlying RAM
 // blocks, but it can support arbitrary numbers of read and write ports by
@@ -24,6 +15,26 @@
 // functional units, and is the building block of more efficient, larger
 // multi-ported memories.
 
+//## Implementation Style
+
+// This implementation describes the logic in a structural manner, built from
+// known sub-modules which can all be directly ported to any other HDL, rather
+// than depend on Verilog-specific features as in the [behavioural
+// implementation](./RAM_Multiported_LE_Behavioural.html), at the cost of
+// larger logic (but the same number of registers). The structural
+// implementation also makes the operation under out-of-bounds accesses
+// well-defined, and easy to change as necessary for your application. 
+
+//## Concurrency and Write Conflicts
+
+// Concurrent reads and writes to the same address always returns the
+// currently stored data, not the data being written, which becomes readable
+// in the next cycle.  The result of concurrent writes to the same address is
+// defined by the `ON_WRITE_CONFLICT` parameter, which specifies the Boolean
+// combination of the conflicting data writes to the same address.
+
+//## Synthesis Parameters
+
 // The `RAMSTYLE` parameter is still provided for cases where the CAD tool
 // might be able to map to RAM blocks, such as when `WRITE_PORT_COUNT` is 1.
 // However, write-forwarding is not supported, unlike the [Simple Dual Port
@@ -33,11 +44,17 @@
 // `ADDR_WIDTH**2`. It is allowable: *out-of-bounds reads and writes
 // will respectively return zero and have no effect on the stored data.*
 
-// Concurrent reads and writes to the same address always returns the
-// currently stored data, not the data being written, which becomes readable
-// in the next cycle.  The result of concurrent writes to the same address is
-// defined by the `ON_WRITE_CONFLICT` parameter, which specifies the Boolean
-// combination of the conflicting data writes to the same address.
+// The `SYNCHRONOUS_READ` parameter defines if the read ports are registered
+// (1) or combinational (0). In other words, if the read results are available
+// in the next cycle or the current one. There is the usual tradeoff in
+// latency versus clock speed here. Any other parameter value will cause
+// a synthesis error.
+
+// **NOTE**: when reads are combinational, the `read_enable` line functions as
+// an extra address line which maps the read output to a space where all
+// values are `INIT_VALUE`. This can be handy to signal "no value" situations
+// by using a magic number, or you can tie `read_enable` high to optimize away
+// that extra logic.
 
 //## Parameters, Ports, and Constants
 
@@ -61,6 +78,7 @@ module RAM_Multiported_LE_Structural
     parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0,
     parameter                       RAMSTYLE            = "",
     parameter                       ON_WRITE_CONFLICT   = "", // e.g.: AND, OR, XOR, XNOR, etc...
+    parameter                       SYNCHRONOUS_READ    = 1,
 
     // Do not set at instantiation, except in IPI
     parameter TOTAL_READ_DATA  = WORD_WIDTH * READ_PORT_COUNT,
@@ -227,22 +245,29 @@ module RAM_Multiported_LE_Structural
                 .word_out       (read_data_internal [WORD_WIDTH*k +: WORD_WIDTH])
             );
 
-// The output is registered to match the behaviour of synchronous RAMs, but
-// also to pipeline the above *large* multiplexers.
+// The output is optionally registered to match the behaviour of synchronous
+// RAMs, but also to pipeline the above *large* multiplexers. Since
+// `read_data` is a `wire`, this is one of the rare places we have to use an
+// `assign` statement.
 
-            Register
-            #(
-                .WORD_WIDTH     (WORD_WIDTH),
-                .RESET_VALUE    (WORD_ZERO)
-            )
-            read_port_output
-            (
-                .clock          (clock),
-                .clock_enable   (read_enable [k]),
-                .clear          (clear),
-                .data_in        (read_data_internal [WORD_WIDTH*k +: WORD_WIDTH]),
-                .data_out       (read_data          [WORD_WIDTH*k +: WORD_WIDTH])
-            );
+            if (SYNCHRONOUS_READ == 0) begin: async_read
+                // Tie `read_enable` high if not meaningful when `SYNCHRONOUS_READ` is 0
+                assign read_data [WORD_WIDTH*k +: WORD_WIDTH] = (read_enable [k] == 1'b1) ? read_data_internal [WORD_WIDTH*k +: WORD_WIDTH] : INIT_VALUE;
+            end else if (SYNCHRONOUS_READ == 1) begin: sync_read
+                Register
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH),
+                    .RESET_VALUE    (WORD_ZERO)
+                )
+                read_port_output
+                (
+                    .clock          (clock),
+                    .clock_enable   (read_enable [k]),
+                    .clear          (clear),
+                    .data_in        (read_data_internal [WORD_WIDTH*k +: WORD_WIDTH]),
+                    .data_out       (read_data          [WORD_WIDTH*k +: WORD_WIDTH])
+                );
+            end
         end
 
     endgenerate
