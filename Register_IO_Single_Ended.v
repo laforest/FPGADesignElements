@@ -111,6 +111,7 @@ module Register_IO_Single_Ended
 // same 1-cycle latency.  This enables generating signals and testing without
 // having to use extra FPGA pins or disturbing the I/O register placement.
 
+    reg  [WORD_WIDTH-1:0] debug_in_internal = RESET_VALUE;
     wire [WORD_WIDTH-1:0] debug_in_captured;
 
     Register
@@ -123,7 +124,7 @@ module Register_IO_Single_Ended
         .clock          (clock),
         .clock_enable   (clock_enable),
         .clear          (clear),
-        .data_in        (debug_in),
+        .data_in        (debug_in_internal),
         .data_out       (debug_in_captured)
     );
 
@@ -139,6 +140,7 @@ module Register_IO_Single_Ended
         // verilator lint_on  WIDTH
             always @(*) begin
                 data_in_internal    = data_in;
+                debug_in_internal   = debug_in;
                 data_out            = (debug_in_enable == 1'b1) ? debug_in_captured : data_reg;
                 debug_out           = data_out;
             end
@@ -149,6 +151,7 @@ module Register_IO_Single_Ended
         // verilator lint_on  WIDTH
             always @(*) begin
                 data_in_internal    = (debug_in_enable == 1'b1) ? debug_in : data_in;
+                debug_in_internal   = data_in_internal;
                 data_out            = data_reg;
                 debug_out           = debug_in_captured;
             end
