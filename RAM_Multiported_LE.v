@@ -1,8 +1,8 @@
 //# Multi-Ported RAM using Logic Elements
 
 // Implements a memory with multiple, concurrent read and write ports with
-// optionally pipelined reads and multiple write conflict handling
-// strategies.  Storage is implemented using registers.
+// optionally pipelined reads and multiple write conflict handling strategies.
+// Storage is implemented using logic elements and registers.
 
 //## Scaling and Applications
 
@@ -28,6 +28,9 @@
 // * PRIORITY: The lowest conflicting write port wins. The other conflicting
 // writes do nothing and have their `write_conflict` signal raised for one
 // cycle after the write.
+// * ROUNDROBIN: The lowest conflicting write port wins, and served in
+// round-robin order. The other conflicting writes do nothing and have their
+// `write_conflict` signal raised for one cycle after the write.
 // * DISCARD: All conflicting writes do nothing, and have their
 // `write_conflict` signal raised for one cycle after the write.
 // * AND/OR/XOR/NAND/NOR/XNOR: The data from conflicting writes is combined
@@ -67,11 +70,11 @@
 
 module RAM_Multiported_LE
 #(
-    parameter                       WORD_WIDTH          = 16,
-    parameter                       READ_PORT_COUNT     = 5,
-    parameter                       WRITE_PORT_COUNT    = 3,
-    parameter                       ADDR_WIDTH          = 4,
-    parameter                       DEPTH               = 16,
+    parameter                       WORD_WIDTH          = 0,
+    parameter                       READ_PORT_COUNT     = 0,
+    parameter                       WRITE_PORT_COUNT    = 0,
+    parameter                       ADDR_WIDTH          = 0,
+    parameter                       DEPTH               = 0,
     parameter                       USE_INIT_FILE       = 0,
     parameter                       INIT_FILE           = "",
     parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0,
@@ -79,7 +82,7 @@ module RAM_Multiported_LE
     // verilator lint_off UNUSED
     parameter                       RAMSTYLE            = "",
     // verilator lint_on  UNUSED
-    parameter                       ON_WRITE_CONFLICT   = "OR",
+    parameter                       ON_WRITE_CONFLICT   = "",
     parameter                       READ_PIPELINE_DEPTH = 0,
 
     // Do not set at instantiation, except in IPI
@@ -102,13 +105,14 @@ module RAM_Multiported_LE
     input   wire    [READ_PORT_COUNT-1:0]   read_enable
 );
 
-    localparam ADDR_ZERO            = {ADDR_WIDTH{1'b0}};
-    localparam WRITE_ADDR_HIT_ZERO  = {WRITE_PORT_COUNT{1'b0}};
-    localparam WRITE_ADDR_HIT_ONE   = {{WRITE_PORT_COUNT-1{1'b0}},1'b1};
-    localparam TOTAL_STORED_DATA    = WORD_WIDTH * DEPTH;
-    localparam TOTAL_STORED_ZERO    = {TOTAL_STORED_DATA{1'b0}};
-    localparam WRITE_CONFLICT_WIDTH = WRITE_PORT_COUNT * DEPTH;
-    localparam WRITE_CONFLICT_ZERO  = {WRITE_CONFLICT_WIDTH{1'b0}};
+    localparam ADDR_ZERO                = {ADDR_WIDTH{1'b0}};
+    localparam WRITE_ADDR_HIT_ZERO      = {WRITE_PORT_COUNT{1'b0}};
+    localparam WRITE_ROUNDROBIN_NOMASK  = {WRITE_PORT_COUNT{1'b1}};
+    localparam WRITE_ADDR_HIT_ONE       = {{WRITE_PORT_COUNT-1{1'b0}},1'b1};
+    localparam TOTAL_STORED_DATA        = WORD_WIDTH * DEPTH;
+    localparam TOTAL_STORED_ZERO        = {TOTAL_STORED_DATA{1'b0}};
+    localparam WRITE_CONFLICT_WIDTH     = WRITE_PORT_COUNT * DEPTH;
+    localparam WRITE_CONFLICT_ZERO      = {WRITE_CONFLICT_WIDTH{1'b0}};
 
 //## RAM Array
 
@@ -260,6 +264,55 @@ module RAM_Multiported_LE
                 write_data_mux_priority
                 (
                     .selectors      (write_addr_hit_masked_priority),
+                    .words_in       (write_data),
+                    .word_out       (write_data_selected)
+                );
+
+//#### ROUNDROBIN
+
+// Mask off the write address conflict of the winning port if there is
+// a conflict, and select its data to write.  The winning port is the lowest
+// numbered port of the conflicting ports which is waiting for a write, as
+// calculated by a Round-Robin Arbiter.
+
+            // verilator lint_off WIDTH
+            end else if (ON_WRITE_CONFLICT == "ROUNDROBIN") begin
+            // verilator lint_on  WIDTH
+
+                wire [WRITE_PORT_COUNT-1:0] write_addr_hit_masked_roundrobin;
+
+                Arbiter_Round_Robin
+                #(
+                    .INPUT_COUNT    (WRITE_PORT_COUNT)
+                )
+                write_data_round_robin
+                (
+                    .clock          (clock),
+                    .clear          (clear),
+
+                    .requests       (write_addr_hit_enabled),
+                    .requests_mask  (WRITE_ROUNDROBIN_NOMASK), // Set to all-ones if unused.
+                    // verilator lint_off PINCONNECTEMPTY
+                    .grant_previous (),
+                    // verilator lint_on  PINCONNECTEMPTY
+                    .grant          (write_addr_hit_masked_roundrobin)
+                );
+
+                always @(*) begin
+                    write_conflict_ports_masked = write_conflict_ports & ~write_addr_hit_masked_roundrobin;
+                    write_enable_ram            = write_addr_hit_enabled != WRITE_ADDR_HIT_ZERO;
+                end
+
+                Multiplexer_One_Hot
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH),
+                    .WORD_COUNT     (WRITE_PORT_COUNT),
+                    .OPERATION      ("OR"),
+                    .IMPLEMENTATION ("AND")
+                )
+                write_data_mux_roundrobin
+                (
+                    .selectors      (write_addr_hit_masked_roundrobin),
                     .words_in       (write_data),
                     .word_out       (write_data_selected)
                 );

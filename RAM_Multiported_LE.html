@@ -3,7 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Implements a memory with multiple, concurrent read and write ports with optionally pipelined reads and multiple write conflict handling strategies.  Storage is implemented using registers.">
+<meta name="description" content="Implements a memory with multiple, concurrent read and write ports with optionally pipelined reads and multiple write conflict handling strategies. Storage is implemented using logic elements and registers.">
 <title>RAM Multiported LE</title>
 </head>
 <body>
@@ -14,8 +14,8 @@
 
 <h1>Multi-Ported RAM using Logic Elements</h1>
 <p>Implements a memory with multiple, concurrent read and write ports with
- optionally pipelined reads and multiple write conflict handling
- strategies.  Storage is implemented using registers.</p>
+ optionally pipelined reads and multiple write conflict handling strategies.
+ Storage is implemented using logic elements and registers.</p>
 <h2>Scaling and Applications</h2>
 <p>This kind of multi-ported memory is not expected to map to underlying RAM
  blocks, but it can support arbitrary numbers of read and write ports by
@@ -36,6 +36,9 @@
 <li>PRIORITY: The lowest conflicting write port wins. The other conflicting
  writes do nothing and have their <code>write_conflict</code> signal raised for one
  cycle after the write.</li>
+<li>ROUNDROBIN: The lowest conflicting write port wins, and served in
+ round-robin order. The other conflicting writes do nothing and have their
+ <code>write_conflict</code> signal raised for one cycle after the write.</li>
 <li>DISCARD: All conflicting writes do nothing, and have their
  <code>write_conflict</code> signal raised for one cycle after the write.</li>
 <li>AND/OR/XOR/NAND/NOR/XNOR: The data from conflicting writes is combined
@@ -71,11 +74,11 @@
 
 module <a href="./RAM_Multiported_LE.html">RAM_Multiported_LE</a>
 #(
-    parameter                       WORD_WIDTH          = 16,
-    parameter                       READ_PORT_COUNT     = 5,
-    parameter                       WRITE_PORT_COUNT    = 3,
-    parameter                       ADDR_WIDTH          = 4,
-    parameter                       DEPTH               = 16,
+    parameter                       WORD_WIDTH          = 0,
+    parameter                       READ_PORT_COUNT     = 0,
+    parameter                       WRITE_PORT_COUNT    = 0,
+    parameter                       ADDR_WIDTH          = 0,
+    parameter                       DEPTH               = 0,
     parameter                       USE_INIT_FILE       = 0,
     parameter                       INIT_FILE           = "",
     parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0,
@@ -83,7 +86,7 @@ module <a href="./RAM_Multiported_LE.html">RAM_Multiported_LE</a>
     // verilator lint_off UNUSED
     parameter                       RAMSTYLE            = "",
     // verilator lint_on  UNUSED
-    parameter                       ON_WRITE_CONFLICT   = "OR",
+    parameter                       ON_WRITE_CONFLICT   = "",
     parameter                       READ_PIPELINE_DEPTH = 0,
 
     // Do not set at instantiation, except in IPI
@@ -106,13 +109,14 @@ module <a href="./RAM_Multiported_LE.html">RAM_Multiported_LE</a>
     input   wire    [READ_PORT_COUNT-1:0]   read_enable
 );
 
-    localparam ADDR_ZERO            = {ADDR_WIDTH{1'b0}};
-    localparam WRITE_ADDR_HIT_ZERO  = {WRITE_PORT_COUNT{1'b0}};
-    localparam WRITE_ADDR_HIT_ONE   = {{WRITE_PORT_COUNT-1{1'b0}},1'b1};
-    localparam TOTAL_STORED_DATA    = WORD_WIDTH * DEPTH;
-    localparam TOTAL_STORED_ZERO    = {TOTAL_STORED_DATA{1'b0}};
-    localparam WRITE_CONFLICT_WIDTH = WRITE_PORT_COUNT * DEPTH;
-    localparam WRITE_CONFLICT_ZERO  = {WRITE_CONFLICT_WIDTH{1'b0}};
+    localparam ADDR_ZERO                = {ADDR_WIDTH{1'b0}};
+    localparam WRITE_ADDR_HIT_ZERO      = {WRITE_PORT_COUNT{1'b0}};
+    localparam WRITE_ROUNDROBIN_NOMASK  = {WRITE_PORT_COUNT{1'b1}};
+    localparam WRITE_ADDR_HIT_ONE       = {{WRITE_PORT_COUNT-1{1'b0}},1'b1};
+    localparam TOTAL_STORED_DATA        = WORD_WIDTH * DEPTH;
+    localparam TOTAL_STORED_ZERO        = {TOTAL_STORED_DATA{1'b0}};
+    localparam WRITE_CONFLICT_WIDTH     = WRITE_PORT_COUNT * DEPTH;
+    localparam WRITE_CONFLICT_ZERO      = {WRITE_CONFLICT_WIDTH{1'b0}};
 </pre>
 
 <h2>RAM Array</h2>
@@ -275,6 +279,56 @@ module <a href="./RAM_Multiported_LE.html">RAM_Multiported_LE</a>
                 write_data_mux_priority
                 (
                     .selectors      (write_addr_hit_masked_priority),
+                    .words_in       (write_data),
+                    .word_out       (write_data_selected)
+                );
+</pre>
+
+<h4>ROUNDROBIN</h4>
+<p>Mask off the write address conflict of the winning port if there is
+ a conflict, and select its data to write.  The winning port is the lowest
+ numbered port of the conflicting ports which is waiting for a write, as
+ calculated by a Round-Robin Arbiter.</p>
+
+<pre>
+            // verilator lint_off WIDTH
+            end else if (ON_WRITE_CONFLICT == "ROUNDROBIN") begin
+            // verilator lint_on  WIDTH
+
+                wire [WRITE_PORT_COUNT-1:0] write_addr_hit_masked_roundrobin;
+
+                <a href="./Arbiter_Round_Robin.html">Arbiter_Round_Robin</a>
+                #(
+                    .INPUT_COUNT    (WRITE_PORT_COUNT)
+                )
+                write_data_round_robin
+                (
+                    .clock          (clock),
+                    .clear          (clear),
+
+                    .requests       (write_addr_hit_enabled),
+                    .requests_mask  (WRITE_ROUNDROBIN_NOMASK), // Set to all-ones if unused.
+                    // verilator lint_off PINCONNECTEMPTY
+                    .grant_previous (),
+                    // verilator lint_on  PINCONNECTEMPTY
+                    .grant          (write_addr_hit_masked_roundrobin)
+                );
+
+                always @(*) begin
+                    write_conflict_ports_masked = write_conflict_ports & ~write_addr_hit_masked_roundrobin;
+                    write_enable_ram            = write_addr_hit_enabled != WRITE_ADDR_HIT_ZERO;
+                end
+
+                <a href="./Multiplexer_One_Hot.html">Multiplexer_One_Hot</a>
+                #(
+                    .WORD_WIDTH     (WORD_WIDTH),
+                    .WORD_COUNT     (WRITE_PORT_COUNT),
+                    .OPERATION      ("OR"),
+                    .IMPLEMENTATION ("AND")
+                )
+                write_data_mux_roundrobin
+                (
+                    .selectors      (write_addr_hit_masked_roundrobin),
                     .words_in       (write_data),
                     .word_out       (write_data_selected)
                 );
