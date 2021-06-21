@@ -61,12 +61,14 @@ module Averager_Powers_of_Two
     localparam ACCUMULATOR_WIDTH    = WORD_WIDTH + POWER_OF_TWO_EXPONENT; 
     localparam ACCUMULATOR_ZERO     = {ACCUMULATOR_WIDTH{1'b0}};
 
-// The counter counts samples from (2^POWER_OF_TWO_EXPONENT)-1 down to 0.
-
-    `include "clog2_function.vh"
-
-    localparam SAMPLE_COUNT         = (2**POWER_OF_TWO_EXPONENT) - 1;
-    localparam COUNTER_WIDTH        = clog2(SAMPLE_COUNT);
+// The counter counts samples from 2^N to 1, and we declare the acumulation
+// ready when the counter hits zero, so that's (2^N)+1 cases, so we need an
+// extra bit in the counter.
+ 
+     `include "clog2_function.vh"
+ 
+    localparam SAMPLE_COUNT         = 2 ** POWER_OF_TWO_EXPONENT;
+    localparam COUNTER_WIDTH        = clog2(SAMPLE_COUNT) + 1;
     localparam COUNTER_ONE          = {{COUNTER_WIDTH-1{1'b0}}, 1'b1};
     localparam COUNTER_ZERO         = {COUNTER_WIDTH{1'b0}};
 
