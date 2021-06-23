@@ -23,7 +23,7 @@
         <li><a href="http://www.sunburst-design.com/papers/CummingsHDLCON2002_Parameters.pdf">New Verilog-2001 Techniques for Creating Parameterized Models (or Down With `define and Death of a defparam!)</a> argues well about not using <code>defparam</code>, which has caused me a lot of grief in a commercial design, where it hid a difference in behaviour between simulation and synthesis (and thus in emulation, down the line).
         <li><a href="http://www.sunburst-design.com/papers/CummingsHDLCON2002_SystemVerilogPorts.pdf">SystemVerilog Ports & Data Types For Simple, Efficient and Enhanced HDL Modeling</a> on the other hand, argues for never using <code>`default_nettype none</code>, which I completely disagree with. I find it better to keep code concise to avoid bugs via extensive modularization and re-use, rather than lines-of-code count.
     </ul>
-    <li>Avrum Warshawsky of <a href="http://www.hardent.com/">Hardent</a> has posted extensively on the Xilinx Forums (as "avrumw") about CDC and how to properly apply constraints on these cases. Colm Ryan has collected some posts at <a href="http://www.colmryan.org/avrums-clock-domain-crossing-widsom.html">Avrum's Clock Domain Crossing Widsom</a>.
+    <li>Avrum Warshawsky of <a href="http://www.hardent.com/">Hardent</a> has posted extensively on the Xilinx Forums (as "avrumw") about CDC and how to properly apply constraints on these cases. Colm Ryan has collected some posts at <a href="http://www.colmryan.org/posts/avrum-cdc-wisdom/">Avrum's Clock Domain Crossing Widsom</a>.
     <li>dirjud's <a href="https://github.com/dirjud/Nitro-Parts-lib-Xilinx">library of Verilator-compatible Xilinx primitives</a>.
 </ul>
 
