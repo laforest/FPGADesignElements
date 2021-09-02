@@ -135,6 +135,32 @@ interface must be reset, else the interface may remain in the wrong state after
 reset (e.g. the source interface signalling that data is valid when there isn't
 any).
 
+<h2>Internal State</h2>
+
+<p>Any internal state of a module which affects a source or destination
+interface must only ever change in the same cycle as a <em>completed</em>
+handshake, when both ready and valid are raised together. Otherwise, data may
+be lost.
+
+<p>For example, if you are counting down words in a packet passing through a
+source interface, and you change state as soon as the counter reaches zero, you
+will lose the last packet word if, by coincidence, the ready signal of the
+destination interface goes low at the same time as the counter reaches zero. By
+the time the destination interface raises ready, the source interface has
+already moved on to the next packet and the previous data word has been lost,
+corrupting the previous packet and all following packets.
+
+<p>Thus, as a rule, define a line of code like this one:
+
+<pre>
+    always @(*) begin
+        data_transfer = (ready == 1'b1) && (valid == 1'b1);
+    end
+</pre>
+
+and use it to gate any state transitions that affect a source or destination
+interface.
+
 <hr><a href="./index.html">Back to FPGA Design Elements</a>
 </body>
 </html>
