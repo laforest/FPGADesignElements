@@ -19,6 +19,62 @@ crossing.
 
 <ul>
 
+<li><h3>Design Books</h3>
+
+<ul>
+
+<li>Most books about digital design repeat the same superficial basics, and are
+usually out-of-print, out-of-date, and overpriced. The exception is <a
+href="http://www.wakerly.org/DDPP/">Digital Design Principles and Practices</a>
+by John F. Wakerly, which covers many topics effectively, and deals with
+real-life details at all levels, from microelectronics to coding practices. It
+also discusses number systems better than other textbooks.
+
+<li>Another useful book is "Logical Effort: Designing Fast CMOS Circuits" by Ivan
+Sutherland, Bob Sproull, and David Harris. It describes the relationships
+between the source/load capacitances and drive strengths of CMOS circuits in a
+simple and very structured way, allowing you to optimize and compare the delay
+of different circuit implementations pretty much using pencil-and-paper level
+mathematics. You can read a summary of Logical Effort Theory and an example of
+its application in one of my old project reports: <a
+href="http://fpgacpu.ca/writings/OptimizationOfBurstModeCircuitsUsingLogicalEffortTheory.pdf">Optimization
+Of Burst-Mode Circuits Using Logical Effort Theory</a>.
+
+<li>The original VLSI book, "Introduction To VLSI Systems", by Carver Mead and
+Lynn Conway, is still worth looking through even though it describes obsolete
+NMOS technology with lamba-based design rules, because of its illuminating
+perspective (and beautiful full-color circuit layouts). It's the book that made
+me understand that capacitance is <b>necessary</b> for digital circuits to
+operate at all! The chapter on self-timed circuits is still one of the
+fundamental texts on asynchronous circuits.
+
+</ul>
+
+<li><h3>Finite State Machines</h3>
+
+<p>Two books which I've found talk usefully about FSM design and implementation are:
+<ul>
+<li>"FSM-based Digital Design using the Verilog HDL" by Elliott Mins
+<li>"Finite State Machine Datapath Design, Optimization, and Implementation" by Reese Davis 
+</ul>
+
+<li><h3>Arbiters</h3>
+
+<p>There isn't much written about arbiters out there that isn't specializations
+of existing designs for particular uses. I couldn't find any good treatment of
+the fundamentals, and some ASIC arbiter designs rely on combinational loops,
+which are not allowed in conventional synchronous design. Here's what I could
+find:
+
+<ul>
+<li>"Principles and Practices of Interconnection Networks" by Dally and Towles, specifically Chapter 18, "Arbitration". <em>This is also the major text on Network-on-Chip design.</em>
+<li>"Microarchitecture of Network-on-Chip Routers" by Dimitrakopoulos, Psarras, and Seitanidis, specifically Chapter 4, "Arbitration Logic".
+<li>"Scalable arbiters and multiplexers for on-FPGA interconnection networks" by Dimitrakopoulos, Psarras, and Seitanidis, published at FPL 2011.
+<li>"Arbiters: Design Ideas and Coding Styles" by Matt Weber, published at SNUG Boston 2001. <em>This is the most accessible source material for priority and round-robin arbiter design.</em>
+<li>The <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask: Isolate Rightmost 1 Bit</a> module efficiently implements a <a href="./Arbiter_Priority.html">Priority Arbiter</a> using adder carry-chain logic.
+
+</ul>
+
 <li><h3>Resets</h3>Ken Chapman's <a
 href="https://www.xilinx.com/support/documentation/white_papers/wp272.pdf">Get
 Smart About Reset: Think Local, Not Global</a> discusses why, on FPGAs, it's
