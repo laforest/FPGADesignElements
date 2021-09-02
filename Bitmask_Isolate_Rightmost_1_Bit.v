@@ -7,7 +7,7 @@
 // none (e.g., 01011000 -> 00001000)
 
 // This function can trivially implement a [Priority
-// Arbiter](./Priority_Arbiter.html), with the highest priority given to the
+// Arbiter](./Arbiter_Priority.html), with the highest priority given to the
 // least-significant bit.
 
 `default_nettype none
