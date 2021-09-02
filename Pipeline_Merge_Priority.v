@@ -3,20 +3,18 @@
 
 // Takes in multiple input ready/valid handshakes with associated data, and
 // merges them one at a time into a single output ready/valid handshake. The
-// inputs are merged in priority order, with the lowest indexed input having
+// inputs are merged by priority, with the lowest indexed input having
 // the highest priority.
 
 //## Atomicity
 
-// So long as an input holds its valid signal high (implying a continous
-// stream of data), it will hold the output (once granted) and so all that
-// input's data will be passed atomically, without other data interleaved in
-// it. Backpressure still works via the ready signal. If the source connected
-// to the input cannot provide its block of data in a single continously valid
-// stream, then any other input source may grab the output in the meantime.
-// Thus, if you can't avoid interleaving, attach some metadata in parallel to
-// the data (e.g.: a source ID number) to allow sorting it out further down
-// the pipeline.
+// So long as an input has the highest priority valid signal asserted, it's
+// data will be passed to the output. Backpressure still works via the ready
+// signal. *However, if at any time a higher-priority valid signal is raised,
+// it will take over the output.* No data will be lost, but sources will be
+// interleaved at the output.  Thus, if you can't avoid interleaving, attach
+// some metadata in parallel to the data (e.g.: a source ID number) to allow
+// sorting it out further down the pipeline.
 
 // The IMPLEMENTATION parameter defaults to "AND", and controls the
 // implementation of the Annullers inside the mux/demux. It is unlikely you
