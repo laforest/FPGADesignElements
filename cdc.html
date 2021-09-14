@@ -34,7 +34,7 @@ next logic output may remain metastable or resolve too late, a flip-flop may
 sample the wrong state, and so on... and your system falls apart.
 
 <p>Metastability can happen at clock domain crossings since the sending clock
-and receiving clock are (usually) asynchronous to eachother, or at least is is
+and receiving clock are (usually) asynchronous to eachother, or at least is
 a lot simpler and robust to assume they are independent that way. Thus the
 receiving clock might sample a signal from the sending clock domain too close
 to its transitions, causing metastability.

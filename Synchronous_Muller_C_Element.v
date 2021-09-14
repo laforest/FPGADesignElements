@@ -21,7 +21,7 @@
 // * A C-Element can act as a barrier to synchronize independent calculations:
 // all calculations reaching a given point can signal the C-Element and stop
 // until the C-Element output goes high, then continue calculating and halt
-// again if they reach the same point while he C-Element output is still high,
+// again if they reach the same point while the C-Element output is still high,
 // then signal it again once the output goes low.  A [Pulse
 // Generator](./Pulse_Generator.html) and [Pulse Latch](./Pulse_Latch.html)
 // would be handy here to handle the state transitions.

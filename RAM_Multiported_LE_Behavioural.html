@@ -46,7 +46,7 @@
  However, write-forwarding is not supported, unlike the <a href="./RAM_Simple_Dual_Port.html">Simple Dual Port
  RAM</a>, for example. </p>
 <p>Expect warnings from the linter and your CAD tools if <code>DEPTH</code> is less than
- <code>ADDR_WIDTH**2</code>. It is allowable, <em>but if the given address
+ <code>2**ADDR_WIDTH</code>. It is allowable, <em>but if the given address
  exceeds <code>DEPTH</code>, it's unknown if you will access a different memory
  location, or if the access will do nothing</em>. <strong>Check your synthesis
  results.</strong></p>

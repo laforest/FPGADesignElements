@@ -45,7 +45,7 @@
  However, write-forwarding is not supported, unlike the <a href="./RAM_Simple_Dual_Port.html">Simple Dual Port
  RAM</a>, for example. </p>
 <p>Expect warnings from the linter and your CAD tools if <code>DEPTH</code> is less than
- <code>ADDR_WIDTH**2</code>. It is allowable: <em>out-of-bounds reads and writes
+ <code>2**ADDR_WIDTH</code>. It is allowable: <em>out-of-bounds reads and writes
  will respectively return zero and have no effect on the stored data.</em></p>
 <p>The <code>SYNCHRONOUS_READ</code> parameter defines if the read ports are registered
  (1) or combinational (0). In other words, if the read results are available
