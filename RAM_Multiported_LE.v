@@ -45,7 +45,7 @@
 // RAM](./RAM_Simple_Dual_Port.html), for example. 
 
 // Expect warnings from the linter and your CAD tools if `DEPTH` is less than
-// `ADDR_WIDTH**2`. It is allowable: *out-of-bounds reads and writes
+// `2**ADDR_WIDTH`. It is allowable: *out-of-bounds reads and writes
 // will respectively return zero and have no effect on the stored data.*
 // Out-of-bounds writes cannot cause write conflicts.
 

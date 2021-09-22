@@ -42,7 +42,7 @@
 // RAM](./RAM_Simple_Dual_Port.html), for example. 
 
 // Expect warnings from the linter and your CAD tools if `DEPTH` is less than
-// `ADDR_WIDTH**2`. It is allowable, *but if the given address
+// `2**ADDR_WIDTH`. It is allowable, *but if the given address
 // exceeds `DEPTH`, it's unknown if you will access a different memory
 // location, or if the access will do nothing*. **Check your synthesis
 // results.**
