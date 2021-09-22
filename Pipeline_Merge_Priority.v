@@ -6,15 +6,12 @@
 // inputs are merged by priority, with the lowest indexed input having
 // the highest priority.
 
-//## Atomicity
+//## Arbitration
 
-// So long as an input has the highest priority valid signal asserted, it's
-// data will be passed to the output. Backpressure still works via the ready
-// signal. *However, if at any time a higher-priority valid signal is raised,
-// it will take over the output.* No data will be lost, but sources will be
-// interleaved at the output.  Thus, if you can't avoid interleaving, attach
-// some metadata in parallel to the data (e.g.: a source ID number) to allow
-// sorting it out further down the pipeline.
+// So long as an input has the highest priority (lowest bit) valid signal
+// asserted and is granted its turn, it's data will be passed to the output.
+// Once valid is released, the turn is lost if a higher priority valid is
+// asserted. Backpressure still works via the corresponding ready signal.
 
 // The IMPLEMENTATION parameter defaults to "AND", and controls the
 // implementation of the Annullers inside the mux/demux. It is unlikely you
@@ -57,6 +54,7 @@ module Pipeline_Merge_Priority
 );
 
     localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
+    localparam INPUT_ONES = {INPUT_COUNT{1'b1}};
 
     initial begin
         output_valid = 1'b0;
@@ -99,7 +97,8 @@ module Pipeline_Merge_Priority
     end
 
 // Then filter the input valid signals to only one, in order of priority.
-// Least-significant bit has highest priority.
+// Least-significant valid bit has highest priority and holds the grant until
+// valid is released.
 
     wire [INPUT_COUNT-1:0] input_valid_granted;
 
@@ -109,7 +108,13 @@ module Pipeline_Merge_Priority
     )
     pipeline_arbiter
     (
+        .clock          (clock),
+        .clear          (clear),
         .requests       (input_valid_buffered),
+        .requests_mask  (INPUT_ONES),
+        // verilator lint_off PINCONNECTEMPTY
+        .grant_previous (),
+        // verilator lint_on  PINCONNECTEMPTY
         .grant          (input_valid_granted)
     );
 

@@ -8,7 +8,7 @@
 
 // This function can trivially implement a [Priority
 // Arbiter](./Arbiter_Priority.html), with the highest priority given to the
-// least-significant bit.
+// least-significant bit, and is the building block of more complex arbiters.
 
 `default_nettype none
 

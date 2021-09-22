@@ -110,7 +110,10 @@ module RAM_Multiported_LE
     localparam WRITE_ROUNDROBIN_NOMASK  = {WRITE_PORT_COUNT{1'b1}};
     localparam WRITE_ADDR_HIT_ONE       = {{WRITE_PORT_COUNT-1{1'b0}},1'b1};
     localparam TOTAL_STORED_DATA        = WORD_WIDTH * DEPTH;
+    // This is a very wide value, which worries CAD tools and linters.
+    // verilator lint_off WIDTHCONCAT
     localparam TOTAL_STORED_ZERO        = {TOTAL_STORED_DATA{1'b0}};
+    // verilator lint_off WIDTHCONCAT
     localparam WRITE_CONFLICT_WIDTH     = WRITE_PORT_COUNT * DEPTH;
     localparam WRITE_CONFLICT_ZERO      = {WRITE_CONFLICT_WIDTH{1'b0}};
 
@@ -231,7 +234,7 @@ module RAM_Multiported_LE
 
 // Mask off the write address conflict of the winning port if there is
 // a conflict, and select its data to write.  The winning port is the lowest
-// numbered port of the conflicting ports, as calculated by a Priority Arbiter.
+// numbered port of the conflicting ports, as calculated by a priority bitmask.
 
             // verilator lint_off WIDTH
             if (ON_WRITE_CONFLICT == "PRIORITY") begin
@@ -239,14 +242,14 @@ module RAM_Multiported_LE
 
                 wire [WRITE_PORT_COUNT-1:0] write_addr_hit_masked_priority;
 
-                Arbiter_Priority
+                Bitmask_Isolate_Rightmost_1_Bit
                 #(
-                    .INPUT_COUNT    (WRITE_PORT_COUNT)
+                    .WORD_WIDTH     (WRITE_PORT_COUNT)
                 )
                 write_data_priority
                 (
-                    .requests       (write_addr_hit_enabled),
-                    .grant          (write_addr_hit_masked_priority)
+                    .word_in        (write_addr_hit_enabled),
+                    .word_out       (write_addr_hit_masked_priority)
                 );
 
                 always @(*) begin

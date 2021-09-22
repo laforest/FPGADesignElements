@@ -133,14 +133,14 @@ module Arbiter_Round_Robin
 
     wire [INPUT_COUNT-1:0] grant_priority;
 
-    Arbiter_Priority
+    Bitmask_Isolate_Rightmost_1_Bit
     #(
-        .INPUT_COUNT (INPUT_COUNT)
+        .WORD_WIDTH (INPUT_COUNT)
     )
     priority_grants
     (
-        .requests   (requests_masked_priority),
-        .grant      (grant_priority)
+        .word_in    (requests_masked_priority),
+        .word_out   (grant_priority)
     );
 
 // Mask-off all requests *of equal and higher priority* than the request
@@ -196,14 +196,14 @@ module Arbiter_Round_Robin
 
     wire [INPUT_COUNT-1:0] grant_round_robin;
 
-    Arbiter_Priority
+    Bitmask_Isolate_Rightmost_1_Bit
     #(
-        .INPUT_COUNT (INPUT_COUNT)
+        .WORD_WIDTH (INPUT_COUNT)
     )
     round_robin_grants
     (
-        .requests   (requests_masked_round_robin),
-        .grant      (grant_round_robin)
+        .word_in    (requests_masked_round_robin),
+        .word_out   (grant_round_robin)
     );
 
 // If no round-robin granted requests remain, then instead grant from the
