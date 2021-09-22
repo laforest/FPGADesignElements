@@ -51,7 +51,7 @@
  However, write-forwarding is not supported, unlike the <a href="./RAM_Simple_Dual_Port.html">Simple Dual Port
  RAM</a>, for example. </p>
 <p>Expect warnings from the linter and your CAD tools if <code>DEPTH</code> is less than
- <code>ADDR_WIDTH**2</code>. It is allowable: <em>out-of-bounds reads and writes
+ <code>2**ADDR_WIDTH</code>. It is allowable: <em>out-of-bounds reads and writes
  will respectively return zero and have no effect on the stored data.</em>
  Out-of-bounds writes cannot cause write conflicts.</p>
 <p>The <code>READ_PIPELINE_DEPTH</code> parameter defines how many pipeline stages are
