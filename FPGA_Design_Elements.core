@@ -93,8 +93,8 @@ fileset:
         - Pulse_to_Pipeline.v
         - Quadrature_Decoder.v
         - Quotient_Integer_Signed.v
-        - RAM_Multiported_LE_Behavioural.v
-        - RAM_Multiported_LE_Structural.v
+        - RAM_1WnR_Replicated.v
+        - RAM_Multiported_LE.v
         - RAM_Multiported_LVT.v
         - RAM_Simple_Dual_Port_Dual_Clock.v
         - RAM_Simple_Dual_Port.v
