@@ -1,29 +1,57 @@
 
 //# A Priority Arbiter
 
-// Returns a one-hot bitmask of the least-significant bit set in a word, where
-// bit 0 can be viewed as having highest priority. 
+// Returns a one-hot grant bitmask of the least-significant bit set in a word,
+// where bit 0 can be viewed as having highest priority. *A grant is held
+// until the request is released.*
 
 // The requestors must raise and hold a `requests` bit and wait until the
-// corresponding `grant` bit rises to begin their transaction. At any point,
-// the highest priority request is granted.  The grant remains for as long as
-// the request is held without interruption, *or until a higher priority
-// request appears*. Requesters can hold or drop their requests as desired, as
-// this is a combinational circuit.
+// corresponding `grant` bit rises to begin their transaction. *Grants are
+// calculated combinationally from the requests*, so pipeline as necessary.
+// The highest priority pending and unmasked request is granted once the
+// currently granted request is released.  The grant remains for as long as
+// the request is held without interruption. Requesters can raise or drop
+// their requests before their turn comes, but this must be done synchronously
+// to the clock.
 
-// This Priority Arbiter is the building block of more complex arbiters: By
-// masking other requests with a mask derived from the grants, we can alter
-// the priority scheme as desired, and guarantee the current grant cannot be
-// interrupted by another request. 
+//## Usage
 
 // A common use-case for an arbiter is to drive a [one-hot
 // multiplexer](./Multiplexer_One_Hot.html) to select one of multiple senders
 // requesting for one receiver, or one of multiple receivers requesting from
-// one sender.
+// one sender. This arrangement requires that the requestors can raise and
+// hold a `requests` bit, wait until they receive the correspondig `grant` bit
+// to begin their transaction, and to drop their `requests` bit only once they
+// are done.  This is very similar to a ready/valid handshake, except that the
+// transaction cannot be interrupted, else the granted access is lost.
 
-// Note that if a higher-priority request happens too frequently, even if
-// brief, it will starve lower priority requests. To distribute the grants
-// fairly, you need a [Round-Robin Arbiter](./Arbiter_Round_Robin.html).
+//## Fairness
+
+// **A Priority Arbiter is not fair:** if a higher-priority request happens too
+// frequently it will starve lower-priority requests, and if a lower-priority
+// request holds its grant too long it will starve higher-priority requests,
+// causing priority inversion. To distribute the grants fairly, you need
+// a [Round-Robin Arbiter](./Arbiter_Round_Robin.html).
+
+//### Customizations
+
+// To enable the creation of custom fairness adjustments, the `requests_mask`
+// input can be used to exclude one or more requests from being granted in the
+// current cycle, and must be updated synchronously to the `clock`. The
+// `requests_mask` is arbitrary, and if desired can be calculated from the
+// current `requests`, the `grant_previous` one-hot output which holds the
+// `grant` from the previous clock cycle, and the current one-hot `grant`
+// output.
+
+// * Since a grant typically lasts longer than one cycle and won't get granted
+// again for several cycles, taking multiple cycles to compute the next
+// `requests_mask` is a valid option.
+// * The `requests_mask` is applied combinationally to the `requests` input
+// and to the internal `grant_previous`, both of which have a combinational
+// path to `grant`, so pipeline as necessary. 
+
+// If unused, leave `requests_mask` set to all-ones, and the masking logic
+// will optimize away.
 
 `default_nettype none
 
@@ -32,18 +60,57 @@ module Arbiter_Priority
     parameter INPUT_COUNT = 0
 )
 (
-    input   wire    [INPUT_COUNT-1:0]    requests,
-    output  wire    [INPUT_COUNT-1:0]    grant
+    input   wire                        clock,
+    input   wire                        clear,
+
+    input   wire    [INPUT_COUNT-1:0]   requests,
+    input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
+    output  wire    [INPUT_COUNT-1:0]   grant_previous,
+    output  wire    [INPUT_COUNT-1:0]   grant
 );
+
+// First we filter the requests, masking off any externally disabled requestst
+// (`requests_mask` bit is 0), or only allowing the currently granted request
+// (if any).
+
+    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
+
+    reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
+
+    always @(*) begin
+        requests_masked = requests & requests_mask & ~grant_previous;
+    end
+
+// Then, from the remaining requests, we further mask out all but the highest
+// priority (lowest bit) set request and grant it.
 
     Bitmask_Isolate_Rightmost_1_Bit
     #(
         .WORD_WIDTH (INPUT_COUNT)
     )
-    calc_grant 
+    priority_mask
     (
-        .word_in    (requests),
+        .word_in    (requests_masked),
         .word_out   (grant)
+    );
+
+// We must use the current grant to mask off all the other input requests so
+// a grant cannot be interrupted by a higher priority request until the
+// current granted request is released. We need a register here to avoid
+// a combinational feedback path.
+
+    Register
+    #(
+        .WORD_WIDTH     (INPUT_COUNT),
+        .RESET_VALUE    (INPUT_ZERO)
+    )
+    previously_granted_request
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (clear),
+        .data_in        (grant),
+        .data_out       (grant_previous)
     );
 
 endmodule

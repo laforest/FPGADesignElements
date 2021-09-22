@@ -3,7 +3,7 @@
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Returns a one-hot bitmask of the least-significant bit set in a word, where bit 0 can be viewed as having highest priority.">
+<meta name="description" content="Returns a one-hot grant bitmask of the least-significant bit set in a word, where bit 0 can be viewed as having highest priority. *A grant is held until the request is released.*">
 <title>Arbiter Priority</title>
 </head>
 <body>
@@ -13,25 +13,50 @@
 <p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
 <h1>A Priority Arbiter</h1>
-<p>Returns a one-hot bitmask of the least-significant bit set in a word, where
- bit 0 can be viewed as having highest priority. </p>
+<p>Returns a one-hot grant bitmask of the least-significant bit set in a word,
+ where bit 0 can be viewed as having highest priority. <em>A grant is held
+ until the request is released.</em></p>
 <p>The requestors must raise and hold a <code>requests</code> bit and wait until the
- corresponding <code>grant</code> bit rises to begin their transaction. At any point,
- the highest priority request is granted.  The grant remains for as long as
- the request is held without interruption, <em>or until a higher priority
- request appears</em>. Requesters can hold or drop their requests as desired, as
- this is a combinational circuit.</p>
-<p>This Priority Arbiter is the building block of more complex arbiters: By
- masking other requests with a mask derived from the grants, we can alter
- the priority scheme as desired, and guarantee the current grant cannot be
- interrupted by another request. </p>
+ corresponding <code>grant</code> bit rises to begin their transaction. <em>Grants are
+ calculated combinationally from the requests</em>, so pipeline as necessary.
+ The highest priority pending and unmasked request is granted once the
+ currently granted request is released.  The grant remains for as long as
+ the request is held without interruption. Requesters can raise or drop
+ their requests before their turn comes, but this must be done synchronously
+ to the clock.</p>
+<h2>Usage</h2>
 <p>A common use-case for an arbiter is to drive a <a href="./Multiplexer_One_Hot.html">one-hot
  multiplexer</a> to select one of multiple senders
  requesting for one receiver, or one of multiple receivers requesting from
- one sender.</p>
-<p>Note that if a higher-priority request happens too frequently, even if
- brief, it will starve lower priority requests. To distribute the grants
- fairly, you need a <a href="./Arbiter_Round_Robin.html">Round-Robin Arbiter</a>.</p>
+ one sender. This arrangement requires that the requestors can raise and
+ hold a <code>requests</code> bit, wait until they receive the correspondig <code>grant</code> bit
+ to begin their transaction, and to drop their <code>requests</code> bit only once they
+ are done.  This is very similar to a ready/valid handshake, except that the
+ transaction cannot be interrupted, else the granted access is lost.</p>
+<h2>Fairness</h2>
+<p><strong>A Priority Arbiter is not fair:</strong> if a higher-priority request happens too
+ frequently it will starve lower-priority requests, and if a lower-priority
+ request holds its grant too long it will starve higher-priority requests,
+ causing priority inversion. To distribute the grants fairly, you need
+ a <a href="./Arbiter_Round_Robin.html">Round-Robin Arbiter</a>.</p>
+<h3>Customizations</h3>
+<p>To enable the creation of custom fairness adjustments, the <code>requests_mask</code>
+ input can be used to exclude one or more requests from being granted in the
+ current cycle, and must be updated synchronously to the <code>clock</code>. The
+ <code>requests_mask</code> is arbitrary, and if desired can be calculated from the
+ current <code>requests</code>, the <code>grant_previous</code> one-hot output which holds the
+ <code>grant</code> from the previous clock cycle, and the current one-hot <code>grant</code>
+ output.</p>
+<ul>
+<li>Since a grant typically lasts longer than one cycle and won't get granted
+ again for several cycles, taking multiple cycles to compute the next
+ <code>requests_mask</code> is a valid option.</li>
+<li>The <code>requests_mask</code> is applied combinationally to the <code>requests</code> input
+ and to the internal <code>grant_previous</code>, both of which have a combinational
+ path to <code>grant</code>, so pipeline as necessary. </li>
+</ul>
+<p>If unused, leave <code>requests_mask</code> set to all-ones, and the masking logic
+ will optimize away.</p>
 
 <pre>
 `default_nettype none
@@ -41,18 +66,63 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     parameter INPUT_COUNT = 0
 )
 (
-    input   wire    [INPUT_COUNT-1:0]    requests,
-    output  wire    [INPUT_COUNT-1:0]    grant
-);
+    input   wire                        clock,
+    input   wire                        clear,
 
+    input   wire    [INPUT_COUNT-1:0]   requests,
+    input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
+    output  wire    [INPUT_COUNT-1:0]   grant_previous,
+    output  wire    [INPUT_COUNT-1:0]   grant
+);
+</pre>
+
+<p>First we filter the requests, masking off any externally disabled requestst
+ (<code>requests_mask</code> bit is 0), or only allowing the currently granted request
+ (if any).</p>
+
+<pre>
+    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
+
+    reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
+
+    always @(*) begin
+        requests_masked = requests & requests_mask & ~grant_previous;
+    end
+</pre>
+
+<p>Then, from the remaining requests, we further mask out all but the highest
+ priority (lowest bit) set request and grant it.</p>
+
+<pre>
     <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (INPUT_COUNT)
     )
-    calc_grant 
+    priority_mask
     (
-        .word_in    (requests),
+        .word_in    (requests_masked),
         .word_out   (grant)
+    );
+</pre>
+
+<p>We must use the current grant to mask off all the other input requests so
+ a grant cannot be interrupted by a higher priority request until the
+ current granted request is released. We need a register here to avoid
+ a combinational feedback path.</p>
+
+<pre>
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (INPUT_COUNT),
+        .RESET_VALUE    (INPUT_ZERO)
+    )
+    previously_granted_request
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (clear),
+        .data_in        (grant),
+        .data_out       (grant_previous)
     );
 
 endmodule
