@@ -293,7 +293,7 @@ module Adder_Subtractor_Binary_Multiprecision
     )
     step_adder
     (
-        .add_sub    (1'b0), // 0/1 -> A+B/A-B
+        .add_sub    (add_sub), // 0/1 -> A+B/A-B
         .carry_in   (step_carry_in),
         .A          (step_A),
         .B          (step_B),
