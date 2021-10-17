@@ -72,8 +72,6 @@ module Pulse_to_Pipeline
     output  reg                         module_ready
 );
 
-    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
-
     initial begin
         module_ready = 1'b0;
     end
