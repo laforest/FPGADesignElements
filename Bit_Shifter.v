@@ -16,6 +16,11 @@
 // of the intermediate division steps*. That is, if a non-zero bit was shifted
 // out to the right.
 
+// To implement proper signed division by a power-of-two, use the <a
+// href="./Divider_Integer_Signed_by_Powers_of_Two.html">Integer Divider by
+// Power of Two</a> module, which performs the correction for negative
+// numbers and also calculates the remainder as a bonus.
+
 //## Usage
 
 // We can treat the `shift_amount` and the `shift_direction` together as

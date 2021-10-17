@@ -25,6 +25,10 @@
  must be corrected by adding +1, <em>but only if an odd number results as part
  of the intermediate division steps</em>. That is, if a non-zero bit was shifted
  out to the right.</p>
+<p>To implement proper signed division by a power-of-two, use the <a
+ href="./Divider_Integer_Signed_by_Powers_of_Two.html">Integer Divider by
+ Power of Two</a> module, which performs the correction for negative
+ numbers and also calculates the remainder as a bonus.</p>
 <h2>Usage</h2>
 <p>We can treat the <code>shift_amount</code> and the <code>shift_direction</code> together as
  a signed magnitude number: the amount is an absolute value, and the
