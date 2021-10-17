@@ -312,7 +312,7 @@ module Pipeline_FIFO_Buffer
 
     always @(*) begin
         empty = (buffer_data_count == COUNT_ZERO);
-        full  = (buffer_data_count == COUNT_LAST);
+        full  = (buffer_data_count == COUNT_LAST [COUNT_WIDTH-1:0]);
         busy  = (empty == 1'b0) && (full == 1'b0);
     end
 
