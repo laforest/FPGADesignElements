@@ -979,14 +979,17 @@ is strongly discouraged.) <em>(This corner case was pointed out (and fixed!) by
 
 <h3>Avoiding Zero-Width Padding</h3>
 
-<p>When splitting a long bit vector into a number of words of a given width,
-it's possible that you will need to pad the last few bits of the last word,
-usually with zeros. Typically, you compute the difference or the division
-remainder to get the pad width, then create the pad with a replication:
+<p>When splitting a long bit vector into a number of words of a given width, or
+concatenating multiple words into a single wider vector, it's possible that you
+will need to pad a few unused bits, usually with zeros.  Typically, you compute
+the width difference or the division remainder to get the pad width, then
+create the pad with a replication:
 
 <pre>
-localparam PAD_WIDTH = BIG_VECTOR_WIDTH % WORD_WIDTH;
-localparam PAD       = {PAD_WIDTH{1'b0}};
+localparam PAD_WIDTH   = BIG_VECTOR_WIDTH % WORD_WIDTH;
+localparam TOTAL_WIDTH = WORD_WIDTH * WORD_COUNT;        // Alternate
+localparam PAD_WIDTH   = BIG_VECTOR_WIDTH - TOTAL_WIDTH; // Alternate
+localparam PAD         = {PAD_WIDTH{1'b0}};
 </pre>
 
 <p>However, this fails if no pad is needed. Variables of zero width cannot
@@ -1002,17 +1005,60 @@ zero. This works because a pad is necessarily between 0 and
 concatenation with or without a pad:
 
 <pre>
+reg [BIG_VECTOR_WIDTH-1:0] baz;
+reg [WORD_WIDTH-1:0]       wibble, ...;
+
 generate
     if (PAD_WIDTH != WORD_WIDTH) begin
-        baz = {{PAD, wibble, ....};
+        always @(*) begin
+            baz = {PAD, wibble, ....}; // Padding MSBs here
+        end
     end
     else begin
-        baz = {wibble, ... };
+        always @(*) begin
+            baz = {wibble, ... };
+        end
     end
 endgenerate
 </pre>
 
-<p>The <a href="./word_pad_function.html">Word Pad</a> function implements this idiom.
+<p>The <a href="./word_pad_function.html">Word Pad</a> function implements this
+idiom, returning the pad width or `WORD_WIDTH` if the pad width would be zero.
+
+<h4>Simple Cases for Zero-Padding</h4>
+
+<p>While the <a href="./word_pad_function.html">Word Pad</a> function enables
+padding of arbitrary length at arbitrary positions (e.g.: you could pad in the
+middle of a wide vector with a special pattern instead of only zeros), the
+common case is to pad with zeros at the least-significant bits. 
+
+<p>We can zero-pad the least significant bits of a wider vector automatically
+by making sure the vector is initialized to zero, then using a vector part
+select to place the concatenated words into the wider vector at just after the
+location of the pad. This approach automatically handles the case where the pad
+width equals zero without defining impossible zero-width variables or
+replications.
+
+<pre>
+localparam BIG_VECTOR_ZERO = {BIG_VECTOR_WIDTH{1'b0}};
+localparam TOTAL_WIDTH     = WORD_WIDTH * WORD_COUNT;
+localparam PAD_WIDTH       = BIG_VECTOR_WIDTH - TOTAL_WIDTH;
+
+reg [BIG_VECTOR_WIDTH-1:0] baz = BIG_VECTOR_ZERO;
+reg [WORD_WIDTH-1:0]       wibble, ...;
+
+always @(*) begin
+    baz [PAD_WIDTH +: TOTAL_WIDTH] = {wibble, ... };
+end
+</pre>
+
+<p>Alternately, you could first concatenate the individual words into a vector
+of <code>TOTAL_WIDTH</code> bits, then pass it through a <a
+href="./Width_Adjuster.html">Width Adjuster</a> to widen it to
+<code>BIG_VECTOR_WIDTH</code>, then pass that wider vector through a <a
+href="./Bit_Shifter.html">Bit Shifter</a> to shift it left by
+<code>PAD_WIDTH</code>, filling in the least-significant bits with any pattern
+you wish.
 
 <hr>
 
