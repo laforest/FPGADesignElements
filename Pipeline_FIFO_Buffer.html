@@ -21,7 +21,9 @@
 <p><strong>NOTE</strong>: This module is not suitable for pipelining long combinational
  paths since it depends on a central buffer. If you need to pipeline a path
  to improve timing rather than concurrency, use a <a href="./Skid_Buffer_Pipeline.html">Skid Buffer
- Pipeline</a> instead.</p>
+ Pipeline</a> instead. You can also use
+ a <a href="./Pipeline_Credit_Buffer.html">Pipeline Credit Buffer</a> to improve both
+ timing and concurrency, particularly for longer pipelines.</p>
 <p>Since a FIFO buffer stores variable amounts of data, it will smooth out
  irregularities in the transfer rates of the input and output interfaces,
  and when used in pipeline loops, can store enough data to prevent

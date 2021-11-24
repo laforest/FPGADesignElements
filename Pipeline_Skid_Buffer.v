@@ -13,6 +13,10 @@
 // LUTRAMs or Block RAMs (depending on implementation), and has more freedom
 // of placement and routing.
 
+// Alternately, a Skid Buffer is also known as a Carloni Buffer. For reference,
+// see Abbas and Betz ["Latency Insensitive Design Styles for
+// FPGAs"](./reading.html#elastic) (FPL, 2018).
+
 //## Background
 
 // Networks-on-Chip (NoC) and elastic pipelines have as a fundamental building

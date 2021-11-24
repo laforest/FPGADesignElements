@@ -19,7 +19,7 @@
 <p>This module is a simplification of the <a href="./Register_Pipeline.html">Register
  Pipeline</a>, which allows parallel input/output and
  initial values other than zero, but does not support a <code>PIPE_DEPTH</code> of
- zero.</p>
+ zero like this one.</p>
 <p>Each cycle <code>clock_enable</code> is high, the pipeline shifts by one from
  <code>pipe_in</code> towards <code>pipe_out</code>. <code>clear</code> sets all registers to zero. If
  <code>PIPE_DEPTH</code> is zero, <code>pipe_in</code> becomes directly wired to <code>pipe_out</code> and no

@@ -8,7 +8,7 @@
 // This module is a simplification of the [Register
 // Pipeline](./Register_Pipeline.html), which allows parallel input/output and
 // initial values other than zero, but does not support a `PIPE_DEPTH` of
-// zero.
+// zero like this one.
 
 // Each cycle `clock_enable` is high, the pipeline shifts by one from
 // `pipe_in` towards `pipe_out`. `clear` sets all registers to zero. If

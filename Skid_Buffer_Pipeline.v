@@ -10,7 +10,14 @@
 // Unlike a [Pipeline FIFO Buffer](./Pipeline_FIFO_Buffer.html), a Skid Buffer
 // Pipeline will not improve concurrency by absorbing any irregularities in
 // the transfer rates of the input and output interfaces: if one interface
-// stalls, the other interface will eventually see that stall.
+// stalls, the other interface will eventually see that stall. However, a FIFO
+// buffer will not add much pipelining.
+
+// Alternatively, if you can afford a FIFO or if your hardware supports it
+// well, you may want to use a [Pipeline Credit
+// Buffer](./Pipeline_Credit_Buffer.html) instead, which might use less
+// hardware for longer pipelines and has both the pipelining benefits of
+// a Skid Buffer Pipeline and the buffering of a FIFO.
 
 // `clear` sets all registers to zero. If `PIPE_DEPTH` is zero, the input
 // handshake ports becomes directly wired to the output handshake ports and no
