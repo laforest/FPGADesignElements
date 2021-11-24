@@ -74,6 +74,7 @@ fileset:
         - Number_of_Trailing_Zeros.v
         - Parallel_Serial.v
         - Pipeline_Branch_One_Hot.v
+        - Pipeline_Credit_Buffer.v
         - Pipeline_FIFO_Buffer.v
         - Pipeline_Fork_Eager.v
         - Pipeline_Fork_Lazy.v
