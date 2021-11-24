@@ -243,6 +243,8 @@ module Pipeline_Credit_Buffer
         .pipe_out       (output_handshake_done_pipelined)
     );
 
+//## Output Interface
+
 // Finally, we store any valid pipelined input data into a FIFO until it can
 // be read out. The FIFO itself is the output interface.
 
