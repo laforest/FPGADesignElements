@@ -18,7 +18,7 @@
 //localparam PAD       = {PAD_WIDTH{1'b0}};
 //
 //if (PAD_WIDTH != word_width) begin
-//    baz = {{PAD, wibble, ....};
+//    baz = {PAD, wibble, ....};
 //end
 //else begin
 //    baz = {wibble, ... };
