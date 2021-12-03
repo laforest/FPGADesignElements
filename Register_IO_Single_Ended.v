@@ -21,11 +21,11 @@
 // location since we can only connect one thing at a time to an I/O pin. So we
 // provide separate debug signals which do not touch the I/O pin.
 
-// The `debug_out` port mirrors `data_out` and is usually brought out
-// to the ports of the module enclosing the I/O Register, so you don't have to
-// alter the module logic to monitor operation. While `debug_in_enable` is
-// set, then `debug_in` replaces `data_in`, which allows for injecting test
-// signals without using extra pins.
+// The `debug_out` port mirrors `data_out` and is usually brought out to the
+// ports of the module enclosing the I/O Register, so you don't have to alter
+// the module logic to monitor operation. While a given `debug_in_enable` bit
+// is set, then the corresponding `debug_in` replaces the same `data_in` bit,
+// which allows for injecting test signals without using extra pins.
 
 //## Ports and Parameters
 
@@ -43,17 +43,12 @@ module Register_IO_Single_Ended
     input   wire                        clear,
 
     input   wire    [WORD_WIDTH-1:0]    data_in,
-    output  reg     [WORD_WIDTH-1:0]    data_out,
+    output  wire    [WORD_WIDTH-1:0]    data_out,
 
     input   wire    [WORD_WIDTH-1:0]    debug_in,
-    input   wire                        debug_in_enable,
-    output  reg     [WORD_WIDTH-1:0]    debug_out
+    input   wire    [WORD_WIDTH-1:0]    debug_in_enable,
+    output  wire    [WORD_WIDTH-1:0]    debug_out
 );
-
-    initial begin
-        data_out  = RESET_VALUE;
-        debug_out = RESET_VALUE;
-    end
 
 //## Registers with attributes
 
@@ -91,7 +86,7 @@ module Register_IO_Single_Ended
 // override any previous assignment with the current value of `data_out` if
 // `clear` is not asserted!
 
-    reg [WORD_WIDTH-1:0] data_in_internal = RESET_VALUE;
+    wire [WORD_WIDTH-1:0] data_in_internal;
 
     always @(posedge clock) begin
         if (clock_enable == 1'b1) begin
@@ -106,10 +101,11 @@ module Register_IO_Single_Ended
 //## Debug Support
 
 // We also mimic the I/O Register with a conventional register taking a debug
-// input. If `debug_in_enable` is set, then the `debug_in` input will show up
-// at the `data_out` and `debug_out` outputs instead of `data_in`, with the
-// same 1-cycle latency.  This enables generating signals and testing without
-// having to use extra FPGA pins or disturbing the I/O register placement.
+// input. If a `debug_in_enable` bit is set, then the matching `debug_in`
+// input bit will show up at the same `data_out` bit and `debug_out` bit
+// outputs instead of `data_in`, with the same 1-cycle latency.  This enables
+// generating signals and testing without having to use extra FPGA pins or
+// disturbing the I/O register placement.
 
     reg  [WORD_WIDTH-1:0] debug_in_internal = RESET_VALUE;
     wire [WORD_WIDTH-1:0] debug_in_captured;
@@ -138,23 +134,49 @@ module Register_IO_Single_Ended
         // verilator lint_off WIDTH
         if (DIRECTION == "INPUT") begin
         // verilator lint_on  WIDTH
+
+            Multiplexer_Bitwise_2to1
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            debug_bit_select
+            (
+                .bitmask    (debug_in_enable),
+                .word_in_0  (data_reg),
+                .word_in_1  (debug_in_captured),
+                .word_out   (data_out)
+            );
+
             always @(*) begin
-                data_in_internal    = data_in;
                 debug_in_internal   = debug_in;
-                data_out            = (debug_in_enable == 1'b1) ? debug_in_captured : data_reg;
-                debug_out           = data_out;
             end
+
+            assign data_in_internal = data_in;
+            assign debug_out        = data_out;
         end
 
         // verilator lint_off WIDTH
         if (DIRECTION == "OUTPUT") begin
         // verilator lint_on  WIDTH
+
+            Multiplexer_Bitwise_2to1
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            debug_bit_select
+            (
+                .bitmask    (debug_in_enable),
+                .word_in_0  (data_in),
+                .word_in_1  (debug_in),
+                .word_out   (data_in_internal)
+            );
+
             always @(*) begin
-                data_in_internal    = (debug_in_enable == 1'b1) ? debug_in : data_in;
-                debug_in_internal   = data_in_internal;
-                data_out            = data_reg;
-                debug_out           = debug_in_captured;
+                debug_in_internal = data_in_internal;
             end
+
+            assign data_out  = data_reg;
+            assign debug_out = debug_in_captured;
         end
 
     endgenerate

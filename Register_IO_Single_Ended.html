@@ -30,11 +30,11 @@
  <code>data_in</code> or <code>data_out</code> will prevent placing the I/O Register into an I/O
  location since we can only connect one thing at a time to an I/O pin. So we
  provide separate debug signals which do not touch the I/O pin.</p>
-<p>The <code>debug_out</code> port mirrors <code>data_out</code> and is usually brought out
- to the ports of the module enclosing the I/O Register, so you don't have to
- alter the module logic to monitor operation. While <code>debug_in_enable</code> is
- set, then <code>debug_in</code> replaces <code>data_in</code>, which allows for injecting test
- signals without using extra pins.</p>
+<p>The <code>debug_out</code> port mirrors <code>data_out</code> and is usually brought out to the
+ ports of the module enclosing the I/O Register, so you don't have to alter
+ the module logic to monitor operation. While a given <code>debug_in_enable</code> bit
+ is set, then the corresponding <code>debug_in</code> replaces the same <code>data_in</code> bit,
+ which allows for injecting test signals without using extra pins.</p>
 <h2>Ports and Parameters</h2>
 
 <pre>
@@ -52,17 +52,12 @@ module <a href="./Register_IO_Single_Ended.html">Register_IO_Single_Ended</a>
     input   wire                        clear,
 
     input   wire    [WORD_WIDTH-1:0]    data_in,
-    output  reg     [WORD_WIDTH-1:0]    data_out,
+    output  wire    [WORD_WIDTH-1:0]    data_out,
 
     input   wire    [WORD_WIDTH-1:0]    debug_in,
-    input   wire                        debug_in_enable,
-    output  reg     [WORD_WIDTH-1:0]    debug_out
+    input   wire    [WORD_WIDTH-1:0]    debug_in_enable,
+    output  wire    [WORD_WIDTH-1:0]    debug_out
 );
-
-    initial begin
-        data_out  = RESET_VALUE;
-        debug_out = RESET_VALUE;
-    end
 </pre>
 
 <h2>Registers with attributes</h2>
@@ -100,7 +95,7 @@ module <a href="./Register_IO_Single_Ended.html">Register_IO_Single_Ended</a>
  <code>clear</code> is not asserted!</p>
 
 <pre>
-    reg [WORD_WIDTH-1:0] data_in_internal = RESET_VALUE;
+    wire [WORD_WIDTH-1:0] data_in_internal;
 
     always @(posedge clock) begin
         if (clock_enable == 1'b1) begin
@@ -115,10 +110,11 @@ module <a href="./Register_IO_Single_Ended.html">Register_IO_Single_Ended</a>
 
 <h2>Debug Support</h2>
 <p>We also mimic the I/O Register with a conventional register taking a debug
- input. If <code>debug_in_enable</code> is set, then the <code>debug_in</code> input will show up
- at the <code>data_out</code> and <code>debug_out</code> outputs instead of <code>data_in</code>, with the
- same 1-cycle latency.  This enables generating signals and testing without
- having to use extra FPGA pins or disturbing the I/O register placement.</p>
+ input. If a <code>debug_in_enable</code> bit is set, then the matching <code>debug_in</code>
+ input bit will show up at the same <code>data_out</code> bit and <code>debug_out</code> bit
+ outputs instead of <code>data_in</code>, with the same 1-cycle latency.  This enables
+ generating signals and testing without having to use extra FPGA pins or
+ disturbing the I/O register placement.</p>
 
 <pre>
     reg  [WORD_WIDTH-1:0] debug_in_internal = RESET_VALUE;
@@ -149,23 +145,49 @@ module <a href="./Register_IO_Single_Ended.html">Register_IO_Single_Ended</a>
         // verilator lint_off WIDTH
         if (DIRECTION == "INPUT") begin
         // verilator lint_on  WIDTH
+
+            <a href="./Multiplexer_Bitwise_2to1.html">Multiplexer_Bitwise_2to1</a>
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            debug_bit_select
+            (
+                .bitmask    (debug_in_enable),
+                .word_in_0  (data_reg),
+                .word_in_1  (debug_in_captured),
+                .word_out   (data_out)
+            );
+
             always @(*) begin
-                data_in_internal    = data_in;
                 debug_in_internal   = debug_in;
-                data_out            = (debug_in_enable == 1'b1) ? debug_in_captured : data_reg;
-                debug_out           = data_out;
             end
+
+            assign data_in_internal = data_in;
+            assign debug_out        = data_out;
         end
 
         // verilator lint_off WIDTH
         if (DIRECTION == "OUTPUT") begin
         // verilator lint_on  WIDTH
+
+            <a href="./Multiplexer_Bitwise_2to1.html">Multiplexer_Bitwise_2to1</a>
+            #(
+                .WORD_WIDTH (WORD_WIDTH)
+            )
+            debug_bit_select
+            (
+                .bitmask    (debug_in_enable),
+                .word_in_0  (data_in),
+                .word_in_1  (debug_in),
+                .word_out   (data_in_internal)
+            );
+
             always @(*) begin
-                data_in_internal    = (debug_in_enable == 1'b1) ? debug_in : data_in;
-                debug_in_internal   = data_in_internal;
-                data_out            = data_reg;
-                debug_out           = debug_in_captured;
+                debug_in_internal = data_in_internal;
             end
+
+            assign data_out  = data_reg;
+            assign debug_out = debug_in_captured;
         end
 
     endgenerate
