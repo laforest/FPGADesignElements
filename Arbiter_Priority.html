@@ -76,9 +76,10 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
 );
 </pre>
 
-<p>First we filter the requests, masking off any externally disabled requestst
- (<code>requests_mask</code> bit is 0), or only allowing the currently granted request
- (if any).</p>
+<p>If the request granted on the previous clock cycle is still active, hold it.
+ Else, filter the requests, masking off any externally disabled requests
+ (<code>requests_mask</code> bit is 0).
+ Note that a granted request cannot be interrupted by clearing its mask bit. </p>
 
 <pre>
     localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
@@ -86,7 +87,7 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
     always @(*) begin
-        requests_masked = requests & requests_mask & ~grant_previous;
+        requests_masked = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : (requests & requests_mask);
     end
 </pre>
 
