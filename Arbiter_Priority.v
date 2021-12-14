@@ -69,16 +69,17 @@ module Arbiter_Priority
     output  wire    [INPUT_COUNT-1:0]   grant
 );
 
-// First we filter the requests, masking off any externally disabled requestst
-// (`requests_mask` bit is 0), or only allowing the currently granted request
-// (if any).
+// If the request granted on the previous clock cycle is still active, hold it.
+// Else, filter the requests, masking off any externally disabled requests
+// (`requests_mask` bit is 0).
+// Note that a granted request cannot be interrupted by clearing its mask bit. 
 
     localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
 
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
     always @(*) begin
-        requests_masked = requests & requests_mask & ~grant_previous;
+        requests_masked = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : (requests & requests_mask);
     end
 
 // Then, from the remaining requests, we further mask out all but the highest
