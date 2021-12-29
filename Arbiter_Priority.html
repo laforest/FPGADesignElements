@@ -76,10 +76,8 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
 );
 </pre>
 
-<p>If the request granted on the previous clock cycle is still active, hold it.
- Else, filter the requests, masking off any externally disabled requests
- (<code>requests_mask</code> bit is 0).
- Note that a granted request cannot be interrupted by clearing its mask bit. </p>
+<p>First we filter the requests, masking off any externally disabled requestst
+ (<code>requests_mask</code> bit is 0)</p>
 
 <pre>
     localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
@@ -87,14 +85,15 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
     always @(*) begin
-        requests_masked = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : (requests & requests_mask);
+        requests_masked = requests & requests_mask;
     end
 </pre>
 
 <p>Then, from the remaining requests, we further mask out all but the highest
- priority (lowest bit) set request and grant it.</p>
+ priority (lowest bit) set request. This is the new grant candidate.</p>
 
 <pre>
+    wire [INPUT_COUNT-1:0] grant_candidate;
     <a href="./Bitmask_Isolate_Rightmost_1_Bit.html">Bitmask_Isolate_Rightmost_1_Bit</a>
     #(
         .WORD_WIDTH (INPUT_COUNT)
@@ -102,14 +101,25 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     priority_mask
     (
         .word_in    (requests_masked),
-        .word_out   (grant)
+        .word_out   (grant_candidate)
     );
 </pre>
 
-<p>We must use the current grant to mask off all the other input requests so
- a grant cannot be interrupted by a higher priority request until the
- current granted request is released. We need a register here to avoid
- a combinational feedback path.</p>
+<p>If the request granted on the previous clock cycle is still active, hold it.
+ Else, select the current candidate.   </p>
+
+<pre>
+    reg  [INPUT_COUNT-1:0] grant_selected = INPUT_ZERO;
+    always @(*) begin
+        grant_selected = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
+    end
+
+    assign grant = grant_selected;
+</pre>
+
+<p>A grant cannot be interrupted by a higher priority request until the current 
+ granted request is released. We need a register to store the current grant 
+ for the next clock cycle.</p>
 
 <pre>
     <a href="./Register.html">Register</a>
@@ -122,7 +132,7 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (clear),
-        .data_in        (grant),
+        .data_in        (grant_selected),
         .data_out       (grant_previous)
     );
 
