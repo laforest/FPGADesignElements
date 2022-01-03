@@ -66,7 +66,7 @@ module Arbiter_Priority
     input   wire    [INPUT_COUNT-1:0]   requests,
     input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
     output  wire    [INPUT_COUNT-1:0]   grant_previous,
-    output  wire    [INPUT_COUNT-1:0]   grant
+    output  reg     [INPUT_COUNT-1:0]   grant
 );
 
 // First we filter the requests, masking off any externally disabled requestst
@@ -97,12 +97,9 @@ module Arbiter_Priority
 // If the request granted on the previous clock cycle is still active, hold it.
 // Else, select the current candidate.   
 
-    reg  [INPUT_COUNT-1:0] grant_selected = INPUT_ZERO;
     always @(*) begin
-        grant_selected = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
+        grant = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
     end
-
-    assign grant = grant_selected;
 
 // A grant cannot be interrupted by a higher priority request until the current 
 // granted request is released. We need a register to store the current grant 
@@ -118,7 +115,7 @@ module Arbiter_Priority
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (clear),
-        .data_in        (grant_selected),
+        .data_in        (grant),
         .data_out       (grant_previous)
     );
 

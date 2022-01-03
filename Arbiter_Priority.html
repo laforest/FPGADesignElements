@@ -72,7 +72,7 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     input   wire    [INPUT_COUNT-1:0]   requests,
     input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
     output  wire    [INPUT_COUNT-1:0]   grant_previous,
-    output  wire    [INPUT_COUNT-1:0]   grant
+    output  reg     [INPUT_COUNT-1:0]   grant
 );
 </pre>
 
@@ -109,12 +109,9 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
  Else, select the current candidate.   </p>
 
 <pre>
-    reg  [INPUT_COUNT-1:0] grant_selected = INPUT_ZERO;
     always @(*) begin
-        grant_selected = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
+        grant = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
     end
-
-    assign grant = grant_selected;
 </pre>
 
 <p>A grant cannot be interrupted by a higher priority request until the current 
@@ -132,7 +129,7 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (clear),
-        .data_in        (grant_selected),
+        .data_in        (grant),
         .data_out       (grant_previous)
     );
 
