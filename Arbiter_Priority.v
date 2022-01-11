@@ -66,25 +66,24 @@ module Arbiter_Priority
     input   wire    [INPUT_COUNT-1:0]   requests,
     input   wire    [INPUT_COUNT-1:0]   requests_mask,  // Set to all-ones if unused.
     output  wire    [INPUT_COUNT-1:0]   grant_previous,
-    output  wire    [INPUT_COUNT-1:0]   grant
+    output  reg     [INPUT_COUNT-1:0]   grant
 );
 
-// If the request granted on the previous clock cycle is still active, hold it.
-// Else, filter the requests, masking off any externally disabled requests
-// (`requests_mask` bit is 0).
-// Note that a granted request cannot be interrupted by clearing its mask bit. 
+// First we filter the requests, masking off any externally disabled requestst
+// (`requests_mask` bit is 0)
 
     localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
 
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
     always @(*) begin
-        requests_masked = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : (requests & requests_mask);
+        requests_masked = requests & requests_mask;
     end
 
 // Then, from the remaining requests, we further mask out all but the highest
-// priority (lowest bit) set request and grant it.
+// priority (lowest bit) set request. This is the new grant candidate.
 
+    wire [INPUT_COUNT-1:0] grant_candidate;
     Bitmask_Isolate_Rightmost_1_Bit
     #(
         .WORD_WIDTH (INPUT_COUNT)
@@ -92,13 +91,19 @@ module Arbiter_Priority
     priority_mask
     (
         .word_in    (requests_masked),
-        .word_out   (grant)
+        .word_out   (grant_candidate)
     );
 
-// We must use the current grant to mask off all the other input requests so
-// a grant cannot be interrupted by a higher priority request until the
-// current granted request is released. We need a register here to avoid
-// a combinational feedback path.
+// If the request granted on the previous clock cycle is still active, hold it.
+// Else, select the current candidate.   
+
+    always @(*) begin
+        grant = ((requests & grant_previous) != INPUT_ZERO) ? grant_previous : grant_candidate;
+    end
+
+// A grant cannot be interrupted by a higher priority request until the current 
+// granted request is released. We need a register to store the current grant 
+// for the next clock cycle.
 
     Register
     #(
