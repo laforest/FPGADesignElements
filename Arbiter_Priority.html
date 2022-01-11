@@ -74,14 +74,18 @@ module <a href="./Arbiter_Priority.html">Arbiter_Priority</a>
     output  wire    [INPUT_COUNT-1:0]   grant_previous,
     output  reg     [INPUT_COUNT-1:0]   grant
 );
+
+    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
+
+    initial begin
+        grant = INPUT_ZERO;
+    end
 </pre>
 
 <p>First we filter the requests, masking off any externally disabled requestst
  (<code>requests_mask</code> bit is 0)</p>
 
 <pre>
-    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
-
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
     always @(*) begin

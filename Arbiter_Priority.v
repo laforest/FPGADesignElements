@@ -69,10 +69,14 @@ module Arbiter_Priority
     output  reg     [INPUT_COUNT-1:0]   grant
 );
 
+    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
+
+    initial begin
+        grant = INPUT_ZERO;
+    end
+
 // First we filter the requests, masking off any externally disabled requestst
 // (`requests_mask` bit is 0)
-
-    localparam INPUT_ZERO = {INPUT_COUNT{1'b0}};
 
     reg  [INPUT_COUNT-1:0] requests_masked = INPUT_ZERO;
 
