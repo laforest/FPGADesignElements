@@ -15,12 +15,13 @@
 // Networks](https://en.wikipedia.org/wiki/Kahn_process_networks#Boundedness_of_channels)
 // with bounded channels).
 
-// *This module is a variation of the synchronous [Pipeline FIFO
-// Buffer](./Pipeline_FIFO_Buffer.html), directly derived from Clifford E.
-// Cummings' <a
+// *This module is directly derived from Clifford E. Cummings' <a
 // href="http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf">Simulation
 // and Synthesis Techniques for Asynchronous FIFO Design</a>, SNUG 2002, San
 // Jose.*
+
+// If you do not need to cross clock domains, use the simpler, lower-latency
+// [Pipeline FIFO Buffer](./Pipeline_FIFO_Buffer.html).
 
 //## Asynchronous Clocks
 
@@ -54,9 +55,9 @@
 
 module CDC_FIFO_Buffer
 #(
-    parameter WORD_WIDTH        = 0,
-    parameter DEPTH             = 0,
-    parameter RAMSTYLE          = "",
+    parameter WORD_WIDTH        = 33,
+    parameter DEPTH             = 23,
+    parameter RAMSTYLE          = "block",
     parameter CDC_EXTRA_STAGES  = 0
 )
 (
@@ -137,38 +138,14 @@ module CDC_FIFO_Buffer
         .read_data      (output_data)
     );
 
-// Since the buffer is a synchronous RAM, it takes a clock cycle before the
-// read data updates, so we pass along the read enable line (`buffer_rden`)
-// through a register to synchronize it and signal valid read data
-// (`output_valid`). However, the register needs separate control: for
-// example, when the output interface reads out the last item out of the
-// buffer, the output becomes invalid even though the buffer output is
-// unchanged.
-
-    reg update_output_valid = 1'b0;
-
-    Register
-    #(
-        .WORD_WIDTH     (1),
-        .RESET_VALUE    (1'b0)
-    )
-    output_data_valid
-    (
-        .clock          (output_clock),
-        .clock_enable   (update_output_valid),
-        .clear          (output_clear),
-        .data_in        (buffer_rden),
-        .data_out       (output_valid)
-    );
-
 //### Read/Write Address Counters
 
 // The buffer read and write addresses are stored in counters, running in
 // separate clock domains, which both start at (and `clear` to) `ADDR_ZERO`.
 // Each counter can only increment by `ADDR_ONE` at each read or write, and
 // will wrap around to `ADDR_ZERO` if incremented past a value of `DEPTH-1`,
-// labelled as `ADDR_LAST`. *The depth can be any positive number, not only
-// a power-of-2.*
+// labelled as `ADDR_LAST` (`load` overrides `run`). *The depth can be any
+// positive number, not only a power-of-2.*
 
     reg increment_buffer_write_addr = 1'b0;
     reg load_buffer_write_addr      = 1'b0;
@@ -278,8 +255,7 @@ module CDC_FIFO_Buffer
 //### Read/Write Address CDC Transfer
 
 // We need to compare the read and write addresses, along with their
-// associated wrap-around bits, to detect if the FIFO is full or empty and
-// then signal to the input or output interfaces to stall temporarily.
+// associated wrap-around bits, to detect if the buffer is holding any items.
 // Therefore, we need to transfer the read address into the `output_clock`
 // domain, and the write address into the `input_clock` domain. We do this
 // with two CDC Word Synchronizers.
@@ -296,10 +272,10 @@ module CDC_FIFO_Buffer
 // other clock domain, we are comparing to a slightly stale version, lagging
 // behind the actual value. However, since the addresses never pass eachother,
 // this does not cause any corruption. The synchronized value eventually
-// catches up, and any artificial empty/full buffer condition is cleared. *At
-// worst, this lag means having to specify a somewhat deeper FIFO to achieve
-// the expected peak capacity, depending on input/output rates.* However, not
-// being restricted to powers-of-two FIFO depths minimizes this overhead.
+// catches up, and the actual buffer condition is updated. *At worst, this lag
+// means having to specify a somewhat deeper FIFO to achieve the expected peak
+// capacity, depending on input/output rates.* However, not being restricted
+// to powers-of-two FIFO depths minimizes this overhead.
 
     wire [ADDR_WIDTH-1:0]   buffer_write_addr_synced;
     wire                    buffer_write_addr_wrap_around_synced;
@@ -308,7 +284,7 @@ module CDC_FIFO_Buffer
     CDC_Word_Synchronizer
     #(
         .WORD_WIDTH             (ADDR_WIDTH + 1),
-        .EXTRA_CDC_DEPTH        (0),
+        .EXTRA_CDC_DEPTH        (CDC_EXTRA_STAGES),
         .OUTPUT_BUFFER_TYPE     ("HALF"), // "HALF", "SKID", "FIFO"
         .FIFO_BUFFER_DEPTH      (), // Only for "FIFO"
         .FIFO_BUFFER_RAMSTYLE   ()  // Only for "FIFO"
@@ -337,7 +313,7 @@ module CDC_FIFO_Buffer
     CDC_Word_Synchronizer
     #(
         .WORD_WIDTH             (ADDR_WIDTH + 1),
-        .EXTRA_CDC_DEPTH        (0),
+        .EXTRA_CDC_DEPTH        (CDC_EXTRA_STAGES),
         .OUTPUT_BUFFER_TYPE     ("HALF"), // "HALF", "SKID", "FIFO"
         .FIFO_BUFFER_DEPTH      (), // Only for "FIFO"
         .FIFO_BUFFER_RAMSTYLE   ()  // Only for "FIFO"
@@ -362,93 +338,83 @@ module CDC_FIFO_Buffer
 
 //## Control Path
 
-// Normally, there is a singular source of state in a design, and all inputs
-// and outputs are synchronous with eachother, and thus a singular calculation
-// of control. But since the state of *this* particular design is split across
-// two asynchronous clock domains, we cannot make a reliable simultaneous
-// calculation with both halves. Thus, each half does its own control
-// calculations, using the "stale", synchronized signals from the other half.
+//### Buffer States
+
+// We describe the state of the buffer itself as the number of items currently
+// stored in the buffer, as indicated by the read and write addresses and
+// their wrap-around bits. We only care about the extremes: if the buffer
+// holds no items, or if it holds its maximum number of items, as explained
+// above.
+
+    reg stored_items_zero = 1'b0;
+    reg stored_items_max  = 1'b0;
+
+    always @(*) begin
+        stored_items_zero = (buffer_read_addr        == buffer_write_addr_synced) && (buffer_read_addr_wrap_around        == buffer_write_addr_wrap_around_synced);
+        stored_items_max  = (buffer_read_addr_synced == buffer_write_addr)        && (buffer_read_addr_wrap_around_synced != buffer_write_addr_wrap_around);
+    end
 
 //### Input Interface (Insert)
 
-// The input interface **inserts** directly into the buffer, and only signals
-// transfers to stop if the buffer is full.
+// The input interface is simple: if the buffer isn't at its maximum capacity,
+// signal the input is ready, and when an input handshake completes, write the
+// data directly into the buffer and increment the write address, wrapping
+// around as necessary.
 
-    reg full   = 1'b0;
     reg insert = 1'b0;
 
     always @(*) begin
-        full        = (buffer_read_addr_synced == buffer_write_addr) && (buffer_read_addr_wrap_around_synced != buffer_write_addr_wrap_around);
-        input_ready = (full == 1'b0);
-        insert      = (input_valid  == 1'b1) && (input_ready  == 1'b1);
+        input_ready                             = (stored_items_max == 1'b0);
+        insert                                  = (input_valid      == 1'b1) && (input_ready  == 1'b1);
+
+        buffer_wren                             = (insert == 1'b1);
+        increment_buffer_write_addr             = (insert == 1'b1);
+        load_buffer_write_addr                  = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
+        toggle_buffer_write_addr_wrap_around    = (load_buffer_write_addr      == 1'b1);
     end
 
 //### Output Interface (Remove)
 
-// The buffer output is registered, so the output interface is necessarily
-// pipelined and works in parallel with the input interface. Keeping that
-// pipeline full and signalling to the `read_address` counter when an item is
-// removed from the buffer requires a separate little engine to continually
-// read from the `buffer` when possible.
+// The output interface is not so simple because the output is registered, and
+// so holds data independently of the buffer. We signal the output holds valid
+// data whenever we can remove an item from the buffer and load it into the
+// output register. We meet this condition if an output handshake completes,
+// or if the buffer holds an item but the output register is not holding any
+// valid data.  Also, we do not increment/wrap the read address if the
+// previous item removed from the buffer and loaded into the output register
+// was the last one.
 
-// Recall from above that `output_valid` is a registered version of
-// `buffer_rden`, matching the latency of a buffer read and signalling when
-// a buffer read has completed and new `output_data` is available.
-
-// We update `output_valid` and try to read from the buffer if the other end
-// of the output interface is ready (`output_ready` is high) or if
-// `output_data` is currently invalid, so even if `output_ready` is low, we
-// try and pre-load the output interface with valid data. A buffer read then
-// happens if the buffer is not empty. Otherwise, `output_valid` updates from
-// a `buffer_rden` which is necessarily low, because the buffer is empty, and
-// thus `output_valid` goes (or remains) low in the next cycle. If we can read
-// from the buffer, and `output_ready` is high, then we have **removed** an
-// item from the buffer.
-
-    reg empty  = 1'b0;
-    reg remove = 1'b0;
+    reg remove                  = 1'b0;
+    reg output_leaving_idle     = 1'b0;
+    reg load_output_register    = 1'b0;
 
     always @(*) begin
-        empty               = (buffer_read_addr == buffer_write_addr_synced) && (buffer_read_addr_wrap_around == buffer_write_addr_wrap_around_synced);
-        update_output_valid = (output_valid == 1'b0) || (output_ready        == 1'b1);
-        buffer_rden         = (empty        == 1'b0) && (update_output_valid == 1'b1);
-        remove              = (buffer_rden  == 1'b1) && (output_ready        == 1'b1);
+        remove                              = (output_valid == 1'b1) && (output_ready        == 1'b1);
+        output_leaving_idle                 = (output_valid == 1'b0) && (stored_items_zero   == 1'b0);
+        load_output_register                = (remove       == 1'b1) || (output_leaving_idle == 1'b1);
+
+        buffer_rden                         = (load_output_register == 1'b1) && (stored_items_zero == 1'b0);
+        increment_buffer_read_addr          = (load_output_register == 1'b1) && (stored_items_zero == 1'b0);
+        load_buffer_read_addr               = (increment_buffer_read_addr == 1'b1) && (buffer_read_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
+        toggle_buffer_read_addr_wrap_around = (load_buffer_read_addr      == 1'b1);
     end
 
-//### Datapath Transformations
+// Finally, `output_valid` must be registered to match the latency of the
+// `buffer` output register.
 
-// Now that we have defined the possible operations on the FIFO datapath
-// (*insert* and *remove*), we can define the datapath transformations, which
-// are the edges between states. Or put otherwise: in which state(s) can the
-// *insert* and/or *remove* operations happen, and what do they mean.
-
-// Here, we can *insert* when not *full* (load), and *remove* when not *empty*
-// (unload).
-
-    reg load    = 1'b0; // Inserts data into buffer.
-    reg unload  = 1'b0; // Remove data from buffer.
-
-    always @(*) begin
-        load    = (full  == 1'b0) && (insert == 1'b1);
-        unload  = (empty == 1'b0) && (remove == 1'b1);
-    end
-
-//### Control Signals
-
-// Here, we increment the read/write addresses as necessary, enable a write to
-// the buffer if we increment the write address, wrap-around the read/write
-// addresses when they reach the end of the buffer, and record that by
-// toggling their associated wrap-around bit.
-
-    always @(*) begin
-        increment_buffer_write_addr             = (load   == 1'b1);
-        increment_buffer_read_addr              = (unload == 1'b1);
-        buffer_wren                             = increment_buffer_write_addr;
-        load_buffer_write_addr                  = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
-        load_buffer_read_addr                   = (increment_buffer_read_addr  == 1'b1) && (buffer_read_addr  == ADDR_LAST [ADDR_WIDTH-1:0]);
-        toggle_buffer_write_addr_wrap_around    = (load_buffer_write_addr == 1'b1);
-        toggle_buffer_read_addr_wrap_around     = (load_buffer_read_addr  == 1'b1);
-    end
+    Register
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    output_data_valid
+    (
+        .clock          (output_clock),
+        .clock_enable   (load_output_register == 1'b1),
+        .clear          (output_clear),
+        .data_in        (stored_items_zero == 1'b0),
+        .data_out       (output_valid)
+    );
 
 endmodule
 
