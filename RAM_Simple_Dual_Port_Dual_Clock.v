@@ -22,7 +22,10 @@ module RAM_Simple_Dual_Port_Dual_Clock
     parameter                       WORD_WIDTH          = 0,
     parameter                       ADDR_WIDTH          = 0,
     parameter                       DEPTH               = 0,
+    // Used as an attribute, not a value
+    // verilator lint_off UNUSED
     parameter                       RAMSTYLE            = "",
+    // verilator lint_on  UNUSED
     parameter                       USE_INIT_FILE       = 0,
     parameter                       INIT_FILE           = "",
     parameter   [WORD_WIDTH-1:0]    INIT_VALUE          = 0

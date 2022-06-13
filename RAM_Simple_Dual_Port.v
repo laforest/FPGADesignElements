@@ -55,7 +55,7 @@ module RAM_Simple_Dual_Port
     parameter                       WORD_WIDTH          = 0,
     parameter                       ADDR_WIDTH          = 0,
     parameter                       DEPTH               = 0,
-    // The usage in attributes is not seen by the linter.
+    // Used as attributes, not values
     // verilator lint_off UNUSED
     parameter                       RAMSTYLE            = "",
     parameter                       RW_ADDR_COLLISION   = "",
