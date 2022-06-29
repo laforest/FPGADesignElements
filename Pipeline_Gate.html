@@ -1,0 +1,100 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Conditionally blocks ready/valid handshakes and data from passing through a pipeline. Handshakes complete only when the `enable` input is high. There is no buffering: this is purely combinational. The `enable` input MUST be changed synchronously to the clock.">
+<title>Pipeline Gate</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Pipeline_Gate.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Pipeline Gate</h1>
+<p>Conditionally blocks ready/valid handshakes and data from passing through
+ a pipeline. Handshakes complete only when the <code>enable</code> input is high.
+ There is no buffering: this is purely combinational. The <code>enable</code> input
+ MUST be changed synchronously to the clock.</p>
+<p>It is not enough to block only valid or ready: if valid is blocked, then
+ the sender can still see the receiver's ready and complete a handshake,
+ dropping that data. The opposite happens when blocking only ready, with the
+ receiver taking in stale data or garbage.</p>
+<p>An example use case for a gate is to prevent a FIFO from sending out data
+ while you are loading it with some unit composed of many words (e.g.
+ a packet). </p>
+<h2>Configuration</h2>
+<p>If the <code>GATE_DATA</code> parameter is non-zero, a disabled gate will not let any
+ data through and zero it out.  Else the data is always a simple
+ pass-through, and only the ready/valid handshakes are gated. Change the
+ <a href="./Annuller.html">Annuller</a> <code>IMPLEMENTATION</code> as necessary, but the default
+ should be fine.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Gate.html">Pipeline_Gate</a>
+#(
+    parameter WORD_WIDTH        = 0,
+    parameter IMPLEMENTATION    = "AND",
+    parameter GATE_DATA         = 0
+)
+(
+    input   wire                        enable,
+
+    output  wire                        input_ready,
+    input   wire                        input_valid,
+    input   wire    [WORD_WIDTH-1:0]    input_data,
+
+    output  wire                        output_valid,
+    input   wire                        output_ready,
+    output  wire    [WORD_WIDTH-1:0]    output_data
+);
+
+    generate
+
+        if (GATE_DATA != 0) begin
+
+            <a href="./Annuller.html">Annuller</a>
+            #(
+                .WORD_WIDTH     (WORD_WIDTH + 1 + 1),
+                .IMPLEMENTATION (IMPLEMENTATION)
+            )
+            gate_control_and_data
+            (
+                .annul      (enable == 1'b0),
+                .data_in    ({input_data,  output_ready, input_valid}),
+                .data_out   ({output_data, input_ready,  output_valid})
+            );
+
+        end
+        else begin
+
+            assign output_data = input_data;
+
+            <a href="./Annuller.html">Annuller</a>
+            #(
+                .WORD_WIDTH     (1 + 1),
+                .IMPLEMENTATION (IMPLEMENTATION)
+            )
+            gate_control_only
+            (
+                .annul      (enable == 1'b0),
+                .data_in    ({output_ready, input_valid}),
+                .data_out   ({input_ready,  output_valid})
+            );
+
+        end
+
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
