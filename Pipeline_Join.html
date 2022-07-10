@@ -99,8 +99,11 @@ module <a href="./Pipeline_Join.html">Pipeline_Join</a>
 <pre>
     always @(*) begin
         output_valid            = (input_valid_buffered == INPUT_ONES);
-        input_ready_buffered    = (output_valid == 1'b1) ? {INPUT_COUNT{output_ready}} : INPUT_ZERO;
         output_data             = input_data_buffered;
+    end
+
+    always @(*) begin
+        input_ready_buffered    = (output_valid == 1'b1) ? {INPUT_COUNT{output_ready}} : INPUT_ZERO;
     end
 
 endmodule

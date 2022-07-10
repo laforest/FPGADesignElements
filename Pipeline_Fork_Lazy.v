@@ -47,9 +47,12 @@ module Pipeline_Fork_Lazy
 
     always @(*) begin
         input_ready         = (output_ready == OUTPUT_ONES);
-        output_valid_gated  = (input_valid == 1'b1) && (input_ready == 1'b1);
         output_valid        = {OUTPUT_COUNT{output_valid_gated}};
         output_data         = {OUTPUT_COUNT{input_data}};
+    end
+
+    always @(*) begin
+        output_valid_gated  = (input_valid == 1'b1) && (input_ready == 1'b1);
     end
 
 endmodule
