@@ -1,0 +1,102 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Takes in a ready/valid handshake with the associated data, and replicates that transaction to multiple outputs. The input can proceed to the next transaction once **all** outputs can finish their transactions **simultaneously**. This constraint prevents any branch from running ahead of the others.">
+<title>Pipeline Fork Blocking</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Pipeline_Fork_Blocking.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Pipeline Fork (Blocking)</h1>
+<p>Takes in a ready/valid handshake with the associated data, and replicates
+ that transaction to multiple outputs. The input can proceed to the next
+ transaction once <strong>all</strong> outputs can finish their transactions
+ <strong>simultaneously</strong>. This constraint prevents any branch from running ahead
+ of the others.</p>
+<p><strong>NOTE</strong>: If the downstream logic connected to the output interfaces can
+ lower their <code>ready</code> signal after raising it, before the corresponding
+ <code>valid</code> is raised to complete the handshake, you could end up with
+ deadlocks of unknown duration until all <code>ready</code> signals happen to be
+ asserted together. To avoid this situation, use an <a href="./Pipeline_Fork_Eager.html">Eager Pipeline
+ Fork</a>, but then you cannot guarantee lockstep
+ operation of the various downstream logic branches.</p>
+<p>The input is buffered to minimise any long combinational path or loops
+ which might happen when using the <a href="./Pipeline_Fork_Lazy.html">Lazy Pipeline
+ Fork</a>.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Fork_Blocking.html">Pipeline_Fork_Blocking</a>
+#(
+    parameter WORD_WIDTH    = 0,
+    parameter OUTPUT_COUNT  = 0,
+
+    // Do not set at instantiation, except in IPI
+    parameter TOTAL_WIDTH   = WORD_WIDTH * OUTPUT_COUNT
+)
+(
+    input  wire                     clock,
+    input  wire                     clear,
+
+    input  wire                     input_valid,
+    output wire                     input_ready,
+    input  wire [WORD_WIDTH-1:0]    input_data,
+
+    output wire [OUTPUT_COUNT-1:0]  output_valid,
+    input  wire [OUTPUT_COUNT-1:0]  output_ready,
+    output wire [TOTAL_WIDTH-1:0]   output_data
+);
+
+    wire                    input_valid_buffered;
+    wire                    input_ready_buffered;
+    wire [WORD_WIDTH-1:0]   input_data_buffered;
+
+    <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH)
+    )
+    input_buffer
+    (
+        .clock           (clock),
+        .clear           (clear),
+
+        .input_valid     (input_valid),
+        .input_ready     (input_ready),
+        .input_data      (input_data),
+
+        .output_valid    (input_valid_buffered),
+        .output_ready    (input_ready_buffered),
+        .output_data     (input_data_buffered)
+    );
+
+    <a href="./Pipeline_Fork_Lazy.html">Pipeline_Fork_Lazy</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .OUTPUT_COUNT   (OUTPUT_COUNT)
+    )
+    output_fork
+    (
+        .input_valid    (input_valid_buffered),
+        .input_ready    (input_ready_buffered),
+        .input_data     (input_data_buffered),
+
+        .output_valid   (output_valid),
+        .output_ready   (output_ready),
+        .output_data    (output_data)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
