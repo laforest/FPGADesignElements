@@ -453,7 +453,9 @@ module Adder_Subtractor_Binary_Multiprecision
     localparam [STATE_WIDTH-1:0] STATE_LOAD  = 2'b00;
     localparam [STATE_WIDTH-1:0] STATE_CALC  = 2'b01;
     localparam [STATE_WIDTH-1:0] STATE_DONE  = 2'b11;
+    //verilator lint_off UNUSED
     localparam [STATE_WIDTH-1:0] STATE_ERROR = 2'b10; // Never reached.
+    //verilator lint_on  UNUSED
 
     wire [STATE_WIDTH-1:0] state;
     reg  [STATE_WIDTH-1:0] state_next = STATE_LOAD;
