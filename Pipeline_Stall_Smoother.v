@@ -44,9 +44,9 @@
 
 module Pipeline_Stall_Smoother
 #(
-    parameter       WORD_WIDTH          = 32,
-    parameter       RAMSTYLE            = "block",
-    parameter       MAX_STALL_CYCLES    = 7,
+    parameter       WORD_WIDTH          = 0,
+    parameter       RAMSTYLE            = "",
+    parameter       MAX_STALL_CYCLES    = 0,
     parameter       GATE_DATA           = 0,
     parameter       GATE_IMPLEMENTATION = "AND"
 )
