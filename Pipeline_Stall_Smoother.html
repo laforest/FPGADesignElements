@@ -1,0 +1,328 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Prevents pipeline stalls at the output interface, given a known maximum input pipeline stall duration, by buffering a sufficient number of items from the input pipeline before allowing the output pipeline to start providing data.">
+<title>Pipeline Stall Smoother</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Pipeline_Stall_Smoother.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Pipeline Stall Smoother</h1>
+<p>Prevents pipeline stalls at the output interface, given a known maximum
+ input pipeline stall duration, by buffering a sufficient number of items
+ from the input pipeline before allowing the output pipeline to start
+ providing data.</p>
+<p>This controlled buffering allows any periodic stalls at the input (e.g. CDC
+ latency) to resolve before the output runs out of data, thus ensuring an
+ uninterrupted flow of data at the output once started.  Once started, the
+ output provides data continuously until it stalls from lack of input data,
+ then the buffering starts again.</p>
+<p>Alternately, if the input data meets an externally calculated trigger
+ condition (e.g.: the end of a packet), the output will begin providing data
+ only after sufficient time has passed (assuming 1 cycle/transfer), even if
+ not enough items have arrived, to ensure that any pending input stall has
+ time to complete and thus not stall the continuous output.</p>
+<p><em>This whole mechanism depends on the average input and output data rates
+ being identical, otherwise propagating stalls between input and output is
+ inevitable.</em> You can externally detect an input stall propagated to the
+ output by using a <a href="./Pulse_Generator.html">Pulse Generator</a> to detect
+ a negative edge on the <code>output_valid</code> port.</p>
+<h2>Parameters</h2>
+<p>Set <code>WORD_WIDTH</code> to the width in bits of each transfer. Set <code>RAMSTYLE</code> to
+ control the implementation of the FIFO buffer storage (see your CAD tool
+ and target device for available option). Set <code>GATE_DATA</code> to a non-zero
+ value to zero-out <code>output_data</code> when waiting to start output transfers.
+ Select <code>GATE_IMPLEMENTATION</code> to best match your CAD tools and FPGA device,
+ but it can virtually always be left as "AND".</p>
+<p>Note that if you want to precisely control the FIFO storage size (e.g.: to
+ use up exactly one Block RAM), you must make <code>MAX_STALL_CYCLES</code> equal to
+ the depth of your desired storage <em>minus one</em>. Values below 2 will be
+ adjusted back up to 2, using up a total of 3 FIFO storage locations.</p>
+<h2>Ports and Constants</h2>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Stall_Smoother.html">Pipeline_Stall_Smoother</a>
+#(
+    parameter       WORD_WIDTH          = 32,
+    parameter       RAMSTYLE            = "block",
+    parameter       MAX_STALL_CYCLES    = 7,
+    parameter       GATE_DATA           = 0,
+    parameter       GATE_IMPLEMENTATION = "AND"
+)
+(
+    input   wire                        clock,
+    input   wire                        clear,
+
+    input   wire                        input_valid,
+    output  wire                        input_ready,
+    input   wire    [WORD_WIDTH-1:0]    input_data,
+
+    input   wire                        input_trigger, // Preferably a one-cycle pulse high
+
+    output  wire                        output_valid,
+    input   wire                        output_ready,
+    output  wire    [WORD_WIDTH-1:0]    output_data
+);
+</pre>
+
+<p>The <code>Pipeline_FIFO_Buffer</code> has a latency from input to output of 2 cycles,
+ so we cannot specify a shorter input stall duration: single-cycle stalls are
+ treated as two-cycle stalls.</p>
+<p>Also, to prevent creating a 1-cycle stall at the input when the FIFO buffer
+ fills sufficiently to absorb the specified maximum input stall duration, we
+ must add 1 to the specified <code>MAX_STALL_CYCLES</code> so that we have 1 storage
+ location left to take in input during the cycle the first buffered output
+ is sent out.</p>
+
+<pre>
+    `include "<a href="./clog2_function.html">clog2_function</a>.vh"
+    `include "<a href="./max_function.html">max_function</a>.vh"
+
+    localparam FIFO_DEPTH = max(MAX_STALL_CYCLES, 2) + 1;
+</pre>
+
+<h2>Stored Item Counting</h2>
+<p>Since the stored data count has to be able to represent <code>FIFO_DEPTH</code> itself, and
+ not a zero to <code>FIFO_DEPTH-1</code> count of that quantity, we need an extra bit to
+ guarantee sufficient range.</p>
+
+<pre>
+    localparam BUFFER_COUNT_WIDTH  = clog2(FIFO_DEPTH) + 1;
+    localparam BUFFER_COUNT_ONE    = {{BUFFER_COUNT_WIDTH-1{1'b0}},1'b1};
+    localparam BUFFER_COUNT_ZERO   = {BUFFER_COUNT_WIDTH{1'b0}};
+    localparam BUFFER_COUNT_LAST   = FIFO_DEPTH [BUFFER_COUNT_WIDTH-1:0];
+    localparam BUFFER_COUNT_UP     = 1'b0;
+    localparam BUFFER_COUNT_DOWN   = 1'b1;
+
+    reg                             buffer_count_up_down   = BUFFER_COUNT_UP;
+    reg                             buffer_count_run       = 1'b0;
+    wire [BUFFER_COUNT_WIDTH-1:0]   items_in_buffer;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (BUFFER_COUNT_WIDTH),
+        .INCREMENT      (BUFFER_COUNT_ONE),
+        .INITIAL_COUNT  (BUFFER_COUNT_ZERO)
+    )
+    buffer_occupancy
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .up_down        (buffer_count_up_down), // 0/1 --> up/down
+        .run            (buffer_count_run),
+
+        .load           (1'b0),
+        .load_count     (BUFFER_COUNT_ZERO),
+
+        .carry_in       (1'b0),
+        //verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        //verilator lint_on  PINCONNECTEMPTY
+
+        .count          (items_in_buffer)
+    );
+</pre>
+
+<h2>Trigger Delay</h2>
+<p>Since the delay count has to be able to represent <code>FIFO_DEPTH</code> itself, and
+ not a zero to <code>FIFO_DEPTH-1</code> count of that quantity, we need an extra bit to
+ guarantee sufficient range.</p>
+
+<pre>
+    localparam TRIGGER_COUNT_WIDTH  = clog2(FIFO_DEPTH) + 1;
+    localparam TRIGGER_COUNT_ONE    = {{TRIGGER_COUNT_WIDTH-1{1'b0}},1'b1};
+    localparam TRIGGER_COUNT_ZERO   = {TRIGGER_COUNT_WIDTH{1'b0}};
+    localparam TRIGGER_COUNT_LAST   = FIFO_DEPTH [TRIGGER_COUNT_WIDTH-1:0];
+    localparam TRIGGER_COUNT_UP     = 1'b0;
+
+    reg                             trigger_count_reload    = 1'b0;
+    reg                             trigger_count_run       = 1'b0;
+    wire [TRIGGER_COUNT_WIDTH-1:0]  cycles_since_trigger;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (TRIGGER_COUNT_WIDTH),
+        .INCREMENT      (TRIGGER_COUNT_ONE),
+        .INITIAL_COUNT  (TRIGGER_COUNT_ZERO)
+    )
+    trigger_delay
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .up_down        (TRIGGER_COUNT_UP), // 0/1 --> up/down
+        .run            (trigger_count_run),
+
+        .load           (trigger_count_reload),
+        .load_count     (TRIGGER_COUNT_ZERO),
+
+        .carry_in       (1'b0),
+        //verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        //verilator lint_on  PINCONNECTEMPTY
+
+        .count          (cycles_since_trigger)
+    );
+</pre>
+
+<h2>Stored Item Buffering</h2>
+
+<pre>
+    wire                    output_valid_internal;
+    wire                    output_ready_internal;
+    wire [WORD_WIDTH-1:0]   output_data_internal;
+
+    <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .DEPTH          (FIFO_DEPTH),
+        .RAMSTYLE       (RAMSTYLE)
+    )
+    smoothing_buffer
+    (
+        .clock          (clock),
+        .clear          (clear),
+
+        .input_valid    (input_valid),
+        .input_ready    (input_ready),
+        .input_data     (input_data),
+
+        .output_valid   (output_valid_internal),
+        .output_ready   (output_ready_internal),
+        .output_data    (output_data_internal)
+    );
+</pre>
+
+<h2>Control Logic</h2>
+<p>Buffer the input data in the <code>smoothing_buffer</code> until there is enough to
+ absorb <code>MAX_STALL_CYCLES</code> cycles of input stall, then allow that buffered
+ data to exit the output. If we run out of buffered data (which should never
+ happen during steady flow state with a known maximum input stall duration),
+ then revert back to buffering data.</p>
+
+<pre>
+    localparam STATE_BUFFERING = 1'b0;
+    localparam STATE_SENDING   = 1'b1; 
+
+    wire state;
+    reg  state_next = STATE_BUFFERING;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (STATE_BUFFERING)
+    )
+    state_storage
+    (
+        .clock          (clock),
+        .clock_enable   (1'b1),
+        .clear          (clear),
+        .data_in        (state_next),
+        .data_out       (state)
+    );
+</pre>
+
+<p>Common logic for control. Everything must follow the state of the
+ interfaces, else data can get lost.</p>
+
+<pre>
+    reg input_handshake_done    = 1'b0;
+    reg output_handshake_done   = 1'b0;
+
+    always @(*) begin
+        input_handshake_done    = (input_valid  == 1'b1) && (input_ready  == 1'b1);
+        output_handshake_done   = (output_valid == 1'b1) && (output_ready == 1'b1);
+    end
+</pre>
+
+<p>Control the buffer counter. Increment when data enters, decrement when data
+ leaves, and stay constant otherwise.</p>
+
+<pre>
+    always @(*) begin
+        buffer_count_run        = (input_handshake_done != output_handshake_done);
+        buffer_count_up_down    = (input_handshake_done == 1'b0) && (output_handshake_done == 1'b1) ? BUFFER_COUNT_DOWN : BUFFER_COUNT_UP;
+        buffer_count_up_down    = (input_handshake_done == 1'b1) && (output_handshake_done == 1'b0) ? BUFFER_COUNT_UP   : buffer_count_up_down;
+    end
+</pre>
+
+<p>Control the trigger counter. Start counting when a trigger is seen. Reset
+ when sending begins, which is when this counter completes, at least.</p>
+
+<pre>
+    reg  trigger_clear = 1'b0;
+    wire trigger_latched;
+
+    <a href="./Pulse_Latch.html">Pulse_Latch</a>
+    #(
+        .RESET_VALUE    (1'b0)
+    )
+    capture_trigger
+    (
+        .clock          (clock),
+        .clear          (trigger_clear),
+        .pulse_in       (input_trigger),
+        .level_out      (trigger_latched)
+    );
+
+    always @(*) begin
+        trigger_count_run       = (trigger_latched      == 1'b1);
+        trigger_count_reload    = (cycles_since_trigger == TRIGGER_COUNT_LAST);
+        trigger_clear           = (trigger_count_reload == 1'b1);
+    end
+</pre>
+
+<p>Calculate the next state. Buffer until full or until trigger. Then send
+ until empty, then buffer again.</p>
+
+<pre>
+    always @(*) begin
+        state_next              = (items_in_buffer == BUFFER_COUNT_LAST) || (cycles_since_trigger == TRIGGER_COUNT_LAST) ? STATE_SENDING   : state;
+        state_next              = (items_in_buffer == BUFFER_COUNT_ZERO)                                                 ? STATE_BUFFERING : state_next;
+    end
+</pre>
+
+<p>If we are not sending data, gate the output handshake, and optionally gate
+ the data also.</p>
+
+<pre>
+    <a href="./Pipeline_Gate.html">Pipeline_Gate</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .IMPLEMENTATION (GATE_IMPLEMENTATION),
+        .GATE_DATA      (GATE_DATA)
+    )
+    output_gate
+    (
+        .enable         (state == STATE_SENDING),
+
+        .input_ready    (output_ready_internal),
+        .input_valid    (output_valid_internal),
+        .input_data     (output_data_internal),
+
+        .output_valid   (output_valid),
+        .output_ready   (output_ready),
+        .output_data    (output_data)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
