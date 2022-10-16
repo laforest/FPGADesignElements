@@ -167,24 +167,25 @@ a parameter, and leave a comment that it should not be set at module
 instantiation.
 
 <pre>
-// Unclear if extended with zeros or Xs past 32 or 64 bits
+// This is 32-bits by default
 localparam WORD_WIDTH = 72;
-reg [WORD_WIDTH-1:0] foo = 'b0;
+
+// Also legal to define bit width
+localparam [WORD_WIDTH-1:0] WORD_CONSTANT = `SOME_DEFINED_CONSTANT;
 
 // Not legal
-localparam WORD_WIDTH = 72;
 reg [WORD_WIDTH-1:0] foo = WORD_WIDTH'b0;
 
 // Legal workarounds
-localparam WORD_WIDTH     = 72;
 localparam WORD_ZERO      = {WORD_WIDTH{1'b0}};
 localparam WORD_ONE       = {{WORD_WIDTH-1{1'b0}},1'b1};
 localparam WORD_MINUS_ONE = ~WORD_ZERO;
 
 reg [WORD_WIDTH-1:0] foo  = WORD_ZERO;
 
-// Also legal to define bit width
-localparam [WORD_WIDTH-1:0] WORD_CONSTANT = `SOME_INTEGER_CONSTANT;
+// Simpler, but unclear if extended with zeros or Xs past 32 or 64 bits
+reg [WORD_WIDTH-1:0] foo = 'b0;
+reg [WORD_WIDTH-1:0] foo = 'd42;
 
 // Sometimes you have to clip at the point of use
 localparam NARROW_ZERO = {NARROW_WIDTH{1'b0}};
