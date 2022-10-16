@@ -1,0 +1,352 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Raises an alarm signal if not "pinged" before a given number of cycles have passed since the last ping or since start. This can be used as a simple event timer, or as part of a hardware failsafe.">
+<title>Watchdog Timer</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Watchdog_Timer.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Watchdog Timer</h1>
+<p>Raises an alarm signal if not "pinged" before a given number of cycles have
+ passed since the last ping or since start. This can be used as a simple
+ event timer, or as part of a hardware failsafe.</p>
+<h2>Operation</h2>
+<p>If more cycles than the last loaded <code>cycle_count</code> have passed (except for
+ a value of zero) since the last cycle <code>start</code>, or <code>ping</code> was pulsed high,
+ the watchdog stops and raises and holds high <code>alarm</code> (but not <code>error</code>)
+ until <code>start</code> is raised high to re-use the last loaded <code>cycle_count</code>. </p>
+<p><code>clear</code> overrides all signals, lowers all outputs, and stops the watchdog.
+ So it's possible for <code>clear</code> to hide a timeout. <em><code>clear</code> may be held high
+ for multiple cycles without error.</em></p>
+<p><code>ping</code>, <code>load</code>, <code>start</code>, and <code>stop</code> are separate signals to separate the
+ <em>controlling</em> process(es) (hardware and/or software) which configures and
+ controls the watchdog (load/start/stop), and the <em>supervised</em> process which
+ must periodically "ping" the watchdog, and to prevent the need for
+ a duplicate external storage of the <code>cycle_count</code>. Typically, <code>load</code> is
+ used by software controling processes which update the <code>cycle_count</code>, and
+ <code>start</code> and <code>stop</code> are used by hardware controlling processes which only
+ need to manage a pre-configured watchdog.</p>
+<p><code>running</code> is high whenever the watchdog is counting down and not zero.
+ Use it to determine if you should also start the watchdog when loading it.</p>
+<h2>Ping</h2>
+<p>While the watchdog is running, pulsing <code>ping</code> high for exactly <em>one</em> cycle
+ restarts the watchdog's timeout countdown with the last loaded
+ <code>cycle_count</code>.  Holding <code>ping</code> high for more than one cycle stops the
+ watchdog and raises <code>error</code> and <code>alarm</code>, to detect stuck-at faults in the
+ supervised process.</p>
+<p>Raising <code>load</code> at the same time as <code>ping</code> restarts the watchdog with the
+ new <code>cycle_count</code> value instead of the previously stored value.</p>
+<p><code>ping</code> has no effect while the watchdog is stopped, so as to prevent a case
+ where the alarm is raised, but not noticed before <code>ping</code> is raised again,
+ which would clear the alarm and lose the detection of a timeout. This case
+ also allows us to suspend using the watchdog, or to start the supervised
+ process before the controlling process starts the watchdog.</p>
+<h2>Load</h2>
+<p>Pulsing <code>load</code> for exactly <em>one</em> cycle while providing the desired
+ <code>cycle_count</code> value in the same cycle will reload the watchdog internal
+ <code>cycle_count</code> storage, <em>but does NOT clear <code>alarm</code> and <code>error</code>, does NOT
+ start a stopped watchdog, and does NOT stop a running watchdog nor alter
+ its current timeout</em>. Holding <code>load</code> high for more than one cycle stops the
+ watchdog and raises <code>error</code> and <code>alarm</code> to detect stuck-at faults in the
+ controlling process.</p>
+<h2>Start</h2>
+<p>Pulsing <code>start</code> for exactly <em>one</em> cycle will reload the last loaded
+ <code>cycle_count</code>, restart the watchdog and clear <code>alarm</code> and <code>error</code>. Holding
+ <code>start</code> high for more than one cycle, or raising <code>start</code> while the watchdog
+ is already running, stops the watchdog and raises <code>error</code> and <code>alarm</code> to
+ detect stuck-at faults in the controlling process.</p>
+<p>Raising <code>load</code> at the same time as <code>start</code> starts the watchdog with the new
+ <code>cycle_count</code> value instead of the previously stored value.</p>
+<p>Starting the watchdog with a <code>cycle_count</code> of zero halts the watchdog,
+ clears <code>alarm</code> and <code>error</code>, and <code>ping</code> will have no effect. This special
+ case allows us to choose to run without a watchdog, or to start the
+ supervised process first, then the watchdog, in cases where we cannot be
+ sure if the latency when configuring the watchdog or starting the
+ supervised process will exceed the watchdog timeout. </p>
+<h2>Stop</h2>
+<p>Pulsing <code>stop</code> for exactly <em>one</em> cycle while the watchdog is running will
+ stop the watchdog (by loading it with zero) and preserve the last loaded
+ <code>cycle_count</code>. Holding <code>stop</code> high for more than one cycle, or raising
+ <code>stop</code> while the watchdog is <em>not</em> running, stops the watchdog and raises
+ <code>error</code> and <code>alarm</code> to detect faults in the controlling process.</p>
+<p>If the watchdog is running, raising <code>stop</code> and <code>load</code> together is allowed:
+ the watchdog stops and the internal <code>cycle_count</code> storage is updated. </p>
+<p>Raising <code>stop</code> and <code>start</code> together is always an error: if the watchdog is
+ stopped then <code>stop</code> causes an error, else if the watchdog is running then
+ <code>start</code> causes an error.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Watchdog_Timer.html">Watchdog_Timer</a>
+#(
+    parameter WORD_WIDTH                = 0
+)
+(
+    input   wire                        clock,
+    input   wire                        clear,
+
+    // From supervised process
+    input   wire                        ping,
+
+    // From controlling process(es)
+    input   wire                        start,
+    input   wire                        stop,
+    input   wire                        load,
+    input   wire    [WORD_WIDTH-1:0]    cycle_count,
+
+    output  wire                        alarm,
+    output  wire                        error,
+    output  reg                         running
+);
+
+    initial begin
+        running = 1'b0;
+    end
+
+    localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
+    localparam WORD_ONE  = {{WORD_WIDTH-1{1'b0}}, 1'b1};
+</pre>
+
+<h2>Storage and Counting</h2>
+<p>Store the last <code>load</code>ed <code>cycle_count</code> so <code>ping</code> and <code>start</code> can reload it
+ into the counter.</p>
+
+<pre>
+    reg                     store_cycle_count = 1'b0;
+    wire [WORD_WIDTH-1:0]   cycle_count_stored;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .RESET_VALUE    (WORD_ZERO)
+    )
+    cycle_count_storage
+    (
+        .clock          (clock),
+        .clock_enable   (store_cycle_count),
+        .clear          (clear),
+        .data_in        (cycle_count),
+        .data_out       (cycle_count_stored)
+    );
+</pre>
+
+<p>Simply a countdown timer which runs freely.
+ Note that <code>clear</code> implicitly loads zero (INITIAL_COUNT).
+ And a counter value of zero signals a stopped counter.</p>
+
+<pre>
+    reg                     timer_clear         = 1'b0;
+    reg                     timer_run           = 1'b0;
+    reg                     timer_load          = 1'b0;
+    reg  [WORD_WIDTH-1:0]   timer_load_value    = WORD_ZERO;
+    wire [WORD_WIDTH-1:0]   cycles_remaining;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH),
+        .INCREMENT      (WORD_ONE),
+        .INITIAL_COUNT  (WORD_ZERO)
+    )
+    timer_cycles
+    (
+        .clock          (clock),
+        .clear          (timer_clear),
+
+        .up_down        (1'b1), // 0/1 --> up/down
+        .run            (timer_run),
+
+        .load           (timer_load),
+        .load_count     (timer_load_value),
+
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+
+        .count          (cycles_remaining)
+    );
+</pre>
+
+<p>We detect a timeout by the counter reaching 1, not zero, and raising the
+ alarm in the next cycle.  This means loading zero directly, to stop the
+ counter, does not trigger an alarm, and that loading a <code>cycle_count</code> value
+ of N means the alarm will raise exactly N cycles later.</p>
+
+<pre>
+    reg timer_expiring = 1'b0;
+    reg timer_stopped  = 1'b0;
+
+    always @(*) begin
+        timer_expiring  = (cycles_remaining == WORD_ONE);
+        timer_stopped   = (cycles_remaining == WORD_ZERO);
+        running         = (timer_stopped    == 1'b0);
+    end
+</pre>
+
+<p>Alarm is a latch. <code>clear</code> overrides <code>pulse_in</code>.</p>
+
+<pre>
+    reg alarm_clear = 1'b0;
+    reg alarm_set   = 1'b0;
+
+    <a href="./Pulse_Latch.html">Pulse_Latch</a>
+    #(
+        .RESET_VALUE    (1'b0)
+    )
+    alarm_hold
+    (
+        .clock          (clock),
+        .clear          (alarm_clear),
+        .pulse_in       (alarm_set),
+        .level_out      (alarm)
+    );
+</pre>
+
+<p>Error is a latch. <code>clear</code> overrides <code>pulse_in</code>.</p>
+
+<pre>
+    reg error_clear = 1'b0;
+    reg error_set   = 1'b0;
+
+    <a href="./Pulse_Latch.html">Pulse_Latch</a>
+    #(
+        .RESET_VALUE    (1'b0)
+    )
+    error_hold
+    (
+        .clock          (clock),
+        .clear          (error_clear),
+        .pulse_in       (error_set),
+        .level_out      (error)
+    );
+</pre>
+
+<h2>Error Detection</h2>
+<p>We can detect if a signal is pulsed for longer than one cycle by seeing if
+ they are still asserted after we combinationally generate a pulse from
+ their rising edge.</p>
+
+<pre>
+    wire ping_first_cycle;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    ping_check
+    (
+        .clock              (clock),
+        .level_in           (ping),
+        .pulse_posedge_out  (ping_first_cycle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+
+    wire start_first_cycle;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    start_check
+    (
+        .clock              (clock),
+        .level_in           (start),
+        .pulse_posedge_out  (start_first_cycle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+
+    wire stop_first_cycle;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    stop_check
+    (
+        .clock              (clock),
+        .level_in           (stop),
+        .pulse_posedge_out  (stop_first_cycle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+
+    wire load_first_cycle;
+
+    <a href="./Pulse_Generator.html">Pulse_Generator</a>
+    load_check
+    (
+        .clock              (clock),
+        .level_in           (load),
+        .pulse_posedge_out  (load_first_cycle),
+        // verilator lint_off PINCONNECTEMPTY
+        .pulse_negedge_out  (),
+        .pulse_anyedge_out  ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+
+    reg ping_error              = 1'b0;
+    reg start_error             = 1'b0;
+    reg stop_error              = 1'b0;
+    reg load_error              = 1'b0;
+    reg long_pulse_error        = 1'b0;
+
+    always @(*) begin
+        ping_error  = (ping  == 1'b1) && (ping_first_cycle  == 1'b0);
+        start_error = (start == 1'b1) && (start_first_cycle == 1'b0);
+        stop_error  = (stop  == 1'b1) && (stop_first_cycle  == 1'b0);
+        load_error  = (load  == 1'b1) && (load_first_cycle  == 1'b0);
+        long_pulse_error = ping_error | start_error | stop_error | load_error;
+    end
+</pre>
+
+<p>We don't distinguish sources of error in the end, so merge them together
+ here to simplify later logic.</p>
+
+<pre>
+    reg any_error = 1'b0;
+
+    always @(*) begin
+        any_error = (long_pulse_error   == 1'b1);
+        any_error = ((stop_first_cycle  == 1'b1) && (timer_stopped == 1'b1)) || (any_error == 1'b1);
+        any_error = ((start_first_cycle == 1'b1) && (timer_stopped == 1'b0)) || (any_error == 1'b1);
+    end
+</pre>
+
+<h2>Control Logic</h2>
+
+<pre>
+    always @(*) begin
+        store_cycle_count   = (load_first_cycle == 1'b1);
+
+        // Clear overrides set on a latch, so make sure we don't clear while
+        // setting unless it's the actual `clear` signal, which overrides all.
+
+        alarm_set           =  (any_error   == 1'b1) || (timer_expiring     == 1'b1);
+        alarm_clear         = ((any_error   == 1'b0) && (start_first_cycle == 1'b1)) || (clear == 1'b1);
+
+        error_set           = (any_error   == 1'b1);
+        error_clear         = (alarm_clear == 1'b1);
+
+        timer_clear         = (any_error == 1'b1) || (stop_first_cycle == 1'b1) || (clear == 1'b1);
+        timer_run           = (cycles_remaining  != WORD_ZERO);
+        timer_load          = (start_first_cycle == 1'b1) || ((ping_first_cycle == 1'b1) && (timer_stopped == 1'b0));
+        timer_load_value    = (load_first_cycle  == 1'b1) ? cycle_count : cycle_count_stored;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
