@@ -36,6 +36,11 @@
 // the relative clock domain frequencies, use a [Pulse
 // Synchronizer](./CDC_Pulse_Synchronizer_2phase.html).
 
+// Similarly, if the rise/fall time of the input signal is longer than the
+// receiving clock period, the receiving clock will sample the transistion
+// multiple times, which will show up as possibly multiple pulses at the
+// output. In these cases, use a [Debouncer](./Debouncer_Low_Latency.html).
+
 //## Single-Bit Synchronization Only
 
 // Also, for reasons explained in [A Primer on Clock Domain Crossing

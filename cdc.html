@@ -23,8 +23,9 @@ complicates things and reduces performance.
 
 <p>Normally, digital logic works in a bistable mode: it's either in a high
 state or low state, glossing over the fact that it takes time to move from one
-state to the other.  But so long as we sample states (e.g.: latch a signal) far
-from those transitions, the assumption holds and everything remains bistable.
+state to the other.  But so long as we sample states (e.g.: latch a signal)
+<em>far from those transitions</em>, the assumption holds and everything
+remains bistable.
 
 <p>A <em>metastable</em> state is simply any state that is neither high nor
 low, but in between, like during a transition. And the closer to the mid-point
@@ -44,13 +45,15 @@ imply instantaneous state transitions, which isn't physically possible.)</i>
 
 <h2>The CDC Basic Building Block</h2>
 
-<p>A <a href="./CDC_Synchronizer.html">CDC Synchronizer</a> forms the core of
+<p>A <a href="./CDC_Bit_Synchronizer.html">CDC Bit Synchronizer</a> forms the core of
 any CDC solution: a chain of two (or more) closely placed registers, with no
 logic between them, and clocked by the receiving clock.  The input register
 receives a bit synchronized to a sending clock, and the output register sends a
 version of that bit synchronized to the receiving clock. The duration between
 bit transitions at the output may be of a different length than the original
 bit, with a new duration of some multiple of the receiving clock period.
+
+<p>(You can find several more ready-to-use CDC modules <a href="./index.html#cdc">here</a>.)
 
 <h2>Latency</h2>
 
@@ -150,6 +153,17 @@ receiving multiple bits in one clock domain and then passing the resulting
 whole word across clock domains (directly, without synchronization!), with a
 single "valid" bit being synchronized across clock domains and acting as a
 latch trigger in the receiving clock domain.
+
+<h3>Special Case: Extreme Clock Rate Differences</h3>
+
+<p>There is an implicit assumption in the above discussion about passing a bit
+through a synchronizer: the receiving clock edges must coincide with the
+incoming transition only once at most. Otherwise, in cases where the incoming
+transition is very slow relative to the receiving clock, the receiving clock
+will sample the incoming transition multiple times, which <em>maximizes</em>
+the chance of a metastable event. This will manifest as multiple bit
+transitions in the receiving clock domain. In these cases, the synchronizer
+must be followed by a <a href="./Debouncer_Low_Latency.html">Debouncer</a>.
 
 <h2>Further Issues and Reading</h2>
 

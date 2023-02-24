@@ -41,6 +41,10 @@
 <p>If you cannot guarantee the duration of a pulse and/or have no knowledge of
  the relative clock domain frequencies, use a <a href="./CDC_Pulse_Synchronizer_2phase.html">Pulse
  Synchronizer</a>.</p>
+<p>Similarly, if the rise/fall time of the input signal is longer than the
+ receiving clock period, the receiving clock will sample the transistion
+ multiple times, which will show up as possibly multiple pulses at the
+ output. In these cases, use a <a href="./Debouncer_Low_Latency.html">Debouncer</a>.</p>
 <h2>Single-Bit Synchronization Only</h2>
 <p>Also, for reasons explained in <a href="./cdc.html">A Primer on Clock Domain Crossing
  Theory</a>, the latency of a CDC Synchronizer can vary between
