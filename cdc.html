@@ -154,7 +154,7 @@ whole word across clock domains (directly, without synchronization!), with a
 single "valid" bit being synchronized across clock domains and acting as a
 latch trigger in the receiving clock domain.
 
-<h3>Special Case: Extreme Clock Rate Differences</h3>
+<h3>Special Cases: Extreme Clock Rate Differences and Logic Glitches</h3>
 
 <p>There is an implicit assumption in the above discussion about passing a bit
 through a synchronizer: the receiving clock edges must coincide with the
@@ -164,6 +164,15 @@ will sample the incoming transition multiple times, which <em>maximizes</em>
 the chance of a metastable event. This will manifest as multiple bit
 transitions in the receiving clock domain. In these cases, the synchronizer
 must be followed by a <a href="./Debouncer_Low_Latency.html">Debouncer</a>.
+
+<p>For similar reasons, the input of a synchronizer must immediately come from
+a register in the sending clock domain, without any logic before the
+synchronizer. Otherwise, that final logic in the sending clock domain might
+converge multiple paths of logic, and thus one or more glitches may appear at
+its output due to different path or logic cell delays. Those glitches may get
+sampled by the synchronizer and also result in multiple bit transitions in the
+receiving clock domain. Again, if this case isn't avoidable, you must use a
+Debouncer.
 
 <h2>Further Issues and Reading</h2>
 
