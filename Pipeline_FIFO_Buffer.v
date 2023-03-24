@@ -5,6 +5,7 @@
 // transfers without a combinational path between input and output, thus
 // pipelining the path to improve concurrency and/or timing. *Any FIFO depth
 // is allowed, not only powers-of-2.* The input-to-output latency is 2 cycles.
+// *Can function as a Circular Buffer.*
 
 // Since a FIFO buffer stores variable amounts of data, it will smooth out
 // irregularities in the transfer rates of the input and output interfaces,
@@ -13,13 +14,6 @@
 // Networks](https://en.wikipedia.org/wiki/Kahn_process_networks#Boundedness_of_channels)
 // with bounded channels).
 
-// **NOTE**: This module is not suitable for pipelining long combinational
-// paths since it depends on a central buffer. If you need to pipeline a path
-// to improve timing rather than concurrency, use a [Skid Buffer
-// Pipeline](./Skid_Buffer_Pipeline.html) instead. You can also use
-// a [Pipeline Credit Buffer](./Pipeline_Credit_Buffer.html) to improve both
-// timing and concurrency, particularly for longer pipelines.
-
 // *This module is a variation of the asynchronous [CDC FIFO
 // Buffer](./CDC_FIFO_Buffer.html), directly derived from Clifford E.
 // Cummings' <a
@@ -27,15 +21,37 @@
 // and Synthesis Techniques for Asynchronous FIFO Design</a>, SNUG 2002, San
 // Jose.*
 
+//## Circular Buffer Mode
+
+// Normally, a FIFO buffer that is full will not complete another input
+// handshake until a data item has been read out. You can think of this as
+// buffering the *earliest* values from the pipeline.
+
+// Setting `CIRCULAR_BUFFER` parameter to a non-zero value changes the
+// behaviour at the input: the input handshake can always complete, discarding
+// the oldest data already in the buffer even if it was never read out.  You
+// can think of this as buffering the *latest* values from the pipeline.  This
+// is a circular buffer.
+
+// However, data at the buffer output can only be read out *once*, as usual,
+// until updated again by data from inside the buffer, possibly in the same
+// clock cycle. Simultaneous input and output handshakes are possible in
+// Circular Buffer Mode since `input_ready` no longer depends on the
+// empty/full state of the buffer (which forces alternation of input and
+// output handshakes), nor on the state of the output handshake (which is
+// disallowed to prevent creating a combinational path between input and
+// output).
+
 //## Parameters, Ports, and Initializations
 
 `default_nettype none
 
 module Pipeline_FIFO_Buffer
 #(
-    parameter WORD_WIDTH                = 33,
-    parameter DEPTH                     = 17,
-    parameter RAMSTYLE                  = "block"
+    parameter WORD_WIDTH                = 0,
+    parameter DEPTH                     = 0,
+    parameter RAMSTYLE                  = "",
+    parameter CIRCULAR_BUFFER           = 0         // non-zero to enable
 )
 (
     input   wire                        clock,
@@ -76,10 +92,13 @@ module Pipeline_FIFO_Buffer
 // from LUT RAM if the width and depth are small, or even plain registers for
 // very small cases. Set the `RAMSTYLE` parameter as required.
 
-// **NOTE**: There will *NEVER* be a concurrent read and write to the same
-// address, so write-forwarding logic is not necessary. Guide your CAD tool as
-// necessary to tell it there will never be read/write address collisions, so
-// you can obtain the highest possible operating frequency. 
+// **NOTE**: write-forwarding logic is not necessary, since in normal mode
+// there will never be a concurrent read and write to the same address, and in
+// Circular Buffer Mode, a concurrent read and write to the same address (when
+// the buffer is already full) always returns the stored data, not the data
+// being written. Guide your CAD tool as necessary in each case about
+// read/write address collisions, so you can obtain the highest possible
+// operating frequency. 
 
 // We initialize the read/write enables to zero, signifying an idle system.
 
@@ -120,7 +139,7 @@ module Pipeline_FIFO_Buffer
 // `ADDR_ONE` at each read or write, and will wrap around to `ADDR_ZERO` if
 // incremented past a value of `DEPTH-1`, labelled as `ADDR_LAST` (`load`
 // overrides `run`). *The depth can be any positive number, not only
-// a power-of-2*.
+// a power-of-2.
 
     reg increment_buffer_write_addr = 1'b0;
     reg load_buffer_write_addr      = 1'b0;
@@ -183,13 +202,14 @@ module Pipeline_FIFO_Buffer
 
 // If the write address runs ahead of the read address enough to wrap-around
 // and reach the read address from behind, the buffer is full and all writes
-// to the buffer halt until after a read happens. We detect this because the
-// write address will have wrapped-around one more time than the read address,
-// so their wrap-around bits will be different.
+// to the buffer halt until after a read happens (except in Circular Buffer
+// Mode). We detect this because the write address will have wrapped-around
+// one more time than the read address, so their wrap-around bits will be
+// different.
 
-// Conversely, if the read address catches up to the write address from
-// behind, the buffer is empty and all reads halt until after a write happens.
-// In this case, the wrap-around bits are identical.
+// Conversely, if the read address catches up to the write address from behind,
+// the buffer is empty and all reads halt until after a write happens.  In
+// this case, the wrap-around bits are identical.
 
     reg  toggle_buffer_write_addr_wrap_around = 1'b0;
     wire buffer_write_addr_wrap_around;
@@ -252,10 +272,14 @@ module Pipeline_FIFO_Buffer
 // data directly into the buffer and increment the write address, wrapping
 // around as necessary.
 
+// In Circular Buffer Mode, the input is always ready. If the buffer is full,
+// we insert by ovewriting the second oldest value (in the buffer) as it is
+// removed and placed into the output register (which held the oldest value).
+
     reg insert = 1'b0;
 
     always @(*) begin
-        input_ready                             = (stored_items_max == 1'b0);
+        input_ready                             = (stored_items_max == 1'b0) || (CIRCULAR_BUFFER != 0);
         insert                                  = (input_valid      == 1'b1) && (input_ready  == 1'b1);
 
         buffer_wren                             = (insert == 1'b1);
@@ -269,29 +293,38 @@ module Pipeline_FIFO_Buffer
 // The output interface is not so simple because the output is registered, and
 // so holds data independently of the buffer. We signal the output holds valid
 // data whenever we can remove an item from the buffer and load it into the
-// output register. We meet this condition if an output handshake completes,
-// or if the buffer holds an item but the output register is not holding any
-// valid data.  Also, we do not increment/wrap the read address if the
-// previous item removed from the buffer and loaded into the output register
-// was the last one.
+// output register. We meet this condition if the output register holds valid
+// data and an output handshake completes, or if the buffer holds an item but
+// the output register is not holding any valid data.  Also, we do not
+// increment/wrap the read address if the previous item removed from the
+// buffer and loaded into the output register was the last one.
 
+// In Circular Buffer Mode, if the buffer is full and we insert a new data
+// value, perform a remove operation, discarding the contents of the output
+// register and replacing it with the next oldest entry in the buffer, as if
+// it had been read out.
+
+    reg remove_normal           = 1'b0;
+    reg remove_circular         = 1'b0;
     reg remove                  = 1'b0;
     reg output_leaving_idle     = 1'b0;
     reg load_output_register    = 1'b0;
 
     always @(*) begin
-        remove                              = (output_valid == 1'b1) && (output_ready        == 1'b1);
-        output_leaving_idle                 = (output_valid == 1'b0) && (stored_items_zero   == 1'b0);
-        load_output_register                = (remove       == 1'b1) || (output_leaving_idle == 1'b1);
+        remove_normal                       = (output_valid    == 1'b1) && (output_ready        == 1'b1);
+        remove_circular                     = (CIRCULAR_BUFFER !=    0) && (stored_items_max    == 1'b1) && (insert == 1'b1);
+        remove                              = (remove_normal   == 1'b1) || (remove_circular     == 1'b1);
+        output_leaving_idle                 = (output_valid    == 1'b0) && (stored_items_zero   == 1'b0);
+        load_output_register                = (remove          == 1'b1) || (output_leaving_idle == 1'b1);
 
-        buffer_rden                         = (load_output_register == 1'b1) && (stored_items_zero == 1'b0);
-        increment_buffer_read_addr          = (load_output_register == 1'b1) && (stored_items_zero == 1'b0);
-        load_buffer_read_addr               = (increment_buffer_read_addr == 1'b1) && (buffer_read_addr == ADDR_LAST [ADDR_WIDTH-1:0]);
+        buffer_rden                         = (load_output_register       == 1'b1) && (stored_items_zero == 1'b0);
+        increment_buffer_read_addr          = (load_output_register       == 1'b1) && (stored_items_zero == 1'b0);
+        load_buffer_read_addr               = (increment_buffer_read_addr == 1'b1) && (buffer_read_addr  == ADDR_LAST [ADDR_WIDTH-1:0]);
         toggle_buffer_read_addr_wrap_around = (load_buffer_read_addr      == 1'b1);
     end
 
-// Finally, `output_valid` must be registered to match the latency of the
-// `buffer` output register.
+// `output_valid` must be registered to match the latency of the buffer output
+// register.
 
     Register
     #(

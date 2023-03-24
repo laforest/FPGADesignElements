@@ -140,7 +140,8 @@ module Pipeline_Merge_One_Hot
 
     Pipeline_Skid_Buffer
     #(
-        .WORD_WIDTH     (WORD_WIDTH)
+        .WORD_WIDTH      (WORD_WIDTH),
+        .CIRCULAR_BUFFER (0)            // Not meaningful here
     )
     output_buffer
     (

@@ -62,7 +62,8 @@ module Pipeline_Join
         for(j=0; j < INPUT_COUNT; j=j+1) begin: per_input
             Pipeline_Skid_Buffer
             #(
-                .WORD_WIDTH (WORD_WIDTH)
+                .WORD_WIDTH         (WORD_WIDTH),
+                .CIRCULAR_BUFFER    (0)             // Not meaningful here
             )
             input_buffer
             (

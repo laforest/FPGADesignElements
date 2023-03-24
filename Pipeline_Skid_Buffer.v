@@ -3,7 +3,7 @@
 
 // Decouples two sides of a ready/valid handshake to allow back-to-back
 // transfers without a combinational path between input and output, thus
-// pipelining the path.
+// pipelining the path. *Can function as a two-entry Circular Buffer.*
 
 // A skid buffer is the smallest [Pipeline FIFO
 // Buffer](./Pipeline_FIFO_Buffer.html), with only two entries.  It is useful
@@ -79,11 +79,36 @@
 // rather than stopping immediately, which we'd previously found contradicts
 // our pipelining requirements.
 
+//## Circular Buffer Mode
+
+// Normally, a Skid Buffer reads in one value and read out one value each
+// cycle. Should there be a stall at the output, the Skid Buffer fills up
+// after one more input handshake and will not complete another input
+// handshake until a value has been read out, causing a one-cycle stall at the
+// input.  You can think of this as buffering the *earliest* values from the
+// pipeline.
+
+// Setting `CIRCULAR_BUFFER` parameter to a non-zero value changes the
+// behaviour at the input: the input handshake can always complete, discarding
+// the earlier data already at the buffer output even if it is never read out
+// and replacing it with the next previously buffered value.  You can think of
+// this as buffering the *latest* values from the pipeline.  This is
+// a two-entry circular buffer.
+
+// Contrary to normal operation, simultaneous input and ouput handshakes are
+// possible on a full Skid Buffer in Circular Buffer Mode, giving full
+// throughput with 2 cycles of latency. This is possible since `input_ready`
+// no longer depends on the empty/full state of the buffer (which forces
+// alternation of input and output handshakes), nor on the state of the output
+// handshake (which is disallowed to prevent creating a combinational path
+// between input and output).
+
 `default_nettype none
 
 module Pipeline_Skid_Buffer
 #(
-    parameter WORD_WIDTH = 0
+    parameter WORD_WIDTH                = 0,
+    parameter CIRCULAR_BUFFER           = 0     // non-zero to enable
 )
 (
     input   wire                        clock,
@@ -177,6 +202,10 @@ module Pipeline_Skid_Buffer
 //    register is emptied and simultaneously refilled from the buffer register, so no
 //    data is lost or reordered.  (Without an available empty register, the
 //    input interface cannot skid to a stop, so it must signal it is not ready.)
+// 4. It is Full and in Circular Buffer Mode, holding data in both registers,
+//    and can accept new data into the buffer register while simultaneously
+//    replacing the contents of the main register with the current contents of
+//    the buffer register.
  
 // The operations which transition between these states are:
  
@@ -191,25 +220,27 @@ module Pipeline_Skid_Buffer
 //                 /--\ +- flow
 //                 |  |
 //          load   |  v   fill
-// -------   +    ------   +    ------
-//|       | ---> |      | ---> |      |
-//| Empty |      | Busy |      | Full |
-//|       | <--- |      | <--- |      |
+// -------   +    ------   +    ------        (CBM)
+//|       | ---> |      | ---> |      | ---\ +  dump
+//| Empty |      | Busy |      | Full |    |   or
+//|       | <--- |      | <--- |      | <--/ +- pass
 // -------    -   ------    -   ------
 //         unload         flush
 //</pre>
 
-// We can see from the resulting state diagram that when the datapath is
-// empty, it can only support an insertion, and when it is full, it can only
-// support a removal. *These constraints will become very important later on.*
-// If the interfaces try to remove while Empty, or insert while Full, data
-// will be duplicated or lost, respectively.
+// We can see from the resulting state diagram that when the datapath is empty,
+// it can only support an insertion, and when it is full, it can only support
+// a removal, unles in Circular Buffer Mode (CBM) where it can support
+// insertion and removal when full. *These constraints will become very
+// important later on.* Normally, if the interfaces try to remove while Empty,
+// or insert while Full, data will be duplicated or lost, respectively.
 
 // This simple FSM description helped us clarify the problem, but it also
 // glossed over the potential complexity of the implementation: 3 states, each
 // connected to 2 signals (valid/ready) per interface, for a total of 16
 // possible transitions out of each state, or 48 possible state transitions
-// total.
+// total. The Circular Buffer Mode does not introduce a new state, as it is
+// an elaboration-time parameter, not a run-time input.
 
 // We don't want to have to manually enumerate all the transitions to then
 // coalesce the equivalent ones and rule out all the impossible or illegal
@@ -240,7 +271,8 @@ module Pipeline_Skid_Buffer
 // Now, let's express the constraints we figured out from the state diagram:
  
 // * The input interface can only insert when the datapath is not full.
-// * The output interface can only remove data when the datapath is not empty.
+// * The output interface can only remove data when the datapath is not empty,
+//   except in Circular Buffer Mode, where it can also insert.
  
 // We do this by computing the allowable output read/valid handshake signals
 // based on the datapath state. We use `state_next` so we can have nice
@@ -253,7 +285,8 @@ module Pipeline_Skid_Buffer
 // current state depend on the current state of the other interface, as that
 // would be a combinational path between both interfaces.
 
-// Compute `ready` for the input interface
+// Compute `ready` for the input interface. In Circular Buffer Mode, the input
+// interface is always ready.
 
     Register
     #(
@@ -265,7 +298,7 @@ module Pipeline_Skid_Buffer
         .clock          (clock),
         .clock_enable   (1'b1),
         .clear          (clear),
-        .data_in        (state_next != FULL),
+        .data_in        ((state_next != FULL) || (CIRCULAR_BUFFER != 0)),
         .data_out       (input_ready)
     );
 
@@ -300,9 +333,10 @@ module Pipeline_Skid_Buffer
 // Now that we have our datapath states and operations, let's use them to
 // describe the possible transformations to the datapath, and in which state
 // they can happen.  You'll see that these exactly describe each of the
-// 5 edges in the state diagram, and since we've pruned the space of possible
-// interface conditions, we only need the minimum logic to describe them, and
-// this logic gets re-used a lot later on, simplifying the code.
+// 5 edges in the state diagram (7 in Circular Buffer Mode), and since we've
+// pruned the space of possible interface conditions, we only need the minimum
+// logic to describe them, and this logic gets re-used a lot later on,
+// simplifying the code.
 
 
     reg load    = 1'b0; // Empty datapath inserts data into output register.
@@ -310,13 +344,17 @@ module Pipeline_Skid_Buffer
     reg fill    = 1'b0; // New inserted data into buffer register. Data not removed from output register.
     reg flush   = 1'b0; // Move data from buffer register into output register. Remove old data. No new data inserted.
     reg unload  = 1'b0; // Remove data from output register, leaving the datapath empty.
+    reg dump    = 1'b0; // New inserted data into buffer register. Move data from buffer register into output register. Discard old output data. (CBM)
+    reg pass    = 1'b0; // New inserted data into buffer register. Move data from buffer register into output register. Remove old output data.  (CBM)
 
     always @(*) begin
         load    = (state == EMPTY) && (insert == 1'b1) && (remove == 1'b0);
         flow    = (state == BUSY)  && (insert == 1'b1) && (remove == 1'b1);
         fill    = (state == BUSY)  && (insert == 1'b1) && (remove == 1'b0);
-        flush   = (state == FULL)  && (insert == 1'b0) && (remove == 1'b1);
         unload  = (state == BUSY)  && (insert == 1'b0) && (remove == 1'b1);
+        flush   = (state == FULL)  && (insert == 1'b0) && (remove == 1'b1);
+        dump    = (state == FULL)  && (insert == 1'b1) && (remove == 1'b0) && (CIRCULAR_BUFFER != 0);
+        pass    = (state == FULL)  && (insert == 1'b1) && (remove == 1'b1) && (CIRCULAR_BUFFER != 0);
     end
 
 // And now we simply need to calculate the next state after each datapath
@@ -328,6 +366,8 @@ module Pipeline_Skid_Buffer
         state_next = (fill   == 1'b1) ? FULL  : state_next;
         state_next = (flush  == 1'b1) ? BUSY  : state_next;
         state_next = (unload == 1'b1) ? EMPTY : state_next;
+        state_next = (dump   == 1'b1) ? FULL  : state_next;
+        state_next = (pass   == 1'b1) ? FULL  : state_next;
     end
 
     Register
@@ -349,9 +389,9 @@ module Pipeline_Skid_Buffer
 // at registers in the datapath.
 
     always @(*) begin
-        data_out_wren     = (load  == 1'b1) || (flow == 1'b1) || (flush == 1'b1);
-        data_buffer_wren  = (fill  == 1'b1);
-        use_buffered_data = (flush == 1'b1);
+        data_out_wren     = (load  == 1'b1) || (flow == 1'b1) || (flush == 1'b1) || (dump == 1'b1) || (pass == 1'b1);
+        data_buffer_wren  = (fill  == 1'b1)                                      || (dump == 1'b1) || (pass == 1'b1);
+        use_buffered_data = (flush == 1'b1)                                      || (dump == 1'b1) || (pass == 1'b1);
     end
 
 endmodule

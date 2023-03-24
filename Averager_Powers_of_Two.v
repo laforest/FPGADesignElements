@@ -64,9 +64,9 @@ module Averager_Powers_of_Two
 // The counter counts samples from 2^N to 1, and we declare the acumulation
 // ready when the counter hits zero, so that's (2^N)+1 cases, so we need an
 // extra bit in the counter.
- 
-     `include "clog2_function.vh"
- 
+
+    `include "clog2_function.vh"
+
     localparam SAMPLE_COUNT         = 2 ** POWER_OF_TWO_EXPONENT;
     localparam COUNTER_WIDTH        = clog2(SAMPLE_COUNT) + 1;
     localparam COUNTER_ONE          = {{COUNTER_WIDTH-1{1'b0}}, 1'b1};
@@ -263,6 +263,7 @@ module Averager_Powers_of_Two
     #(
         .WORD_WIDTH             (WORD_WIDTH),
         .OUTPUT_BUFFER_TYPE     ("SKID"),   // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (0),
         .FIFO_BUFFER_DEPTH      (),         // Only for "FIFO"
         .FIFO_BUFFER_RAMSTYLE   ()          // Only for "FIFO"
     )

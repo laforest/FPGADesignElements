@@ -33,8 +33,8 @@
 // An output buffer is necessary to cut the backwards combinational path from
 // `ready_out` to `module_ready`, as well as to get the best performance and
 // expected behaviour, depending on the connected module. Set
-// `OUTPUT_BUFFER_TYPE` (and maybe `FIFO_BUFFER_DEPTH` and
-// `FIFO_BUFFER_RAMSTYLE`) as required.
+// `OUTPUT_BUFFER_TYPE` (and maybe `FIFO_BUFFER_DEPTH`, `FIFO_BUFFER_RAMSTYLE`,
+// and `OUTPUT_BUFFER_CIRCULAR`) as required.
 
 // * A **Skid Buffer** is generally the right choice: it allows the connected module
 // to start a new computation while the `output_buffer` waits for the next
@@ -45,15 +45,19 @@
 // * Use a **FIFO Buffer** when the later pipeline stages read in a bursty
 // pattern, so the connected module can get through multiple computations in
 // the meantime.
+// * Set `OUTPUT_BUFFER_CIRCULAR` to a non-zero value for cases where you
+// always want the latest data available to the output, regardless of
+// intermediate changes which will be lost.
 
 `default_nettype none
 
 module Pulse_to_Pipeline
 #(
-    parameter WORD_WIDTH            = 0,
-    parameter OUTPUT_BUFFER_TYPE    = "", // "HALF", "SKID", "FIFO"
-    parameter FIFO_BUFFER_DEPTH     = 0,  // Only for "FIFO"
-    parameter FIFO_BUFFER_RAMSTYLE  = ""  // Only for "FIFO"
+    parameter WORD_WIDTH                = 0,
+    parameter OUTPUT_BUFFER_TYPE        = "", // "HALF", "SKID", "FIFO"
+    parameter OUTPUT_BUFFER_CIRCULAR    = 0,  // non-zero to enable
+    parameter FIFO_BUFFER_DEPTH         = 0,  // Only for "FIFO"
+    parameter FIFO_BUFFER_RAMSTYLE      = ""  // Only for "FIFO"
 )
 (
     input   wire                        clock,
@@ -117,18 +121,20 @@ module Pulse_to_Pipeline
     end
 
 // Buffer the output handshake to cut the backwards combinational path from
-// `ready_out` to `module_ready`. A Half-Buffer blocks `module_ready` until it
-// is read out. A Skid Buffer allows overlap by raising `module_ready` while
-// holding 1 previous result, but holding 2 results will cause it to block.
-// A FIFO buffer will allow overlap and hold up to `FIFO_BUFFER_DEPTH` values
-// before blocking.
+// `ready_out` to `module_ready`.  A Half-Buffer blocks `module_ready` until
+// it is read out, and the data is the first buffered one since last read out.
+// A Skid Buffer allows overlap by raising `module_ready` while holding
+// 1 previous result, but holding 2 results will cause it to block.  A FIFO
+// buffer will allow overlap and hold up to `FIFO_BUFFER_DEPTH` values before
+// blocking.
 
     generate
 
         if (OUTPUT_BUFFER_TYPE == "HALF") begin
             Pipeline_Half_Buffer
             #(
-                .WORD_WIDTH (WORD_WIDTH)
+                .WORD_WIDTH         (WORD_WIDTH),
+                .CIRCULAR_BUFFER    (OUTPUT_BUFFER_CIRCULAR)
             )
             output_buffer
             (
@@ -147,7 +153,8 @@ module Pulse_to_Pipeline
         else if (OUTPUT_BUFFER_TYPE == "SKID") begin
             Pipeline_Skid_Buffer
             #(
-                .WORD_WIDTH (WORD_WIDTH)
+                .WORD_WIDTH         (WORD_WIDTH),
+                .CIRCULAR_BUFFER    (OUTPUT_BUFFER_CIRCULAR)
             )
             output_buffer
             (
@@ -166,9 +173,10 @@ module Pulse_to_Pipeline
         else if (OUTPUT_BUFFER_TYPE == "FIFO") begin
             Pipeline_FIFO_Buffer
             #(
-                .WORD_WIDTH (WORD_WIDTH),
-                .DEPTH      (FIFO_BUFFER_DEPTH),
-                .RAMSTYLE   (FIFO_BUFFER_RAMSTYLE)
+                .WORD_WIDTH         (WORD_WIDTH),
+                .DEPTH              (FIFO_BUFFER_DEPTH),
+                .RAMSTYLE           (FIFO_BUFFER_RAMSTYLE),
+                .CIRCULAR_BUFFER    (OUTPUT_BUFFER_CIRCULAR)
             )
             output_buffer
             (

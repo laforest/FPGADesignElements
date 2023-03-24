@@ -3,9 +3,10 @@
 
 // A single pipeline register with ready/valid handshakes.  Decouples the
 // input and ouput handshakes (no combinational path), but does not allow
-// concurrent read/write like a full [Pipeline Skid
-// Buffer](./Pipeline_Skid_Buffer.html). The half-buffer must be read out
-// before you can write into it again, halving the maximum bandwidth.
+// concurrent read/write like a full [Pipeline Skid Buffer]
+// (./Pipeline_Skid_Buffer.html). The half-buffer must be read out before you
+// can write into it again, halving the maximum bandwidth (except in Circular
+// Buffer Mode).
 
 // However, using a half-buffer can improve the throughput of a long-running
 // module with ready/valid handshakes, where the module input will not accept
@@ -15,23 +16,44 @@
 // another computation with the wait time until the final destination reads
 // out the half-buffer.
 
+//## Circular Buffer Mode
+
+// Normally, a Half-Buffer reads in one value and will not complete another
+// input handshake until the data has been read out. You can think of this as
+// buffering the *earliest* value from the pipeline.
+
+// Setting `CIRCULAR_BUFFER` parameter to a non-zero value changes the
+// behaviour at the input: the input handshake can always complete, discarding
+// the data already in the buffer even if it was never read out.  You can
+// think of this as buffering the *latest* value from the pipeline.  This is
+// a one-entry circular buffer.
+
+// However, data in the buffer can only be read out *once*, as usual, until
+// updated again at the input, possibly in the same clock cycle. Simultaneous
+// input and output handshakes are possible in Circular Buffer Mode since
+// `input_ready` no longer depends on the empty/full state of the buffer
+// (which forces alternation of input and output handshakes), nor on the state
+// of the output handshake (which is disallowed to prevent creating
+// a combinational path between input and output).
+
 `default_nettype none
 
 module Pipeline_Half_Buffer
 #(
-    parameter WORD_WIDTH    = 0
+    parameter WORD_WIDTH            = 0,
+    parameter CIRCULAR_BUFFER       = 0     // non-zero to enable
 )
 (
-    input  wire                  clock,
-    input  wire                  clear,
+    input  wire                     clock,
+    input  wire                     clear,
 
-    input  wire                  input_valid,
-    output reg                   input_ready,
-    input  wire [WORD_WIDTH-1:0] input_data,
+    input  wire                     input_valid,
+    output reg                      input_ready,
+    input  wire [WORD_WIDTH-1:0]    input_data,
 
-    output reg                   output_valid,
-    input  wire                  output_ready,
-    output wire [WORD_WIDTH-1:0] output_data
+    output reg                      output_valid,
+    input  wire                     output_ready,
+    output wire [WORD_WIDTH-1:0]    output_data
 );
 
     localparam WORD_ZERO = {WORD_WIDTH{1'b0}};
@@ -80,15 +102,17 @@ module Pipeline_Half_Buffer
 // creates a combinational path from the input handshake to the output
 // handshake.
 
-    always @(*) begin
-        set_to_empty     = (output_valid == 1'b1) && (output_ready == 1'b1);
-        set_to_full      = (input_valid  == 1'b1) && (buffer_full  == 1'b0);
-        half_buffer_load = (set_to_full  == 1'b1);
-    end
+// EXCEPTION: In Circular Buffer Mode, `input_ready` does not depend on any
+// other logic, which enables simultaneous input and output handhsakes without
+// combinational paths between them.
 
     always @(*) begin
-        input_ready      = (buffer_full == 1'b0);
-        output_valid     = (buffer_full == 1'b1);
+        input_ready      = (buffer_full   == 1'b0) || (CIRCULAR_BUFFER != 0);
+        output_valid     = (buffer_full   == 1'b1);
+        set_to_full      = (input_valid   == 1'b1) && (input_ready  == 1'b1);
+        set_to_empty     = (output_valid  == 1'b1) && (output_ready == 1'b1) && (set_to_full == 1'b0);
+        set_to_empty     = (set_to_empty  == 1'b1) || (clear == 1'b1);
+        half_buffer_load = (set_to_full   == 1'b1);
     end
 
 endmodule

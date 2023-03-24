@@ -48,7 +48,8 @@ module Pipeline_Fork_Blocking
 
     Pipeline_Skid_Buffer
     #(
-        .WORD_WIDTH     (WORD_WIDTH)
+        .WORD_WIDTH      (WORD_WIDTH),
+        .CIRCULAR_BUFFER (0)            // Not meaningful here
     )
     input_buffer
     (

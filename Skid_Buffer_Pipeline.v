@@ -73,7 +73,8 @@ module Skid_Buffer_Pipeline
 
             Pipeline_Skid_Buffer
             #(
-                .WORD_WIDTH     (WORD_WIDTH)
+                .WORD_WIDTH      (WORD_WIDTH),
+                .CIRCULAR_BUFFER (0)            // Not meaningful here
             )
             input_stage
             (
@@ -96,7 +97,8 @@ module Skid_Buffer_Pipeline
             for (i=1; i < PIPE_DEPTH; i=i+1) begin: pipe_stages
                 Pipeline_Skid_Buffer
                 #(
-                    .WORD_WIDTH     (WORD_WIDTH)
+                    .WORD_WIDTH      (WORD_WIDTH),
+                    .CIRCULAR_BUFFER (0)            // Not meaningful here
                 )
                 pipe_stage
                 (

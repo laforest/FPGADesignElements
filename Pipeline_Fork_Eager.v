@@ -59,7 +59,8 @@ module Pipeline_Fork_Eager
         for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
             Pipeline_Skid_Buffer
             #(
-                .WORD_WIDTH     (WORD_WIDTH)
+                .WORD_WIDTH      (WORD_WIDTH),
+                .CIRCULAR_BUFFER (0)            // Not meaningful here
             )
             output_buffer
             (

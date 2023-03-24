@@ -153,9 +153,10 @@ module Pipeline_Iterator
 
     Pipeline_FIFO_Buffer
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
-        .DEPTH          (FIFO_DEPTH),
-        .RAMSTYLE       (FIFO_RAMSTYLE)
+        .WORD_WIDTH      (WORD_WIDTH),
+        .DEPTH           (FIFO_DEPTH),
+        .RAMSTYLE        (FIFO_RAMSTYLE),
+        .CIRCULAR_BUFFER (0)
     )
     data_buffer
     (

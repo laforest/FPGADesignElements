@@ -45,6 +45,12 @@
 //     blocking. Use this if the downstream pipeline takes in data in bursts.
 //     The value of `FIFO_BUFFER_RAMSTYLE` will depend on your device, CAD tool,
 //     FIFO depth/width, etc...
+// * Set `OUTPUT_BUFFER_CIRCULAR` to a non-zero value to convert the
+//   `OUTPUT_BUFFER_TYPE` to a circular buffer: sending handshakes are always
+//   accepted, and a full buffer discards the oldest value to make room for the
+//   newest value. This is useful if you want to let data pass (and be
+//   discarded) and sample it irregularly, but not cause any backpressure 
+//   or data duplication.
 
 //## Latency and Throughput
 
@@ -88,11 +94,12 @@
 
 module CDC_Word_Synchronizer
 #(
-    parameter WORD_WIDTH            = 0,
-    parameter EXTRA_CDC_DEPTH       = 0,
-    parameter OUTPUT_BUFFER_TYPE    = "", // "HALF", "SKID", "FIFO"
-    parameter FIFO_BUFFER_DEPTH     = 0,  // Only for "FIFO"
-    parameter FIFO_BUFFER_RAMSTYLE  = ""  // Only for "FIFO"
+    parameter WORD_WIDTH                = 0,
+    parameter EXTRA_CDC_DEPTH           = 0,
+    parameter OUTPUT_BUFFER_TYPE        = "", // "HALF", "SKID", "FIFO"
+    parameter OUTPUT_BUFFER_CIRCULAR    = 0,  // non-zero to enable
+    parameter FIFO_BUFFER_DEPTH         = 0,  // Only for "FIFO"
+    parameter FIFO_BUFFER_RAMSTYLE      = ""  // Only for "FIFO"
 )
 (
     input   wire                        sending_clock,
@@ -226,9 +233,10 @@ module CDC_Word_Synchronizer
     Pulse_to_Pipeline
     #(
         .WORD_WIDTH             (WORD_WIDTH),
-        .OUTPUT_BUFFER_TYPE     (OUTPUT_BUFFER_TYPE),  // "HALF", "SKID", "FIFO"
-        .FIFO_BUFFER_DEPTH      (FIFO_BUFFER_DEPTH),   // Only for "FIFO"
-        .FIFO_BUFFER_RAMSTYLE   (FIFO_BUFFER_RAMSTYLE) // Only for "FIFO"
+        .OUTPUT_BUFFER_TYPE     (OUTPUT_BUFFER_TYPE),       // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (OUTPUT_BUFFER_CIRCULAR),   // non-zero to enable
+        .FIFO_BUFFER_DEPTH      (FIFO_BUFFER_DEPTH),        // Only for "FIFO"
+        .FIFO_BUFFER_RAMSTYLE   (FIFO_BUFFER_RAMSTYLE)      // Only for "FIFO"
     )
     receiving_handshake
     (
