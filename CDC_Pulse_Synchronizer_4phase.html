@@ -20,12 +20,13 @@
  The output is a single-cycle pulse in the receiving clock domain.</p>
 <div class="bordered">
 
-<p>Unless you <em>really</em> need to save a few gates, I would recommend you instead
- use the <a href="./CDC_Pulse_Synchronizer_2phase.html">2-phase handshake Pulse
- Synchronizer</a>, as it can accept input
+ Unless you *really* need to save a few gates, I would recommend you instead
+ use the [2-phase handshake Pulse
+ Synchronizer](./CDC_Pulse_Synchronizer_2phase.html), as it can accept input
  pulses at twice the maximum rate. This 4-phase implementation exists for
- comparison and education.</p>
-</div>
+ comparison and education.
+
+ </div>
 
 <h2>Theory of Operation</h2>
 <p>We can't simply use a <a href="./CDC_Bit_Synchronizer.html">CDC Synchronizer</a> to

@@ -74,7 +74,8 @@ module <a href="./Pipeline_Join.html">Pipeline_Join</a>
         for(j=0; j < INPUT_COUNT; j=j+1) begin: per_input
             <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
             #(
-                .WORD_WIDTH (WORD_WIDTH)
+                .WORD_WIDTH         (WORD_WIDTH),
+                .CIRCULAR_BUFFER    (0)             // Not meaningful here
             )
             input_buffer
             (

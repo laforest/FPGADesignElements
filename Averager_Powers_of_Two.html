@@ -79,8 +79,8 @@ module <a href="./Averager_Powers_of_Two.html">Averager_Powers_of_Two</a>
  extra bit in the counter.</p>
 
 <pre>
-     `include "<a href="./clog2_function.html">clog2_function</a>.vh"
- 
+    `include "<a href="./clog2_function.html">clog2_function</a>.vh"
+
     localparam SAMPLE_COUNT         = 2 ** POWER_OF_TWO_EXPONENT;
     localparam COUNTER_WIDTH        = clog2(SAMPLE_COUNT) + 1;
     localparam COUNTER_ONE          = {{COUNTER_WIDTH-1{1'b0}}, 1'b1};
@@ -290,6 +290,7 @@ module <a href="./Averager_Powers_of_Two.html">Averager_Powers_of_Two</a>
     #(
         .WORD_WIDTH             (WORD_WIDTH),
         .OUTPUT_BUFFER_TYPE     ("SKID"),   // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (0),
         .FIFO_BUFFER_DEPTH      (),         // Only for "FIFO"
         .FIFO_BUFFER_RAMSTYLE   ()          // Only for "FIFO"
     )

@@ -85,7 +85,8 @@ module <a href="./Skid_Buffer_Pipeline.html">Skid_Buffer_Pipeline</a>
 
             <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
             #(
-                .WORD_WIDTH     (WORD_WIDTH)
+                .WORD_WIDTH      (WORD_WIDTH),
+                .CIRCULAR_BUFFER (0)            // Not meaningful here
             )
             input_stage
             (
@@ -110,7 +111,8 @@ module <a href="./Skid_Buffer_Pipeline.html">Skid_Buffer_Pipeline</a>
             for (i=1; i < PIPE_DEPTH; i=i+1) begin: pipe_stages
                 <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
                 #(
-                    .WORD_WIDTH     (WORD_WIDTH)
+                    .WORD_WIDTH      (WORD_WIDTH),
+                    .CIRCULAR_BUFFER (0)            // Not meaningful here
                 )
                 pipe_stage
                 (

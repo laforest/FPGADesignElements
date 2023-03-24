@@ -151,7 +151,8 @@ module <a href="./Pipeline_Merge_One_Hot.html">Pipeline_Merge_One_Hot</a>
 <pre>
     <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
     #(
-        .WORD_WIDTH     (WORD_WIDTH)
+        .WORD_WIDTH      (WORD_WIDTH),
+        .CIRCULAR_BUFFER (0)            // Not meaningful here
     )
     output_buffer
     (

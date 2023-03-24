@@ -71,7 +71,8 @@ module <a href="./Pipeline_Fork_Eager.html">Pipeline_Fork_Eager</a>
         for (i=0; i < OUTPUT_COUNT; i=i+1) begin: per_output
             <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
             #(
-                .WORD_WIDTH     (WORD_WIDTH)
+                .WORD_WIDTH      (WORD_WIDTH),
+                .CIRCULAR_BUFFER (0)            // Not meaningful here
             )
             output_buffer
             (

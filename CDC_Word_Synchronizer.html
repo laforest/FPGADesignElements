@@ -57,6 +57,12 @@
  FIFO depth/width, etc...</li>
 </ul>
 </li>
+<li>Set <code>OUTPUT_BUFFER_CIRCULAR</code> to a non-zero value to convert the
+   <code>OUTPUT_BUFFER_TYPE</code> to a circular buffer: sending handshakes are always
+   accepted, and a full buffer discards the oldest value to make room for the
+   newest value. This is useful if you want to let data pass (and be
+   discarded) and sample it irregularly, but not cause any backpressure 
+   or data duplication.</li>
 </ul>
 <h2>Latency and Throughput</h2>
 <p>The absolute latency from sending to receiving handshake depends on the
@@ -68,18 +74,19 @@
 <li>1 receiving cycle to transform the completion of the receiving handshake to a level toggle</li>
 <li>1<strong>*</strong> to 3 sending cycles to do the CDC into the sending clock domain (and maybe complete a sending handshake)</li>
 </ul>
-<p><div class="bordered">
- <strong>*Corner Case:</strong> The situations where the CDC transfers take 1 cycle in
+<div class="bordered">
+ **\*Corner Case:** The situations where the CDC transfers take 1 cycle in
  either direction are mutually exclusive. The timing of the
  sending/receiving clock edges that makes a CDC crossing in one direction
  take one cycle, is naturally reversed when crossing in the other direction,
  and so cannot happen, and takes the more common 2 to 3 cycles. See the
- "Latency" section in <a href="./cdc.html">A Primer on Clock Domain Crossing (CDC)
- Theory</a> for details. <strong>Unless you know your clocks are
+ "Latency" section in [A Primer on Clock Domain Crossing (CDC)
+ Theory](./cdc.html) for details. **Unless you know your clocks are
  plesiochronous, it is safer and simpler to ignore this corner case and
- assume 2 to 3 cycles per CDC.</strong> However, we still account for this case 
+ assume 2 to 3 cycles per CDC.** However, we still account for this case 
  in the latency ranges that follow. 
- </div></p>
+ </div>
+
 <p>Thus, given roughly equal sending and receiving clock rates, a complete
  transfer takes between 5 and 8 sending clock cycles. If the receiving clock
  rate is effectively "infinite", allowing for the whole receiving side to
@@ -97,11 +104,12 @@
 
 module <a href="./CDC_Word_Synchronizer.html">CDC_Word_Synchronizer</a>
 #(
-    parameter WORD_WIDTH            = 0,
-    parameter EXTRA_CDC_DEPTH       = 0,
-    parameter OUTPUT_BUFFER_TYPE    = "", // "HALF", "SKID", "FIFO"
-    parameter FIFO_BUFFER_DEPTH     = 0,  // Only for "FIFO"
-    parameter FIFO_BUFFER_RAMSTYLE  = ""  // Only for "FIFO"
+    parameter WORD_WIDTH                = 0,
+    parameter EXTRA_CDC_DEPTH           = 0,
+    parameter OUTPUT_BUFFER_TYPE        = "", // "HALF", "SKID", "FIFO"
+    parameter OUTPUT_BUFFER_CIRCULAR    = 0,  // non-zero to enable
+    parameter FIFO_BUFFER_DEPTH         = 0,  // Only for "FIFO"
+    parameter FIFO_BUFFER_RAMSTYLE      = ""  // Only for "FIFO"
 )
 (
     input   wire                        sending_clock,
@@ -245,9 +253,10 @@ module <a href="./CDC_Word_Synchronizer.html">CDC_Word_Synchronizer</a>
     <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
     #(
         .WORD_WIDTH             (WORD_WIDTH),
-        .OUTPUT_BUFFER_TYPE     (OUTPUT_BUFFER_TYPE),  // "HALF", "SKID", "FIFO"
-        .FIFO_BUFFER_DEPTH      (FIFO_BUFFER_DEPTH),   // Only for "FIFO"
-        .FIFO_BUFFER_RAMSTYLE   (FIFO_BUFFER_RAMSTYLE) // Only for "FIFO"
+        .OUTPUT_BUFFER_TYPE     (OUTPUT_BUFFER_TYPE),       // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (OUTPUT_BUFFER_CIRCULAR),   // non-zero to enable
+        .FIFO_BUFFER_DEPTH      (FIFO_BUFFER_DEPTH),        // Only for "FIFO"
+        .FIFO_BUFFER_RAMSTYLE   (FIFO_BUFFER_RAMSTYLE)      // Only for "FIFO"
     )
     receiving_handshake
     (

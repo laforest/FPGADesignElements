@@ -38,9 +38,11 @@
  the operator will perform a non-inverting reduction (e.g.: XOR), then
  invert the final result. For example, <code>A = ~^B;</code> (XNOR reduction) should
  perform the following:</p>
-<p><pre>(((B[0] ~^ B[1]) ~^ B[2]) ~^ B[3) ... </pre></p>
+<pre>(((B[0] ~^ B[1]) ~^ B[2]) ~^ B[3) ... </pre>
+
 <p>but instead performs the following, which is not always equivalent:</p>
-<p><pre>~(B[0] ^ B[1] ^ B[2] ^ B[3 ...)</pre></p>
+<pre>~(B[0] ^ B[1] ^ B[2] ^ B[3 ...)</pre>
+
 <p>To implement the correct logical behaviour, we do the reduction in a loop
  using the alternate implementation described in the <a href="./Word_Reducer.html">Word
  Reducer</a> module.  The differences were

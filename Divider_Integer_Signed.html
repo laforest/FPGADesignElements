@@ -18,7 +18,7 @@
  (e.g. 128 bits), without impacting clock speed, at the expense of extra
  latency.</p>
 <h2>Example Values</h2>
-<p><pre>
+<pre>
   22 /   7 =  3 rem  1
  -22 /   7 = -3 rem -1
   22 /  -7 = -3 rem  1
@@ -29,7 +29,8 @@
    7 / -22 =  0 rem  7
    0 /   0 = -1 rem  0 (raises divide_by_zero)
   22 /   0 = -1 rem 22 (raises divide_by_zero)
- -22 /   0 =  1 rem 22 (raises divide_by_zero)</pre></p>
+ -22 /   0 =  1 rem 22 (raises divide_by_zero)</pre>
+
 <h2>Algorithm</h2>
 <p>This module implements division as iterated conditional subtraction of
  multiples of the <code>divisor</code> from the <code>dividend</code>, just as one would do
