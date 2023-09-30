@@ -48,6 +48,8 @@
 
 `default_nettype none
 
+`timescale 1ns / 1ps
+
 module Simulation_Clock
 #(
     parameter CLOCK_PERIOD = 10
@@ -64,7 +66,11 @@ module Simulation_Clock
 
 endmodule
 
-// Additionally, the following tidbits are handy to use with the resulting clock:
+// Additionally, the following tidbits are handy to use with the resulting
+// clock.  If you use `WAIT_CYCLES` or `UNTIL_CYCLE` exclusively to time
+// actions, without using `#` delays, then a `timescale` directive is not
+// necessary anywhere else, and your simulation will run at the correct
+// simulated rate.
 
 //    `define WAIT_CYCLES(n) repeat (n) begin @(posedge clock); end
 //
