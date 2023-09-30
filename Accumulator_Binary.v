@@ -142,31 +142,34 @@ module Accumulator_Binary
 // **After this point, only use the pipelined inputs.**
 //
 
-// If we are loading, then substitute the `accumulated_value` with zero, and
-// the `increment_value` with the `load_value`. 
-// If we are clearing, then substitute the `accumulated_value` with zero, and
-// the `increment_value` with the `INITIAL_VALUE`. 
+// If we are loading, then substitute the `accumulated_value` and `carry_in`
+// with zero, and the `increment_value` with the `load_value`. 
+
+// If we are clearing, then substitute the `accumulated_value` and `carry_in`
+// with zero, and the `increment_value` with the `INITIAL_VALUE`. 
+
 // Converting a load or clear to an addition to zero will set the `carry_out`
 // and `signed_overflow` bits correctly.
 
-    reg gate_accumulated_value = 1'b0;
+    reg gate_addends= 1'b0;
 
     always @(*) begin
-        gate_accumulated_value = (load_valid_pipelined == 1'b1) || (clear_pipelined == 1'b1);
+        gate_addends = (load_valid_pipelined == 1'b1) || (clear_pipelined == 1'b1);
     end
 
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
+    wire                  increment_carry_in_gated;
 
     Annuller
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
+        .WORD_WIDTH     (WORD_WIDTH + 1),
         .IMPLEMENTATION ("AND")
     )
     gate_accumulated
     (
-        .annul          (gate_accumulated_value == 1'b1),
-        .data_in        (accumulated_value_pipelined),
-        .data_out       (accumulated_value_gated)
+        .annul          (gate_addends == 1'b1),
+        .data_in        ({accumulated_value_pipelined, increment_carry_in_pipelined}),
+        .data_out       ({accumulated_value_gated,     increment_carry_in_gated})
     );
 
     reg [WORD_WIDTH-1:0] increment_selected = WORD_ZERO;
@@ -194,7 +197,7 @@ module Accumulator_Binary
     add_increment
     (
         .add_sub    (increment_add_sub_pipelined),  // 0/1 -> A+B/A-B
-        .carry_in   (increment_carry_in_pipelined),
+        .carry_in   (increment_carry_in_gated),
         .A          (accumulated_value_gated),
         .B          (increment_selected),
         .sum        (incremented_value_internal),

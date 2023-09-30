@@ -161,9 +161,9 @@ module Accumulator_Binary_Saturating
 // **After this point, only use the pipelined inputs.**
 //
 
-// If we are *loading* then substitute the `accumulated_value` with
+// If we are *loading* then substitute the `accumulated_value` and `carry_in` with
 // zero, and the `increment` with the `load_value`. 
-// If we are *clearing* then substitute the `accumulated_value` with
+// If we are *clearing* then substitute the `accumulated_value` and `carry_in` with
 // zero, and the `increment` with the `INITIAL_VALUE`. 
 // Converting a load or clear to an addition to zero prevents us from loading
 // a value outside the given limits, which could really upset things in the
@@ -176,17 +176,18 @@ module Accumulator_Binary_Saturating
     end
 
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
+    wire [WORD_WIDTH-1:0] increment_carry_in_gated;
 
     Annuller
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
+        .WORD_WIDTH     (WORD_WIDTH + 1),
         .IMPLEMENTATION ("AND")
     )
     gate_accumulated
     (
         .annul          (gate_accumulated_value == 1'b1),
-        .data_in        (accumulated_value_pipelined),
-        .data_out       (accumulated_value_gated)
+        .data_in        ({accumulated_value_pipelined, increment_carry_in_pipelined}),
+        .data_out       ({accumulated_value_gated,     increment_carry_in_gated})
     );
 
     reg [WORD_WIDTH-1:0] increment_selected = WORD_ZERO;
@@ -217,7 +218,7 @@ module Accumulator_Binary_Saturating
         .limit_max      (limit_max_pipelined),
         .limit_min      (limit_min_pipelined),
         .add_sub        (increment_add_sub_pipelined),  // 0/1 -> A+B/A-B
-        .carry_in       (increment_carry_in_pipelined),
+        .carry_in       (increment_carry_in_gated),
         .A              (accumulated_value_gated),
         .B              (increment_selected),
         .sum            (incremented_value_internal),
