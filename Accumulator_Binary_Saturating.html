@@ -165,9 +165,9 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
 </pre>
 
 <p><strong>After this point, only use the pipelined inputs.</strong></p>
-<p>If we are <em>loading</em> then substitute the <code>accumulated_value</code> with
+<p>If we are <em>loading</em> then substitute the <code>accumulated_value</code> and <code>carry_in</code> with
  zero, and the <code>increment</code> with the <code>load_value</code>. 
- If we are <em>clearing</em> then substitute the <code>accumulated_value</code> with
+ If we are <em>clearing</em> then substitute the <code>accumulated_value</code> and <code>carry_in</code> with
  zero, and the <code>increment</code> with the <code>INITIAL_VALUE</code>. 
  Converting a load or clear to an addition to zero prevents us from loading
  a value outside the given limits, which could really upset things in the
@@ -181,17 +181,18 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
     end
 
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
+    wire [WORD_WIDTH-1:0] increment_carry_in_gated;
 
     <a href="./Annuller.html">Annuller</a>
     #(
-        .WORD_WIDTH     (WORD_WIDTH),
+        .WORD_WIDTH     (WORD_WIDTH + 1),
         .IMPLEMENTATION ("AND")
     )
     gate_accumulated
     (
         .annul          (gate_accumulated_value == 1'b1),
-        .data_in        (accumulated_value_pipelined),
-        .data_out       (accumulated_value_gated)
+        .data_in        ({accumulated_value_pipelined, increment_carry_in_pipelined}),
+        .data_out       ({accumulated_value_gated,     increment_carry_in_gated})
     );
 
     reg [WORD_WIDTH-1:0] increment_selected = WORD_ZERO;
@@ -224,7 +225,7 @@ module <a href="./Accumulator_Binary_Saturating.html">Accumulator_Binary_Saturat
         .limit_max      (limit_max_pipelined),
         .limit_min      (limit_min_pipelined),
         .add_sub        (increment_add_sub_pipelined),  // 0/1 -> A+B/A-B
-        .carry_in       (increment_carry_in_pipelined),
+        .carry_in       (increment_carry_in_gated),
         .A              (accumulated_value_gated),
         .B              (increment_selected),
         .sum            (incremented_value_internal),
