@@ -48,6 +48,17 @@
  response to also toggle into the same state, is a 2-phase asynchronous
  handshake. It does not depend on the timing of the signals, only their
  sequence.</p>
+<h3>Simulation Latch-Up</h3>
+<p>Since there is a loop leading from the <a href="./Register_Toggle.html">Toggle Register</a>
+ output, through CDC, and back to a Toggle Register
+ input, without a reset or clear available (see below), there is a possible
+ latch-up during simulation: At any point, but especially prior to an
+ initial reset, if an X value enters the Pulse Synchronizer then it will
+ eventually spread to both clock domains and latch-up the Toggle Register,
+ and thus the whole Pulse Synchronizer, into an X state without escape.  The
+ easiest way to avoid this problem on an FPGA is to make sure the
+ <code>sending_pulse_in</code> input is gated-off <code>(1'bX &amp; 1'b0 = 1'b0)</code> before
+ operation starts.</p>
 <h2>Input Pulse Frequency Limit</h2>
 <p>The time taken for the 2-phase handshake to complete puts an upper limit on
  the input pulse rate, that also depends on the receiving clock frequency.
