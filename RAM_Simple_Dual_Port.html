@@ -2,6 +2,7 @@
 <head>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./RAM_Simple_Dual_Port.html">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Defines a memory, of various implementation, with one write port and one read port (1W1R), separately addressed, with a common clock.  Common data width on both ports. *This is usually the fastest BRAM configuration when used with write-forwarding logic.* There is no synchronous clear on the output: In Quartus at least, any register driving it cannot be retimed, and it may not be as portable. Instead, use separate logic (e.g.: an [Annuller](./Annuller.html)) to zero-out the output down the line.">
 <title>RAM Simple Dual Port</title>

@@ -2,6 +2,7 @@
 <head>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./Pipeline_Sink.html">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Acts as either a pass-through or a sink for ready/valid pipeline handshakes, along with the associated data.  While `sink` is raised, any handshake and data presented at the input is immediately lost, and the output never raises valid and presents all-zero data.  *All signals must be synchronous. There is no buffering or registering.*">
 <title>Pipeline Sink</title>
