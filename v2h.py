@@ -27,6 +27,7 @@ header = """<html>
 <head>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./{3}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="{0}">
 <title>{1}</title>
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         line = f.readline()
         line, meta_description = process_first_paragraph(line, f)
         title = filename_to_title(verilog_filename)
-        processed_contents += header.format(meta_description, title, verilog_filename)
+        processed_contents += header.format(meta_description, title, verilog_filename, html_filename)
         # Note the returning of the last line read and restarting of parsing.
         # This avoids the need for look-ahead to know when to end a comment or code block.
         while not is_eof(line):
