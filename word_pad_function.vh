@@ -32,6 +32,11 @@
 // or expressions which evaluate to a constant. Then use the return value as an
 // integer for a localparam, genvar, etc...
 
+// Since this is an included file, it must be idempotent. (defined only once globally)
+
+`ifndef WORDPAD_FUNCTION
+`define WORDPAD_FUNCTION
+
 function integer word_pad;
     input integer bit_vector_width;
     input integer word_width;
@@ -39,4 +44,6 @@ function integer word_pad;
         word_pad = (bit_vector_width < word_width) ? word_width - bit_vector_width : word_width - (bit_vector_width % word_width);
     end
 endfunction
+
+`endif
 

@@ -10,6 +10,11 @@
 // or expressions which evaluate to a constant. Then use the return value as an
 // integer for a localparam, genvar, etc...
 
+// Since this is an included file, it must be idempotent. (defined only once globally)
+
+`ifndef WORDCOUNT_FUNCTION
+`define WORDCOUNT_FUNCTION
+
 function integer word_count;
     input integer bit_vector_width;
     input integer word_width;
@@ -19,4 +24,6 @@ function integer word_count;
         word_count = (bit_vector_width % word_width == 0) ? word_count_raw : word_count_raw + 1;
     end
 endfunction
+
+`endif
 

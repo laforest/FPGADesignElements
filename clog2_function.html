@@ -36,8 +36,12 @@
  register to hold an index to those items (e.g.: a binary counter).</p>
 <p>We use a temp value for calculations since Vivado raises warnings if we
  internally assign a value to a function input port.</p>
+<p>Since this is an included file, it must be idempotent. (defined only once globally)</p>
 
 <pre>
+`ifndef CLOG2_FUNCTION
+`define CLOG2_FUNCTION
+
 function integer clog2;
     input integer value;
           integer temp;
@@ -48,6 +52,8 @@ function integer clog2;
         end
     end
 endfunction
+
+`endif
 </pre>
 
 <hr>

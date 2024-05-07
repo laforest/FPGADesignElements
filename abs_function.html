@@ -1,0 +1,46 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./abs_function.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Takes in a 32-bit signed integer and returns its absolute value. *This is not meant for synthesis!*">
+<title>abs function</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./abs_function.vh">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Absolute Value Function</h1>
+<p>Takes in a 32-bit signed integer and returns its absolute value.
+ <em>This is not meant for synthesis!</em></p>
+<p>Bring in the function at the start of the body of your module like so:</p>
+<pre><code>`include "abs_function.vh"
+</code></pre>
+<p>Pass the function values which, at elaboration time, are either constant or
+ expressions which evaluates to constants. Then use the output value as an
+ integer for a localparam, genvar, etc...</p>
+<p>Since this is an included file, it must be idempotent. (defined only once globally)</p>
+
+<pre>
+`ifndef ABS_FUNCTION
+`define ABS_FUNCTION
+
+function integer abs;
+    input integer value;
+    begin
+        abs = (value < 0) ? -value : value;
+    end
+endfunction
+
+`endif
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

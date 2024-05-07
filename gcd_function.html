@@ -1,0 +1,63 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./gcd_function.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Uses Euclid's Algorithm to iteratively find the greatest common divisor of two signed integers, A and B, of up to 32 bits.  *This is not mean for synthesis!*">
+<title>gcd function</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./gcd_function.vh">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Greatest Common Divisor (GCD) Function</h1>
+<p>Uses Euclid's Algorithm to iteratively find the greatest common divisor of
+ two signed integers, A and B, of up to 32 bits.  <em>This is not mean for
+ synthesis!</em></p>
+<p>Reference: <a href="https://en.wikipedia.org/wiki/Euclidean_algorithm">Wikipedia: Euclidean Algorithm</a></p>
+<p>Bring in the function at the start of the body of your module like so:</p>
+<pre><code>`include "gcd_function.vh"
+</code></pre>
+<p>Pass the function values which, at elaboration time, are either constant or
+ expressions which evaluates to constants. Then use the output value as an
+ integer for a localparam, genvar, etc...</p>
+<p>We use a temp values for calculations since Vivado raises warnings if we
+ internally assign a value to a function input port.</p>
+<p>Since this is an included file, it must be idempotent. (defined only once globally)</p>
+
+<pre>
+`ifndef GCD_FUNCTION
+`define GCD_FUNCTION
+
+`include "<a href="./abs_function.html">abs_function</a>.vh"
+
+function integer gcd;
+    input integer A;
+    input integer B;
+          integer A_tmp;
+          integer B_tmp;
+          integer tmp;
+    begin
+        A_tmp = A;
+        B_tmp = B;
+        while ( B_tmp != 0) begin
+            tmp = B_tmp;
+            B_tmp = A_tmp % B_tmp;
+            A_tmp = tmp;
+        end
+        gcd = abs(A_tmp);
+    end
+endfunction
+
+`endif
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+

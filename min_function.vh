@@ -1,40 +1,40 @@
 
-//# Max of two signed integers
+//# Min of two signed integers
 
-// Takes two signed integers and returns the most positive of the two, or
+// Takes two signed integers and returns the *least* positive of the two, or
 // `in_A` if equal. For example:
 
-// * max(5,5) returns 5
-// * max(5,6) returns 6
-// * max(6,5) returns 6
-// * max(-6,5) returns 5
-// * max(-6,-7) returns -6
+// * min(5,5) returns 5
+// * min(5,6) returns 5
+// * min(6,5) returns 5
+// * min(-6,5) returns -6
+// * min(-6,-7) returns -7
 
 // Bring in the function at the start of the body of your module like so:
 
-//    `include "max_function.vh"
+//    `include "min_function.vh"
 
 // Pass the function a value which, at elaboration time, is either a constant
 // or an expression which evaluates to a constant. Then use that value as an
 // integer for a localparam, genvar, etc...
 
 // This function is handy when you have words of different parameterized widths
-// and you want to scale then all to the width of the largest word (see: [Width
+// and you want to scale then all to the width of the smallest word (see: [Width
 // Adjuster](./Width_Adjuster.html)).
 
 // Since this is an included file, it must be idempotent. (defined only once globally)
 
-`ifndef MAX_FUNCTION
-`define MAX_FUNCTION
+`ifndef MIN_FUNCTION
+`define MIN_FUNCTION
 
-function integer max;
+function integer min;
     input integer in_A;
     input integer in_B;
     begin
-        if (in_A >= in_B) begin
-            max = in_A;
+        if (in_A <= in_B) begin
+            min = in_A;
         end else begin
-            max = in_B;
+            min = in_B;
         end
     end
 endfunction

@@ -15,6 +15,11 @@
 // or expressions which evaluate to a constant. Then use the return value as an
 // integer for a localparam, genvar, etc...
 
+// Since this is an included file, it must be idempotent. (defined only once globally)
+
+`ifndef ADJUST_FUNCTION
+`define ADJUST_FUNCTION
+
 function integer adjust_to_multiple;
     input integer count;
     input integer multiple;
@@ -26,4 +31,6 @@ function integer adjust_to_multiple;
         adjust_to_multiple = count + pad;
     end
 endfunction
+
+`endif
 

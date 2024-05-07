@@ -2,50 +2,50 @@
 <head>
 <link rel="shortcut icon" href="./favicon.ico">
 <link rel="stylesheet" type="text/css" href="./style.css">
-<link rel="canonical" href="./max_function.html">
+<link rel="canonical" href="./min_function.html">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Takes two signed integers and returns the most positive of the two, or `in_A` if equal. For example:">
-<title>max function</title>
+<meta name="description" content="Takes two signed integers and returns the *least* positive of the two, or `in_A` if equal. For example:">
+<title>min function</title>
 </head>
 <body>
 
-<p class="inline bordered"><b><a href="./max_function.vh">Source</a></b></p>
+<p class="inline bordered"><b><a href="./min_function.vh">Source</a></b></p>
 <p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
 <p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
 
-<h1>Max of two signed integers</h1>
-<p>Takes two signed integers and returns the most positive of the two, or
+<h1>Min of two signed integers</h1>
+<p>Takes two signed integers and returns the <em>least</em> positive of the two, or
  <code>in_A</code> if equal. For example:</p>
 <ul>
-<li>max(5,5) returns 5</li>
-<li>max(5,6) returns 6</li>
-<li>max(6,5) returns 6</li>
-<li>max(-6,5) returns 5</li>
-<li>max(-6,-7) returns -6</li>
+<li>min(5,5) returns 5</li>
+<li>min(5,6) returns 5</li>
+<li>min(6,5) returns 5</li>
+<li>min(-6,5) returns -6</li>
+<li>min(-6,-7) returns -7</li>
 </ul>
 <p>Bring in the function at the start of the body of your module like so:</p>
-<pre><code>`include "max_function.vh"
+<pre><code>`include "min_function.vh"
 </code></pre>
 <p>Pass the function a value which, at elaboration time, is either a constant
  or an expression which evaluates to a constant. Then use that value as an
  integer for a localparam, genvar, etc...</p>
 <p>This function is handy when you have words of different parameterized widths
- and you want to scale then all to the width of the largest word (see: <a href="./Width_Adjuster.html">Width
+ and you want to scale then all to the width of the smallest word (see: <a href="./Width_Adjuster.html">Width
  Adjuster</a>).</p>
 <p>Since this is an included file, it must be idempotent. (defined only once globally)</p>
 
 <pre>
-`ifndef MAX_FUNCTION
-`define MAX_FUNCTION
+`ifndef MIN_FUNCTION
+`define MIN_FUNCTION
 
-function integer max;
+function integer min;
     input integer in_A;
     input integer in_B;
     begin
-        if (in_A >= in_B) begin
-            max = in_A;
+        if (in_A <= in_B) begin
+            min = in_A;
         end else begin
-            max = in_B;
+            min = in_B;
         end
     end
 endfunction

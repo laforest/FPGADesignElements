@@ -28,6 +28,11 @@
 // We use a temp value for calculations since Vivado raises warnings if we
 // internally assign a value to a function input port.
 
+// Since this is an included file, it must be idempotent. (defined only once globally)
+
+`ifndef CLOG2_FUNCTION
+`define CLOG2_FUNCTION
+
 function integer clog2;
     input integer value;
           integer temp;
@@ -38,4 +43,6 @@ function integer clog2;
         end
     end
 endfunction
+
+`endif
 
