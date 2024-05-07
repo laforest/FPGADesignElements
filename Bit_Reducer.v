@@ -107,7 +107,7 @@ module Bit_Reducer
     generate
 
         // verilator lint_off WIDTH
-        if (OPERATION == "AND") begin
+        if (OPERATION == "AND") begin : gen_and
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
@@ -117,7 +117,7 @@ module Bit_Reducer
         end
         else
         // verilator lint_off WIDTH
-        if (OPERATION == "NAND") begin
+        if (OPERATION == "NAND") begin : gen_nand
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
@@ -127,7 +127,7 @@ module Bit_Reducer
         end
         else
         // verilator lint_off WIDTH
-        if (OPERATION == "OR") begin
+        if (OPERATION == "OR") begin : gen_or
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
@@ -137,7 +137,7 @@ module Bit_Reducer
         end
         else
         // verilator lint_off WIDTH
-        if (OPERATION == "NOR") begin
+        if (OPERATION == "NOR") begin : gen_nor
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
@@ -147,7 +147,7 @@ module Bit_Reducer
         end
         else
         // verilator lint_off WIDTH
-        if (OPERATION == "XOR") begin
+        if (OPERATION == "XOR") begin : gen_xor
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin
@@ -157,7 +157,7 @@ module Bit_Reducer
         end
         else
         // verilator lint_off WIDTH
-        if (OPERATION == "XNOR") begin
+        if (OPERATION == "XNOR") begin : gen_xnor
         // verilator lint_on  WIDTH
             always @(*) begin
                 for(i=1; i < INPUT_COUNT; i=i+1) begin

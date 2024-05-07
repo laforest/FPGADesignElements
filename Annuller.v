@@ -64,13 +64,13 @@ module Annuller
     end
 
     generate
-        if (IMPLEMENTATION == "MUX") begin
+        if (IMPLEMENTATION == "MUX") begin : gen_mux
             always @(*) begin
                 data_out = (annul == 1'b0) ? data_in : ZERO;
             end
         end
         else
-        if (IMPLEMENTATION == "AND") begin
+        if (IMPLEMENTATION == "AND") begin : gen_and
             always @(*) begin
                 data_out = data_in & {WORD_WIDTH{annul == 1'b0}};
             end

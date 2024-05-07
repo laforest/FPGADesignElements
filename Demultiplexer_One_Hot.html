@@ -85,7 +85,7 @@ module <a href="./Demultiplexer_One_Hot.html">Demultiplexer_One_Hot</a>
 
 <pre>
     generate
-        if (BROADCAST == 0) begin
+        if (BROADCAST == 0) begin : gen_no_broadcast
             wire [TOTAL_WIDTH-1:0] words_out_internal;
 
             genvar i;
@@ -108,7 +108,7 @@ module <a href="./Demultiplexer_One_Hot.html">Demultiplexer_One_Hot</a>
             end
         end
         else
-        if (BROADCAST == 1) begin
+        if (BROADCAST == 1) begin : gen_broadcast
             always @(*) begin
                 words_out = {OUTPUT_COUNT{word_in}};
             end

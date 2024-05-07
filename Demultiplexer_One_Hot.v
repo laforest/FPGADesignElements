@@ -73,7 +73,7 @@ module Demultiplexer_One_Hot
 // replicate and connect the input to all outputs. 
 
     generate
-        if (BROADCAST == 0) begin
+        if (BROADCAST == 0) begin : gen_no_broadcast
             wire [TOTAL_WIDTH-1:0] words_out_internal;
 
             genvar i;
@@ -96,7 +96,7 @@ module Demultiplexer_One_Hot
             end
         end
         else
-        if (BROADCAST == 1) begin
+        if (BROADCAST == 1) begin : gen_broadcast
             always @(*) begin
                 words_out = {OUTPUT_COUNT{word_in}};
             end
