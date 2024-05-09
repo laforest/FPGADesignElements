@@ -64,8 +64,8 @@
 
 module CDC_FIFO_Repacker
 #(
-    parameter WORD_WIDTH_INPUT  = 216,
-    parameter WORD_WIDTH_OUTPUT = 128,
+    parameter WORD_WIDTH_INPUT  = 0,
+    parameter WORD_WIDTH_OUTPUT = 0,
     parameter CDC_EXTRA_STAGES  = 0
 )
 (
