@@ -55,7 +55,7 @@ module <a href="./Pipeline_Gate.html">Pipeline_Gate</a>
 
     generate
 
-        if (GATE_DATA != 0) begin
+        if (GATE_DATA != 0) begin : gen_gate_data
 
             <a href="./Annuller.html">Annuller</a>
             #(
@@ -70,7 +70,7 @@ module <a href="./Pipeline_Gate.html">Pipeline_Gate</a>
             );
 
         end
-        else begin
+        else begin : gen_pass_data
 
             assign output_data = input_data;
 

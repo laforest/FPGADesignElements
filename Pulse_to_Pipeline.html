@@ -147,7 +147,7 @@ module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
 <pre>
     generate
 
-        if (OUTPUT_BUFFER_TYPE == "HALF") begin
+        if (OUTPUT_BUFFER_TYPE == "HALF") begin : gen_half
             <a href="./Pipeline_Half_Buffer.html">Pipeline_Half_Buffer</a>
             #(
                 .WORD_WIDTH         (WORD_WIDTH),
@@ -167,7 +167,7 @@ module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
                 .output_data    (data_out)
             );
         end
-        else if (OUTPUT_BUFFER_TYPE == "SKID") begin
+        else if (OUTPUT_BUFFER_TYPE == "SKID") begin : gen_skid
             <a href="./Pipeline_Skid_Buffer.html">Pipeline_Skid_Buffer</a>
             #(
                 .WORD_WIDTH         (WORD_WIDTH),
@@ -187,7 +187,7 @@ module <a href="./Pulse_to_Pipeline.html">Pulse_to_Pipeline</a>
                 .output_data    (data_out)
             );
         end
-        else if (OUTPUT_BUFFER_TYPE == "FIFO") begin
+        else if (OUTPUT_BUFFER_TYPE == "FIFO") begin : gen_fifo
             <a href="./Pipeline_FIFO_Buffer.html">Pipeline_FIFO_Buffer</a>
             #(
                 .WORD_WIDTH         (WORD_WIDTH),

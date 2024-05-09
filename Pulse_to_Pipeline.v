@@ -130,7 +130,7 @@ module Pulse_to_Pipeline
 
     generate
 
-        if (OUTPUT_BUFFER_TYPE == "HALF") begin
+        if (OUTPUT_BUFFER_TYPE == "HALF") begin : gen_half
             Pipeline_Half_Buffer
             #(
                 .WORD_WIDTH         (WORD_WIDTH),
@@ -150,7 +150,7 @@ module Pulse_to_Pipeline
                 .output_data    (data_out)
             );
         end
-        else if (OUTPUT_BUFFER_TYPE == "SKID") begin
+        else if (OUTPUT_BUFFER_TYPE == "SKID") begin : gen_skid
             Pipeline_Skid_Buffer
             #(
                 .WORD_WIDTH         (WORD_WIDTH),
@@ -170,7 +170,7 @@ module Pulse_to_Pipeline
                 .output_data    (data_out)
             );
         end
-        else if (OUTPUT_BUFFER_TYPE == "FIFO") begin
+        else if (OUTPUT_BUFFER_TYPE == "FIFO") begin : gen_fifo
             Pipeline_FIFO_Buffer
             #(
                 .WORD_WIDTH         (WORD_WIDTH),

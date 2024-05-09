@@ -45,7 +45,7 @@ module Pipeline_Gate
 
     generate
 
-        if (GATE_DATA != 0) begin
+        if (GATE_DATA != 0) begin : gen_gate_data
 
             Annuller
             #(
@@ -60,7 +60,7 @@ module Pipeline_Gate
             );
 
         end
-        else begin
+        else begin : gen_pass_data
 
             assign output_data = input_data;
 

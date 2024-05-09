@@ -113,7 +113,7 @@ module RAM_Simple_Dual_Port
 
     generate
         // Returns OLD data
-        if (READ_NEW_DATA == 0) begin
+        if (READ_NEW_DATA == 0) begin : gen_read_old_data
             always @(posedge clock) begin
                 if(wren == 1'b1) begin
                     ram[write_addr] <= write_data;
@@ -126,7 +126,7 @@ module RAM_Simple_Dual_Port
         // Returns NEW data
         // This isn't proper, but that's what the CAD tool expects for inference.
         // verilator lint_off BLKSEQ
-        else begin
+        else begin : gen_read_new_data
             always @(posedge clock) begin
                 if(wren == 1'b1) begin
                     ram[write_addr] = write_data;
@@ -155,7 +155,7 @@ module RAM_Simple_Dual_Port
 // generator](./RAM_generate_empty_init_file.py).
 
     generate
-        if (USE_INIT_FILE == 0) begin
+        if (USE_INIT_FILE == 0) begin : gen_init_value
             integer i;
             initial begin
                 for (i = 0; i < DEPTH; i = i + 1) begin
@@ -163,7 +163,7 @@ module RAM_Simple_Dual_Port
                 end
             end
         end
-        else begin
+        else begin : gen_init_file
             initial begin
                 $readmemh(INIT_FILE, ram);
             end
