@@ -115,7 +115,7 @@ module Accumulator_Binary_Saturating
     wire [WORD_WIDTH-1:0]   accumulated_value_pipelined;
 
     generate
-        if (EXTRA_PIPE_STAGES == 0) begin: no_pipe
+        if (EXTRA_PIPE_STAGES == 0) begin : gen_no_pipe
             assign clear_pipelined              = clear;
             assign increment_carry_in_pipelined = increment_carry_in;
             assign increment_add_sub_pipelined  = increment_add_sub;
@@ -128,7 +128,7 @@ module Accumulator_Binary_Saturating
             assign increment_carry_in_pipelined = increment_carry_in;
             assign accumulated_value_pipelined  = accumulated_value;
         end
-        else if (EXTRA_PIPE_STAGES > 0) begin: extra_pipe
+        else if (EXTRA_PIPE_STAGES > 0) begin: gen_extra_pipe
 
             localparam PIPELINE_WIDTH       = (WORD_WIDTH * 5) + 5;
             localparam PIPELINE_WORD_ZERO   = {PIPELINE_WIDTH{1'b0}};
@@ -176,7 +176,7 @@ module Accumulator_Binary_Saturating
     end
 
     wire [WORD_WIDTH-1:0] accumulated_value_gated;
-    wire [WORD_WIDTH-1:0] increment_carry_in_gated;
+    wire                  increment_carry_in_gated;
 
     Annuller
     #(
