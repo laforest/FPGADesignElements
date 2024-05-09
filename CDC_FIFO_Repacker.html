@@ -1,0 +1,553 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./CDC_FIFO_Repacker.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Takes in a ready/valid handshake of a given word width, buffers it into a FIFO and passes it into another clock domain with full throughput, and outputs a ready/valid handshake with a *different* word width. The data is repacked without gaps into the new word width. The words widths are arbitrary and need not be multiples of eachother.">
+<title>CDC FIFO Repacker</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./CDC_FIFO_Repacker.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>CDC (Clock Domain Crossing) FIFO Repacker</h1>
+<p>Takes in a ready/valid handshake of a given word width, buffers it into
+ a FIFO and passes it into another clock domain with full throughput, and
+ outputs a ready/valid handshake with a <em>different</em> word width. The data is
+ repacked without gaps into the new word width. The words widths are
+ arbitrary and need not be multiples of eachother.</p>
+<p>The minimum input-to-output latency is 7 cycles when both
+ clocks are plesiochronous.</p>
+<h2>Asynchronous Clocks</h2>
+<p>This FIFO Repacker supports having the input and output interfaces each on
+ their own mutually asynchronous clock (without knowledge or restriction on
+ their relative clock frequencies or phase).  Using a FIFO for data tranfer
+ between asynchronous clock domains allows multiple transfers to overlap
+ with the CDC synchronization overhead. Once the CDC synchronization is done,
+ all the previously written data in one clock domain can be freely read out
+ in the other clock domain without further overhead.</p>
+<h2>Trading Off Size for Simplicity</h2>
+<p>Usually, a repacker is implemented with a minimally sized ring buffer with
+ a pre-calculated read/write schedule which covers the whole sequence of
+ possible amounts of data in the buffer at a given time. This is a complex
+ schedule which resembles pseudo-random number generation and is likely
+ unique for every pair of input/output widths. This also means the read side
+ must be able to read into every possible offset into the ring buffer as
+ given by the schedule, which can create wide multiplexers. The minimum size
+ of the buffer is also a function of the computed schedule.</p>
+<p>Instead, let's trade-off using more storage to obtain the implicit simplest
+ schedule: we use the Least Common Multiple of the input and output widths,
+ which is the smallest buffer which holds an integer number of input and
+ output entries at the same time. Then the behaviour of the buffer reduces
+ to that of a FIFO buffer, albeit with different input and output word
+ widths. This approach tends to minimize the amount of multiplexing and does
+ not require computing any schedules (only plain counting). We only need to
+ specify the input and output widths and everything is computed for us.</p>
+<p><strong>NOTE</strong>: Using the LCM depth does not guarantee full throughput. A multiple
+ of the LCM may be needed. See below.</p>
+<h2>Resets</h2>
+<p>Since the input and output interfaces are asynchronous to eachother, they
+ each have their own locally-synchronous <code>clear</code> reset signal. However, it
+ makes no sense to reset one interface only, as that would corrupt the
+ read/write addresses and duplicate or lose data. <em>Both interfaces must be reset
+ together.</em> Pick one interface reset as the primary reset, then synchronize
+ it into the clock domain of the other interface using a <a href="./Reset_Synchronizer.html">Reset
+ Synchronizer</a>.</p>
+<p><strong>NOTE</strong>: Both interfaces must be out of reset before beginning operation,
+ otherwise a CDC synchronization from one domain into another domain which
+ is still under reset will be lost, and the system state becomes
+ inconsistent.</p>
+<h2>Parameters, Ports, and Constants</h2>
+
+<pre>
+`default_nettype none
+
+module <a href="./CDC_FIFO_Repacker.html">CDC_FIFO_Repacker</a>
+#(
+    parameter WORD_WIDTH_INPUT  = 216,
+    parameter WORD_WIDTH_OUTPUT = 128,
+    parameter CDC_EXTRA_STAGES  = 0
+)
+(
+    input   wire                            input_clock,
+    input   wire                            input_clear,
+    input   wire                            input_valid,
+    output  reg                             input_ready,
+    input   wire    [WORD_WIDTH_INPUT-1:0]  input_data,
+
+    input   wire                            output_clock,
+    input   wire                            output_clear,
+    output  wire                            output_valid,
+    input   wire                            output_ready,
+    output  reg     [WORD_WIDTH_OUTPUT-1:0] output_data
+);
+</pre>
+
+<h3>Buffer Depth Adjustment</h3>
+<p>First, we have to calculate the Least Common Multiple (LCM) of both
+ <code>WORD_WIDTH_INPUT</code> and <code>WORD_WIDTH_OUTPUT</code>, which gives us the minimum
+ buffer depth which will hold a whole number of input and output items at
+ the same time.</p>
+
+<pre>
+    `include "<a href="./lcm_function.html">lcm_function</a>.vh"
+
+    localparam BUFFER_DEPTH_MIN = lcm(WORD_WIDTH_OUTPUT, WORD_WIDTH_INPUT); // Least Common Multiple
+</pre>
+
+<p>However, the LCM depth is not necessarily sufficient to ensure full
+ throughput, as it may contain too few of <code>WORD_WIDTH_INPUT</code> or
+ <code>WORD_WIDTH_OUTPUT</code> entries to allow reads and writes to continue without
+ stalls while the read and write addresses are synchronized across the input
+ and output clock domains.</p>
+<p>Based on the design of the [CDC Word Synchronizer]
+ (./CDC_Word_Synchronizer.html), the absolute worst-case latency for
+ completing a transfer from one clock domain to the other is 8 clock cycles.
+ Thus, we have to contain more than <em>twice</em> that number of entries (17) in
+ the FIFO buffer to guarantee that there is always a free entry to read and
+ write at any time, thus avoiding a stall.</p>
+<p>We calculate the final <code>BUFFER_DEPTH</code> by dividing it by the larger of
+ <code>WORD_WIDTH_OUTPUT</code> and <code>WORD_WIDTH_INPUT</code>, taking the ratio of that
+ fraction with 17 (fudged up by +1 to compensate for integer division), and
+ then multiplying the <code>BUFFER_DEPTH_MIN</code> by that amount, thus guaranteeing
+ that <code>BUFFER_DEPTH</code> &gt;= <code>17 * max(WORD_WIDTH_INPUT, WORD_WIDTH_OUTPUT)</code>.</p>
+<p>I do integer division with a +1 fudge factor to avoid potential problems as
+ it's unclear if casting a real to an integer truncates or rounds. So lets
+ pay the price of possible <code>BUFFER_DEPTH_MIN</code> more entries than we really
+ need to guarantee we meet our constraint. <em>This can double the buffer depth
+ when the LCM is a large number close to <code>17 * max(WORD_WIDTH_OUTPUT,
+ WORD_WIDTH_INPUT)</code>.</em></p>
+
+<pre>
+    `include "<a href="./max_function.html">max_function</a>.vh"
+
+    localparam WORD_WIDTH_MAX           = max(WORD_WIDTH_OUTPUT, WORD_WIDTH_INPUT);
+    localparam ITEM_COUNT_MIN           = BUFFER_DEPTH_MIN / WORD_WIDTH_MAX;
+    localparam BUFFER_DEPTH_MULTIPLIER  = (17 / ITEM_COUNT_MIN) + 1;
+    localparam BUFFER_DEPTH             = BUFFER_DEPTH_MIN * BUFFER_DEPTH_MULTIPLIER;
+
+    `include "<a href="./clog2_function.html">clog2_function</a>.vh"
+
+    localparam ADDR_WIDTH       = clog2(BUFFER_DEPTH);
+
+    localparam ADDR_ZERO        = {ADDR_WIDTH{1'b0}};
+    localparam ADDR_LAST        = BUFFER_DEPTH-1;
+
+    localparam BUFFER_ZERO      = {BUFFER_DEPTH{1'b0}};
+    localparam OUTPUT_ZERO      = {WORD_WIDTH_OUTPUT{1'b0}};
+
+    // A little contortion to please the linter.
+    // (doing (foo-1)[width-1:0], or similar, isn't <a href="./legal.html">legal</a> in Verilog-2001)
+
+    localparam [ADDR_WIDTH-1:0] ADDR_INITIAL_INPUT  = WORD_WIDTH_INPUT  - 1;
+    localparam [ADDR_WIDTH-1:0] ADDR_INITIAL_OUTPUT = WORD_WIDTH_OUTPUT - 1;
+
+    initial begin
+        input_ready = 1'b1; // Empty at start, so accept data
+        output_data = OUTPUT_ZERO;
+    end
+</pre>
+
+<h2>Data Path</h2>
+<h3>FIFO Buffer Registers</h3>
+<p>We have to access arbitrary word subsets of the entire FIFO storage so we
+ can read and write word of different width <em>without introducing gaps in the
+ data!</em> Block RAMs only support limited and fixed word sizes, so are not
+ usable here. Thus, we must implement using registers and read/write the
+ necessary exact word subsets as needed.</p>
+<p>We also need to do CDC, so we must be careful to not have simultaneous
+ reads and write to the same register.</p>
+
+<pre>
+    reg [BUFFER_DEPTH-1:0] buffer = BUFFER_ZERO;
+</pre>
+
+<h3>Read/Write Address Counters (Head and Tail)</h3>
+<p>To define a word subset inside the <code>buffer</code>, the input and output each use
+ two counters: head and tail. The tail counter starts at <code>ADDR_ZERO</code>, and
+ the head counter starts at <code>WORD_WIDTH_OUTPUT-1</code> or <code>WORD_WIDTH_INPUT-1</code>,
+ and both can only increment by <code>WORD_WIDTH_OUTPUT</code> or <code>WORD_WIDTH_INPUT</code>,
+ wrapping around to their start value if incremented past <code>ADDR_LAST</code>.</p>
+<p>Since <code>BUFFER_DEPTH</code> is the Least Common Multiple of the input/output word
+ widths, the counters always index a whole word without residue or having to
+ wrap around the end of the buffer.</p>
+<p>We use two counters rather than a counter and an adder to calculate the
+ next head and tail concurrently.</p>
+<p>From these counter values we can perform range checks (e.g.: by seeing if
+ a write head counter is past a read tail counter, and thus there is word
+ overlap and no room to write) to test if there is enough input data to
+ compose an output data word, if we have reached the end of the buffer, and
+ calculate vector part selects to read/write the buffer.</p>
+<h4>Write Address Counters</h4>
+
+<pre>
+    reg increment_buffer_write_addr = 1'b0;
+    reg load_buffer_write_addr      = 1'b0;
+
+    wire [ADDR_WIDTH-1:0] buffer_write_addr_tail;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (ADDR_WIDTH),
+        .INCREMENT      (WORD_WIDTH_INPUT),
+        .INITIAL_COUNT  (ADDR_ZERO)
+    )
+    write_address_tail
+    (
+        .clock          (input_clock),
+        .clear          (input_clear),
+        .up_down        (1'b0), // 0/1 --> up/down
+        .run            (increment_buffer_write_addr),
+        .load           (load_buffer_write_addr),
+        .load_count     (ADDR_ZERO),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (buffer_write_addr_tail)
+    );
+
+    wire [ADDR_WIDTH-1:0] buffer_write_addr_head;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (ADDR_WIDTH),
+        .INCREMENT      (WORD_WIDTH_INPUT),
+        .INITIAL_COUNT  (ADDR_INITIAL_INPUT)
+    )
+    write_address_head
+    (
+        .clock          (input_clock),
+        .clear          (input_clear),
+        .up_down        (1'b0), // 0/1 --> up/down
+        .run            (increment_buffer_write_addr),
+        .load           (load_buffer_write_addr),
+        .load_count     (ADDR_INITIAL_INPUT),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (buffer_write_addr_head)
+    );
+</pre>
+
+<h4>Read Address Counters</h4>
+
+<pre>
+    reg increment_buffer_read_addr = 1'b0;
+    reg load_buffer_read_addr      = 1'b0;
+
+    wire [ADDR_WIDTH-1:0] buffer_read_addr_tail;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (ADDR_WIDTH),
+        .INCREMENT      (WORD_WIDTH_OUTPUT),
+        .INITIAL_COUNT  (ADDR_ZERO)
+    )
+    read_address_tail
+    (
+        .clock          (output_clock),
+        .clear          (output_clear),
+        .up_down        (1'b0), // 0/1 --> up/down
+        .run            (increment_buffer_read_addr),
+        .load           (load_buffer_read_addr),
+        .load_count     (ADDR_ZERO),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (buffer_read_addr_tail)
+    );
+
+    wire [ADDR_WIDTH-1:0] buffer_read_addr_head;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (ADDR_WIDTH),
+        .INCREMENT      (WORD_WIDTH_OUTPUT),
+        .INITIAL_COUNT  (ADDR_INITIAL_OUTPUT)
+    )
+    read_address_head
+    (
+        .clock          (output_clock),
+        .clear          (output_clear),
+        .up_down        (1'b0), // 0/1 --> up/down
+        .run            (increment_buffer_read_addr),
+        .load           (load_buffer_read_addr),
+        .load_count     (ADDR_INITIAL_OUTPUT),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (buffer_read_addr_head)
+    );
+
+</pre>
+
+<h3>Wrap-Around Bits</h3>
+<p>To distinguish between the empty and full cases, which both identically
+ show as equal read and write buffer addresses, we keep track of each time
+ an address wraps around to zero by toggling a bit.  <em>The addresses never
+ pass eachother.</em> </p>
+<p>If the write address runs ahead of the read address enough to wrap-around
+ and reach the read address from behind, the buffer is full (or has less
+ free space than one write word) and all writes to the buffer halt until
+ after we've read out more than the width of a write word. We detect this
+ because the write address will have wrapped-around one more time than the
+ read address, so their wrap-around bits will be different.</p>
+<p>Conversely, if the read address catches up to the write address from behind,
+ the buffer is empty (or containing less than one read word of data) and all
+ reads halt until after we've written enough data to have more than the
+ width of a read word in the buffer.  In this case, the wrap-around bits are
+ identical.</p>
+
+<pre>
+    reg  toggle_buffer_write_addr_wrap_around = 1'b0;
+    wire buffer_write_addr_wrap_around;
+
+    <a href="./Register_Toggle.html">Register_Toggle</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    write_wrap_around_bit
+    (
+        .clock          (input_clock),
+        .clock_enable   (1'b1),
+        .clear          (input_clear),
+        .toggle         (toggle_buffer_write_addr_wrap_around),
+        .data_in        (buffer_write_addr_wrap_around),
+        .data_out       (buffer_write_addr_wrap_around)
+    );
+
+    reg  toggle_buffer_read_addr_wrap_around = 1'b0;
+    wire buffer_read_addr_wrap_around;
+
+    <a href="./Register_Toggle.html">Register_Toggle</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    read_wrap_around_bit
+    (
+        .clock          (output_clock),
+        .clock_enable   (1'b1),
+        .clear          (output_clear),
+        .toggle         (toggle_buffer_read_addr_wrap_around),
+        .data_in        (buffer_read_addr_wrap_around),
+        .data_out       (buffer_read_addr_wrap_around)
+    );
+</pre>
+
+<h3>Read/Write Address CDC Transfer</h3>
+<p>We need to compare the read and write addresses, along with their
+ associated wrap-around bits, to detect if the buffer is holding any items.
+ Therefore, we need to transfer the read address into the <code>output_clock</code>
+ domain, and the write address into the <code>input_clock</code> domain. We do this
+ with two <a href="./CDC_Word_Synchronizer.html">CDC Word Synchronizers</a>.</p>
+<p>A read/write address is always valid, so we tie <code>sending_valid</code> high and
+ ignore <code>sending_ready</code>. Then, we loop <code>receiving_valid</code> into
+ <code>receiving_ready</code> so we start a new CDC word transfer as soon as the
+ current CDC word transfer completes. This configuration samples the address
+ continuously, as fast as the CDC word transfer happens. The synchronized
+ address at <code>receiving_data</code> remains steady between CDC word transfers.</p>
+<p>It takes a few cycles to do the CDC word transfer, so when comparing the
+ local read or write address with the synchronized counterpart from the
+ other clock domain, we are comparing to a slightly stale version, lagging
+ behind the actual value. However, since the addresses never pass eachother,
+ this does not cause any corruption. The synchronized value eventually
+ catches up, and the actual buffer condition is updated. <em>At worst, this lag
+ means having to specify a somewhat deeper FIFO to achieve the expected peak
+ capacity, depending on input/output rates.</em> However, not being restricted
+ to powers-of-two FIFO depths minimizes this overhead.</p>
+
+<pre>
+    wire [ADDR_WIDTH-1:0]   buffer_write_addr_tail_synced;
+    wire                    buffer_write_addr_wrap_around_synced;
+    wire                    buffer_write_addr_synced_valid;
+
+    <a href="./CDC_Word_Synchronizer.html">CDC_Word_Synchronizer</a>
+    #(
+        .WORD_WIDTH             (1 + ADDR_WIDTH),
+        .EXTRA_CDC_DEPTH        (CDC_EXTRA_STAGES),
+        .OUTPUT_BUFFER_TYPE     ("HALF"), // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (0),
+        .FIFO_BUFFER_DEPTH      (), // Only for "FIFO"
+        .FIFO_BUFFER_RAMSTYLE   ()  // Only for "FIFO"
+    )
+    write_to_read
+    (
+        .sending_clock          (input_clock),
+        .sending_clear          (input_clear),
+        .sending_data           ({buffer_write_addr_wrap_around, buffer_write_addr_tail}),
+        .sending_valid          (1'b1),
+        // verilator lint_off PINCONNECTEMPTY
+        .sending_ready          (),
+        // verilator lint_on  PINCONNECTEMPTY
+
+        .receiving_clock        (output_clock),
+        .receiving_clear        (output_clear),
+        .receiving_data         ({buffer_write_addr_wrap_around_synced, buffer_write_addr_tail_synced}),
+        .receiving_valid        (buffer_write_addr_synced_valid),
+        .receiving_ready        (buffer_write_addr_synced_valid)
+    );
+
+    wire [ADDR_WIDTH-1:0]   buffer_read_addr_tail_synced;
+    wire                    buffer_read_addr_wrap_around_synced;
+    wire                    buffer_read_addr_synced_valid;
+
+    <a href="./CDC_Word_Synchronizer.html">CDC_Word_Synchronizer</a>
+    #(
+        .WORD_WIDTH             (1+ ADDR_WIDTH),
+        .EXTRA_CDC_DEPTH        (CDC_EXTRA_STAGES),
+        .OUTPUT_BUFFER_TYPE     ("HALF"), // "HALF", "SKID", "FIFO"
+        .OUTPUT_BUFFER_CIRCULAR (0),
+        .FIFO_BUFFER_DEPTH      (), // Only for "FIFO"
+        .FIFO_BUFFER_RAMSTYLE   ()  // Only for "FIFO"
+    )
+    read_to_write
+    (
+        .sending_clock          (output_clock),
+        .sending_clear          (output_clear),
+        .sending_data           ({buffer_read_addr_wrap_around, buffer_read_addr_tail}),
+        .sending_valid          (1'b1),
+        // verilator lint_off PINCONNECTEMPTY
+        .sending_ready          (),
+        // verilator lint_on  PINCONNECTEMPTY
+
+        .receiving_clock        (input_clock),
+        .receiving_clear        (input_clear),
+        .receiving_data         ({buffer_read_addr_wrap_around_synced, buffer_read_addr_tail_synced}),
+        .receiving_valid        (buffer_read_addr_synced_valid),
+        .receiving_ready        (buffer_read_addr_synced_valid)
+    );
+
+</pre>
+
+<h2>Control Path</h2>
+<h3>Buffer States</h3>
+<p>We describe the state of the buffer itself as the number of items currently
+ stored in the buffer, as indicated by the read and write addresses and
+ their wrap-around bits. We only care about the extremes: </p>
+<ul>
+<li>if the buffer holds no read words, or less than one read word, thus we cannot read</li>
+<li>if the buffer holds its maximum number of write words, or has less free space than one write word, thus we cannot write</li>
+</ul>
+
+<pre>
+    reg cannot_read  = 1'b0;
+    reg cannot_write = 1'b0;
+
+    always @(*) begin
+        cannot_read  = (buffer_read_addr_head        > buffer_write_addr_tail_synced) && (buffer_read_addr_wrap_around        == buffer_write_addr_wrap_around_synced);
+        cannot_write = (buffer_read_addr_tail_synced < buffer_write_addr_head)        && (buffer_read_addr_wrap_around_synced != buffer_write_addr_wrap_around);
+    end
+</pre>
+
+<h3>Input Interface (Insert)</h3>
+<p>The input interface is simple: if the buffer isn't at its maximum capacity,
+ signal the input is ready, and when an input handshake completes, write the
+ data directly into the buffer and increment the write address, wrapping
+ around as necessary.</p>
+
+<pre>
+    reg insert = 1'b0;
+
+    always @(*) begin
+        input_ready                             = (cannot_write == 1'b0);
+        insert                                  = (input_valid  == 1'b1) && (input_ready  == 1'b1);
+        increment_buffer_write_addr             = (insert == 1'b1);
+        load_buffer_write_addr                  = (increment_buffer_write_addr == 1'b1) && (buffer_write_addr_head == ADDR_LAST [ADDR_WIDTH-1:0]);
+        toggle_buffer_write_addr_wrap_around    = (load_buffer_write_addr      == 1'b1);
+    end
+</pre>
+
+<p>Normally this would be a Register module, but we need to describe a clock
+ enable to <em>part</em> of the registers here, not a data mux. So it's a rare use
+ of an if-statement outside of a generate block.</p>
+
+<pre>
+    always @(posedge input_clock) begin
+        if (insert == 1'b1) begin
+            buffer [buffer_write_addr_tail +: WORD_WIDTH_INPUT] <= input_data;
+        end
+    end
+</pre>
+
+<h3>Output Interface (Remove)</h3>
+<p>The output interface is not so simple because the output is registered, and
+ so holds data independently of the buffer. We signal the output holds valid
+ data whenever we can remove an item from the buffer and load it into the
+ output register. We meet this condition if an output handshake completes,
+ or if the buffer holds an item but the output register is not holding any
+ valid data.  Also, we do not increment/wrap the read address if the
+ previous item removed from the buffer and loaded into the output register
+ was the last one.</p>
+
+<pre>
+    reg remove                  = 1'b0;
+    reg output_leaving_idle     = 1'b0;
+    reg load_output_register    = 1'b0;
+
+    always @(*) begin
+        remove                              = (output_valid == 1'b1) && (output_ready        == 1'b1);
+        output_leaving_idle                 = (output_valid == 1'b0) && (cannot_read         == 1'b0);
+        load_output_register                = (remove       == 1'b1) || (output_leaving_idle == 1'b1);
+
+        increment_buffer_read_addr          = (load_output_register       == 1'b1) && (cannot_read  == 1'b0);
+        load_buffer_read_addr               = (increment_buffer_read_addr == 1'b1) && (buffer_read_addr_head  == ADDR_LAST [ADDR_WIDTH-1:0]);
+        toggle_buffer_read_addr_wrap_around = (load_buffer_read_addr      == 1'b1);
+    end
+</pre>
+
+<p>Normally this would be a Register module, but we need to describe a clock
+ enable to the <code>output_data</code> register, and a mux from the buffer. So it's
+ a rare use of an if-statement outside of a generate block.</p>
+
+<pre>
+    always @(posedge output_clock) begin
+        if (load_output_register == 1'b1) begin
+            output_data <= buffer [buffer_read_addr_tail +: WORD_WIDTH_OUTPUT];
+        end
+    end
+</pre>
+
+<p><code>output_valid</code> must be registered to match the latency of the buffer output
+ register.</p>
+
+<pre>
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (1),
+        .RESET_VALUE    (1'b0)
+    )
+    output_data_valid
+    (
+        .clock          (output_clock),
+        .clock_enable   (load_output_register == 1'b1),
+        .clear          (output_clear),
+        .data_in        (cannot_read == 1'b0),
+        .data_out       (output_valid)
+    );
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
