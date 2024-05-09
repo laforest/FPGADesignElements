@@ -28,6 +28,9 @@
 // to let any level toggle pass through CDC and reach its destination toggle
 // register. *This takes 3 cycles in both `sending_clock` and
 // `receiving_clock`.*
+// * Similarly, if a reset happens, you must wait until both clock domains
+// come out of reset before beginning operation, or a CDC transfer may be
+// lost.
 // * Set `OUTPUT_BUFFER_TYPE` to match the desired behaviour at the output of
 // the receiving handshake:
 //     * '"HALF"': Uses a [Pipeline Half Buffer](./Pipeline_Half_Buffer.html),
@@ -63,7 +66,6 @@
 // * 1 receiving cycle to transform the completion of the receiving handshake to a level toggle
 // * 1**\*** to 3 sending cycles to do the CDC into the sending clock domain (and maybe complete a sending handshake)
 
-// <div class="bordered">
 // **\*Corner Case:** The situations where the CDC transfers take 1 cycle in
 // either direction are mutually exclusive. The timing of the
 // sending/receiving clock edges that makes a CDC crossing in one direction
@@ -74,7 +76,6 @@
 // plesiochronous, it is safer and simpler to ignore this corner case and
 // assume 2 to 3 cycles per CDC.** However, we still account for this case 
 // in the latency ranges that follow. 
-// </div>
 
 // Thus, given roughly equal sending and receiving clock rates, a complete
 // transfer takes between 5 and 8 sending clock cycles. If the receiving clock

@@ -41,14 +41,13 @@
 // makes no sense to reset one interface only, as that would corrupt the
 // read/write addresses and duplicate or lose data. *Both interfaces must be reset
 // together.* Pick one interface reset as the primary reset, then synchronize
-// it into the clock domain of the other interface using a [CDC
-// Synchronizer](./CDC_Synchronizer.html).
+// it into the clock domain of the other interface using a [Reset
+// Synchronizer](./Reset_Synchronizer.html).
 
-// The synchronized reset will release after the primary reset, but that will
-// cause no problems: if the input interface comes out of reset first, it can
-// begin storing data until the FIFO is full. If the output interface comes
-// out of reset first, it will remain idle as the FIFO will remain empty until
-// the input interface stores a data item.
+// **NOTE**: Both interfaces must be out of reset before beginning operation,
+// otherwise a CDC synchronization from one domain into another domain which
+// is still under reset will be lost, and the system state becomes
+// inconsistent.
 
 //## Circular Buffer Mode
 
