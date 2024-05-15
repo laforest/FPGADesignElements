@@ -1,19 +1,22 @@
 #! /usr/bin/python3
 
 """
-This program converts Verilog code to a basic webpage: lines that *begin*
-with a line comment ("// ..."), or groups of such lines separated by blank
-lines, get put together as a block of text and processed as Markdown text. The
-remaining non-blank, non-line-comment lines are code, which gets wrapped in a <pre>
-block, and any module name where a converted Verilog to HTML file exists gets
-transformed into a link. This depends on the convention of one module per file
-where the filename matches the module name.
+This program converts Verilog code to a basic webpage:
+
+Lines that *begin* with a line comment ("// ..."), or groups of such lines
+separated by blank lines, get put together as a block of text and processed as
+Markdown text. 
+
+The remaining non-blank, non-line-comment lines are code, which gets wrapped in
+a <pre> block, and any module name where a converted Verilog to HTML file
+exists gets transformed into a link. This depends on the convention of one
+module per file where the filename matches the module name.
 
 Thus you can keep the Verilog code, its documentation, and its presentation in sync.
 
 A file is only updated if the newly generated HTML is not identical to the existing HTML file.
 
-Copyright (c) 2019-2020 Charles Eric LaForest
+Copyright (c) 2019-2024 Charles Eric LaForest, PhD
 License: https://opensource.org/licenses/MIT
 """
 
