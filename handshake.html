@@ -48,12 +48,20 @@ ready). Otherwise combinational loops will form when connecting interfaces.
 
 <p>Even if only one type of interface has a loop, thus avoiding combinational
 loops, the remaining combinational path will go from one interface to the other
-and back to the first, which will cause a long delay. This delay will both
+and back to the first, which will cause a longer delay. This delay may both
 limit your design clock frequency and make placement and routing of the modules
 connected by these interfaces more difficult. <em>It is not worth saving a
 cycle of latency here at the expense of the performance of the rest of the
 design.</em> Proper handshake interface design and pipelining will avoid this
 extra cycle of latency, while <em>improving</em> clock frequency and P&amp;R.
+
+<p><b>ADDENDUM:</b> Although the above points stand in theory, in practice
+allowing a combinational path between valid and ready can be a good tradeoff.
+Buffering every single source/destination connection can bloat a design and
+will not improve performance except at the highest speeds. Some pipeline
+control is most easily implemented between interfaces, without buffering.
+However, you must then be careful of combinational loops, and of the
+requirement to avoid livelocks and deadlocks (see below).
 
 <h2>Handshake Procedure</h2> 
 
@@ -115,8 +123,8 @@ destination interface asserts ready before asserting valid, while the
 destination interface can wait for the source interface to assert valid before
 asserting ready. This waiting will extend the handshake to two cycles,
 completing in the second cycle, but has applications where we want to
-selectively complete handshakes from multiple source interfaces (e.g.: an
-arbiter).
+selectively complete handshakes from multiple source interfaces, as in an 
+Arbiter.
 
 <p>To prevent livelocks, when the source interface asserts valid <em>it must
 remain asserted until the handshake completes</em>, else we could end up in a
@@ -155,7 +163,7 @@ corrupting the previous packet and all following packets.
 
 <pre>
     always @(*) begin
-        data_transfer = (ready == 1'b1) && (valid == 1'b1);
+        handshake_complete = (ready == 1'b1) && (valid == 1'b1);
     end
 </pre>
 
