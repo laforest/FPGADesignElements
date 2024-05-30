@@ -4,12 +4,12 @@
 <link rel="stylesheet" type="text/css" href="./style.css">
 <link rel="canonical" href="./handshake.html">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A set of rules for consistent and high-performance designs with ready/valid handshakes.">
+<meta name="description" content="A set of rules for consistent and high-performance designs with ready/valid handshakes, and a discussion of the underlying synchronization mechanism.">
 <title>Rules for Ready/Valid Handshakes</title>
 </head>
 <body>
 
-<h1>Rules for Ready/Valid Handshakes</h1>
+<h1>Rules for Ready/Valid Handshakes and Synchronization</h1>
 
 <p>from <a href="./index.html">FPGA Design Elements</a> by <a href="http://fpgacpu.ca/">Charles Eric LaForest, PhD.</a>
 
@@ -17,12 +17,28 @@
 control modules in composable ways, but as I designed more complex modules, I
 found some corner cases I couldn't quite fit into the ready/valid handshake
 model, and some designs started not composing well because I was implementing
-the handshakes inconsistently. So I worked out a set of rules.
+the handshakes inconsistently. So I worked out a set of rules. I also found new
+ways to distribute control logic, and I outline the synchronization process that
+underlies ready/valid handshakes.
 
-<p>I based these rules on those in the AMBA AXI4 Specification, Chapter A3,
-"Single Interface Requirements", and expanded on their meaning and
-consequences. I have replaced the inappropriate "master/slave" terminology with
-"source/destination", correspondingly, when refering to handshake interfaces.
+<h2>AXI is not Fundamental</h2>
+
+<p>I originally based these rules on those written in the AMBA AXI4
+Specification, Chapter A3, "<em>Single Interface Requirements</em>", and
+expanded on their meaning and consequences. I have replaced the inappropriate
+and inaccurate "master/slave" terminology with "source/destination",
+correspondingly, when refering to handshake interfaces.
+
+<p>Ready/valid handshakes are the underlying mechanism for AXI interfaces. Each
+channel of AXI4 is a ready/valid interface, and the TLAST of AXI4-Stream is
+merely a bit of metadata controlled by the ready/valid handshake. AXI4 and
+AXI4-Stream interfaces bring in too many assumptions and complications for most
+designs. It is simpler, smaller, and more flexible to compose your own
+handshaking interfaces up from ready/valid primitives such as <a
+href="./Pipeline_Skid_Buffer.html">Skid Buffers</a> and <a
+href="./Pipeline_Merge_Round_Robin.html">Arbiters</a> and <a
+href="./Pipeline_Fork_Blocking.html">Forks</a> and <a
+href="./Pipeline_Join.html">Joins</a>, to only name a few.
 
 <h2>Interfaces</h2>
 
@@ -56,12 +72,13 @@ design.</em> Proper handshake interface design and pipelining will avoid this
 extra cycle of latency, while <em>improving</em> clock frequency and P&amp;R.
 
 <p><b>ADDENDUM:</b> Although the above points stand in theory, in practice
-allowing a combinational path between valid and ready can be a good tradeoff.
-Buffering every single source/destination connection can bloat a design and
-will not improve performance except at the highest speeds. Some pipeline
-control is most easily implemented between interfaces, without buffering.
-However, you must then be careful of combinational loops, and of the
-requirement to avoid livelocks and deadlocks (see below).
+allowing a combinational path between valid and ready within an interface can
+be a good tradeoff.  Buffering every single source/destination connection can
+bloat a design and will not improve performance except at the highest speeds.
+Some pipeline control is most easily implemented combinationally between
+interfaces, without buffering.  However, you must then be careful of
+combinational loops and of the requirement to avoid livelocks and deadlocks
+(see below).
 
 <h2>Handshake Procedure</h2> 
 
@@ -83,19 +100,30 @@ complete in the same clock cycle.  Similarly, the destination interface drops
 ready if it cannot accept more data, otherwise it keeps ready high and can
 complete the next handshake in the same clock cycle if valid is also high.
 
-<h3>Incorrect Handshakes</h3>
+<h3>Delayed Handshakes</h3>
 
-<p>It is possible, although incorrect, to have the destination interface accept
-data at the moment the source interface asserts valid, then signal ready to
-complete the handshake, after the data is processed, to move the source
-interface to the next data item. 
+<p>It is possible to delay a handshake and have the destination interface
+accept data at the moment the source interface asserts valid, then signal ready
+to complete the handshake, after the accepted data is processed, to move the
+source interface to the next data item. 
 
-<p>Although this is legal and will work, it obscures the operation of the
-logic, and breaks pipelining since the source interface cannot begin processing
-and presenting the next data item concurrently with the destination interface
-processing the current data item. If the source and destination processing
-times are equal, which is the optimum when pipelining, this incorrect handshake
-will halve the throughput instead of doubling it! 
+<p>Although this delayed handshake is legal and will work, it interferes with
+conventional dataflow pipelining since the source interface cannot begin
+processing and presenting the next data item concurrently with the destination
+interface processing the current data item. If the source and destination
+processing times are equal, which is the optimum when pipelining, this
+incorrect handshake will halve the throughput instead of doubling it! 
+
+<p>However, when full throughput pipelining is not needed or possible (e.g.: an
+iterative calculation), a delayed handshake can implement a very useful control
+mechanism by signalling to the source interface when the next item can be
+processed. A <a href="./Pipeline_Half_Buffer.html">Half Buffer</a> implements
+this control mechanism by accepting an item from the source interface, and
+internally presenting that item and a valid signal at its own source interface.
+Detecting the rise of valid with a <a href="./Pulse_Generator.html">Pulse
+Generator</a> starts the internal logic, whose control logic now only need to
+pulse ready when the calculation is done to complete the handshake. This
+simplifies control and maintains concurrency.
 
 <h3>Sampling Changing Data</h3>
 
@@ -108,8 +136,10 @@ whenever a handshake completes.
 <p>Sampling changing data is best done by having the source interface hold
 valid high, while the destination interface asserts ready at an interval.  The
 opposite method of sampling where the source interface periodically asserts
-valid does not guarantee a predictable sampling interval, since it depends on
-the destination interface having already asserted ready.
+valid does not guarantee a predictable sampling interval, or cause a livelock,
+since it depends on the destination interface having already asserted ready. It
+may also cause a deadlock if the destination interface waits for valid before
+raising ready (see below).
 
 <h3>Avoiding Deadlocks and Livelocks</h3>
 
@@ -123,8 +153,8 @@ destination interface asserts ready before asserting valid, while the
 destination interface can wait for the source interface to assert valid before
 asserting ready. This waiting will extend the handshake to two cycles,
 completing in the second cycle, but has applications where we want to
-selectively complete handshakes from multiple source interfaces, as in an 
-Arbiter.
+selectively complete handshakes from multiple source interfaces, as in an <a
+href="./Pipeline_Merge_Priority.html">Arbiter</a>.
 
 <p>To prevent livelocks, when the source interface asserts valid <em>it must
 remain asserted until the handshake completes</em>, else we could end up in a
@@ -169,6 +199,54 @@ corrupting the previous packet and all following packets.
 
 and use it to gate any state transitions that affect a source or destination
 interface.
+
+<h2>Underlying Synchronization</h2>
+
+<p>Since we very usefully partition the design of computating machinery as data
+and control paths, it's natural to think of one module as transferring data to
+another, and of one module as controlling the operation of another. The
+ready/valid handshake is a great fit to both data transfers and module control.
+
+<p>However, ready/valid handshakes are only a particular implementation of a
+more fundamental mechanism of <em>synchronization</em> (a.k.a.:
+<em>rendez-vous</em>), upon which we then build up any combination of data
+transfer and control we need. This is another reason "master/slave" terminology
+(and its analogs) should be discarded: it assumes constraints to the design
+process which are not fundamental or always necessary. These constraints may be
+useful in that they help us manage the complexity of a design, but at the cost
+of an increased mismatch between the desired computation and its
+implementation, which increases complexity and testing difficulty relative to a
+more closely matched design.
+
+<p>To illustrate this underlying synchronization mechanism, imagine two
+modules which operate concurrently, but must sometimes synchronize with
+eachother, for any number of possible reasons (e.g.: minimizing buffering,
+preventing pipeline stalls, keeping audio and video streams synchronized).
+Each module has an input named "OK_IN", and an output named "OK_OUT", and we
+simply connect these outputs to those inputs as expected.
+
+<p>When one module needs to synchronize, it raises and holds high "OK_OUT" and
+waits. Eventually, the other module will do the same and both modules will
+simultaneously see <code>(OK_IN == 1'b1) && (OK_OUT == 1'b1) == 1'b1</code>
+during the same clock cycle, and their control logics can change state also
+simultaneously, if not identically. The modules have synchronized, no data was
+transferred, and neither one is in control of the other.
+
+<p>(<em>This is similar, but not identical to passing both module outputs through a
+<a href="./Pipeline_Synchronizer_Lazy.html">Pipeline Synchronizer</a>, as that
+includes the downstream module(s), implementing a 3-way synchronization and
+data transfer.</em>)
+
+<p>If we then use this synchronization mechanism to transfer data in one
+direction, we have re-invented ready/valid interfaces. We could also implement
+a bidirectional simultaneous data transfer the same way, with the understanding
+that both "OK" signals must follow the same deadlock and livelock avoidance
+rules mentioned before.
+
+<p>Finally, some readers will notice the similarity between this
+synchronization mechanism and the 2-phase and 4-phase handshakes used in
+asynchronous logic, only simplified since we have a clock as an absolute time
+reference.
 
 <hr><a href="./index.html">Back to FPGA Design Elements</a>
 </body>
