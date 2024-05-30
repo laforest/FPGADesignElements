@@ -78,9 +78,9 @@ module Pipeline_Handshake_Multiplier
     reg module_output_handshake_done = 1'b0;
 
     always @(*) begin
-        module_input_handshake_done  = (input_data_valid  == 1'b1) && (input_data_ready  == 1'b1);
+        module_input_handshake_done  = (input_data_valid            == 1'b1) && (input_data_ready        == 1'b1);
         clear_input_buffer           = (module_input_handshake_done == 1'b1) && (input_data_repeat_count == REPEAT_ZERO);
-        module_output_handshake_done = (output_data_valid == 1'b1) && (output_data_ready == 1'b1);
+        module_output_handshake_done = (output_data_valid           == 1'b1) && (output_data_ready       == 1'b1);
     end
 
 // NOTE: a `input_data_repeat_count` of zero DOES get loaded, which will cause
