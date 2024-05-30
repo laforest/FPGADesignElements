@@ -3,18 +3,27 @@
 
 // A single pipeline register with ready/valid handshakes.  Decouples the
 // input and ouput handshakes (no combinational path), but does not allow
-// concurrent read/write like a full [Pipeline Skid Buffer]
-// (./Pipeline_Skid_Buffer.html). The half-buffer must be read out before you
+// concurrent read/write like a full [Pipeline Skid Buffer](./Pipeline_Skid_Buffer.html).
+// The Half-Buffer must be read out before you
 // can write into it again, halving the maximum bandwidth (except in Circular
 // Buffer Mode).
 
-// However, using a half-buffer can improve the throughput of a long-running
+// However, using a Half-Buffer can improve the throughput of a long-running
 // module with ready/valid handshakes, where the module input will not accept
 // new data until the module output is read out, and it takes multiple cycles
-// to compute a result. With a half-buffer, the module can immediately dump
-// its output into the half-buffer and then accept new input data, overlapping
+// to compute a result. With a Half-Buffer, the module can immediately dump
+// its output into the Half-Buffer and then accept new input data, overlapping
 // another computation with the wait time until the final destination reads
-// out the half-buffer.
+// out the Half-Buffer.
+
+// A Half-Buffer can also implement a very useful control mechanism by
+// signalling to the source when the next item can be processed.  After
+// accepting an item at the input, detecting the rise of valid at the output
+// with a [Pulse Generator](./Pulse_Generator.html) starts the internal logic,
+// whose control logic now only need to pulse ready when the calculation is
+// done to complete the handshake. This simplifies control and maintains
+// concurrency.
+
 
 //## Circular Buffer Mode
 
