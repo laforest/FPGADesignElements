@@ -45,7 +45,7 @@ header = """<html>
 
 footer = """<hr>
 <p><a href="./index.html">Back to FPGA Design Elements</a>
-<center><a href="http://fpgacpu.ca/">fpgacpu.ca</a></center>
+<center><a href="https://fpgacpu.ca/">fpgacpu.ca</a></center>
 </body>
 </html>
 
