@@ -1,6 +1,6 @@
 # FPGA Design Elements
 
-## Copyright (c) 2019-2020 Charles Eric LaForest, PhD.
+## Copyright (c) 2019-2024 Charles Eric LaForest, PhD.
 
 A self-contained online book containing a library of FPGA design elements and
 related coding/design guides.
