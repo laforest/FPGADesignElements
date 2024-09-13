@@ -1,0 +1,162 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./Pipeline_Serial_Parallel.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Reads in multiple serial words (most-significant word first) and signals when the last input word has been read-in and a new, wider output word is ready to be read-out, in the same cycle if necessary to receive an uninterrupted serial stream.">
+<title>Pipeline Serial Parallel</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Pipeline_Serial_Parallel.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Pipeline Serial to Parallel Converter</h1>
+<p>Reads in multiple serial words (most-significant word first) and signals
+ when the last input word has been read-in and a new, wider output word is
+ ready to be read-out, in the same cycle if necessary to receive an
+ uninterrupted serial stream.</p>
+<p>Holding <code>clock_enable</code> low halts any shifting, holding all bits in place
+ and ignoring any changes at the control and data inputs, <em>except for
+ <code>clear</code></em>.</p>
+<p>Asserting <code>clear</code> will empty the shift register, re-initialize the counter,
+ drop <code>parallel_out_valid</code>, and start shifting-in serial words.</p>
+<p>This is a generalization of the simpler <a href="./Serial_Parallel.html">Serial to Parallel Converter</a>.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Pipeline_Serial_Parallel.html">Pipeline_Serial_Parallel</a>
+#(
+    parameter WORD_WIDTH_IN     = 0,
+    parameter WORD_COUNT_IN     = 0,
+
+    // Do not set at instantiation, except in Vivado IPI
+    parameter WORD_WIDTH_OUT    = WORD_WIDTH_IN * WORD_COUNT_IN
+)
+(
+    input   wire                            clock,
+    input   wire                            clock_enable,
+    input   wire                            clear,
+
+    input   wire                            serial_in_valid,
+    output  reg                             serial_in_ready,
+    input   wire    [WORD_WIDTH_IN-1:0]     serial_in,
+
+    output  reg                             parallel_out_valid,
+    input   wire                            parallel_out_ready,
+    output  wire    [WORD_WIDTH_OUT-1:0]    parallel_out
+);
+
+    `include "<a href="./clog2_function.html">clog2_function</a>.vh"
+
+    localparam WORD_ZERO_IN     = {WORD_WIDTH_IN{1'b0}};
+    localparam WORD_ZERO_OUT    = {WORD_COUNT_IN{WORD_ZERO_IN}};
+    localparam COUNT_WIDTH      = clog2(WORD_COUNT_IN) + 1;   // Since we must be able to <a href="./index.html">index</a> 0 to N, not N-1
+    localparam COUNT_ZERO       = {COUNT_WIDTH{1'b0}};
+
+    initial begin
+        parallel_out_valid  = 1'b0; // We start empty, so ready to shift-in.
+        serial_in_ready     = 1'b1;
+    end
+</pre>
+
+<p>Count the number of word shifts remaining. When the last word has been
+ read-in from <code>serial_in</code>, the count reaches zero, the counter halts, and we
+ can immediately read out the word.</p>
+<p>As the initial output word is read out, we reload the counter with the
+ initial value if there is no concurrent serial input, or with one less than
+ the initial value if there is a concurrent serial input.</p>
+
+<pre>
+    reg                     counter_run         = 1'b0;
+    reg                     counter_load        = 1'b0;
+    reg  [COUNT_WIDTH-1:0]  counter_load_value  = COUNT_ZERO;
+    wire [COUNT_WIDTH-1:0]  count;
+
+    <a href="./Counter_Binary.html">Counter_Binary</a>
+    #(
+        .WORD_WIDTH     (COUNT_WIDTH),
+        .INCREMENT      (1),
+        .INITIAL_COUNT  (WORD_COUNT_IN [COUNT_WIDTH-1:0])
+    )
+    shifts_remaining
+    (
+        .clock          (clock),
+        .clear          (clear),
+        .up_down        (1'b1), // 0 up, 1 down
+        .run            (counter_run),
+        .load           (counter_load),
+        .load_count     (counter_load_value [COUNT_WIDTH-1:0]),
+        .carry_in       (1'b0),
+        // verilator lint_off PINCONNECTEMPTY
+        .carry_out      (),
+        .carries        (),
+        .overflow       (),
+        // verilator lint_on  PINCONNECTEMPTY
+        .count          (count)
+    );
+</pre>
+
+<p>The shift register only shifts when the counter is running.</p>
+
+<pre>
+    reg shifter_run  = 1'b0;
+
+    <a href="./Register_Pipeline.html">Register_Pipeline</a>
+    #(
+        .WORD_WIDTH     (WORD_WIDTH_IN),
+        .PIPE_DEPTH     (WORD_COUNT_IN),
+        .RESET_VALUES   (WORD_ZERO_OUT)
+    )
+    shift_register
+    (
+        .clock          (clock),
+        .clock_enable   (shifter_run),
+        .clear          (clear),
+        .parallel_load  (1'b0),
+        .parallel_in    (WORD_ZERO_OUT),
+        .parallel_out   (parallel_out),
+        .pipe_in        (serial_in),
+        // verilator lint_off PINCONNECTEMPTY
+        .pipe_out       ()
+        // verilator lint_on  PINCONNECTEMPTY
+    );
+</pre>
+
+<p>Completing the parallel output handshake reloads the counter, starting the
+ word shifting.  After all the words have been read-in from <code>serial_in</code>, the
+ counter reaches to zero, halts, and raises <code>parallel_out_valid</code>.</p>
+
+<pre>
+    reg output_handshake_done   = 1'b0;
+    reg input_handshake_done    = 1'b0;
+
+    always @(*) begin
+        output_handshake_done   = (parallel_out_valid == 1'b1) && (parallel_out_ready == 1'b1);
+        input_handshake_done    = (serial_in_valid    == 1'b1) && (serial_in_ready    == 1'b1);
+    end
+
+    always @(*) begin
+        parallel_out_valid      =  (count == COUNT_ZERO)                                     && (clock_enable == 1'b1);
+        serial_in_ready         = ((count != COUNT_ZERO) || (output_handshake_done == 1'b1)) && (clock_enable == 1'b1);
+
+        counter_run             =  (count != COUNT_ZERO) && (input_handshake_done  == 1'b1)  && (clock_enable == 1'b1);
+        counter_load            = (output_handshake_done == 1'b1);
+
+        shifter_run             = (counter_run == 1'b1) || (counter_load == 1'b1);
+
+        counter_load_value      = ((output_handshake_done == 1'b1) && (input_handshake_done == 1'b1)) ? WORD_COUNT_IN - 1 : WORD_COUNT_IN;
+    end
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="https://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
