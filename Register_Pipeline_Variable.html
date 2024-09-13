@@ -1,0 +1,142 @@
+<html>
+<head>
+<link rel="shortcut icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="./style.css">
+<link rel="canonical" href="./Register_Pipeline_Variable.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Delays a pipeline with variable shift-registers to adjust the latency  from input to output. The latency, in clock cycles, from input to output is selected by the `tap_number` control input, and has a maximum of `PIPE_DEPTH` cycles.">
+<title>Register Pipeline Variable</title>
+</head>
+<body>
+
+<p class="inline bordered"><b><a href="./Register_Pipeline_Variable.v">Source</a></b></p>
+<p class="inline bordered"><b><a href="./legal.html">License</a></b></p>
+<p class="inline bordered"><b><a href="./index.html">Index</a></b></p>
+
+<h1>Variable Register Pipeline</h1>
+<p>Delays a pipeline with variable shift-registers to adjust the latency 
+ from input to output. The latency, in clock cycles, from input to output is
+ selected by the <code>tap_number</code> control input, and has a maximum of
+ <code>PIPE_DEPTH</code> cycles.  </p>
+<p>Each cycle <code>shift_data</code> is high, the pipeline shifts one word from
+ <code>input_data</code> towards <code>output_data</code>. Pulse <code>tap_number_load</code> to set a new
+ <code>tap_number</code>. <code>clear</code> sets all registers and the <code>tap_number</code> to zero. </p>
+<p><strong>NOTE</strong>: <code>PIPE_DEPTH</code> must be 16 or 32 to match the underlying AMD/Xilinx
+ FPGA shift-register LUTs (SRLs). This should be trivial to port to other
+ FPGA families.</p>
+<p>The <code>tap_number</code> is zero-indexed, so a <code>tap_number</code> of 0 selects the output
+ of the first pipeline stage, and <code>PIPE_DEPTH-1</code> selects the output of the
+ last pipeline stage. <em>It is not possible to select the input directly.</em></p>
+<p>Changing the <code>tap_number</code> immediately changes the selected tap, and begins
+ to output whatever data is at that point in the pipeline. Thus, you may
+ skip data or (re)read old data.</p>
+
+<pre>
+`default_nettype none
+
+module <a href="./Register_Pipeline_Variable.html">Register_Pipeline_Variable</a>
+#(
+    parameter WORD_WIDTH = 0,
+    parameter PIPE_DEPTH = 0,   // 16 or 32 only
+
+    // Do not set at instantiation, except in Vivado IPI
+    parameter ADDR_WIDTH = clog2(PIPE_DEPTH)
+)
+(
+    input   wire                        clock,
+    input   wire                        clear,
+
+    input   wire                        tap_number_load,
+    input   wire    [ADDR_WIDTH-1:0]    tap_number,
+
+    input   wire                        shift_data,
+    input   wire    [WORD_WIDTH-1:0]    input_data,
+    output  wire    [WORD_WIDTH-1:0]    output_data
+);
+
+    `include "<a href="./clog2_function.html">clog2_function</a>.vh"
+
+    localparam ADDR_ZERO    = {ADDR_WIDTH{1'b0}};
+</pre>
+
+<p>First, store the tap selection address.</p>
+
+<pre>
+    wire [ADDR_WIDTH-1:0] tap_number_current;
+
+    <a href="./Register.html">Register</a>
+    #(
+        .WORD_WIDTH     (ADDR_WIDTH),
+        .RESET_VALUE    (ADDR_ZERO)
+    )
+    tap_number_storage
+    (
+        .clock          (clock),
+        .clock_enable   (tap_number_load),
+        .clear          (clear),
+        .data_in        (tap_number),
+        .data_out       (tap_number_current)
+    );
+</pre>
+
+<p>Then instantiate SRL dynamic shift registers.</p>
+<p>We use the Xilinx SRLs because implementing this as a <a href="./Register_Pipeline.html">Register Pipeline</a> and a 
+ <a href="./Multiplexer_Binary_Behavioural.html">Multiplexer</a> consumes a very large amount of
+ area for what it does.</p>
+
+<pre>
+    generate
+    genvar i;
+
+        for (i = 0; i < WORD_WIDTH; i=i+1) begin: per_bit
+
+            if (PIPE_DEPTH == 32) begin
+
+                SRLC32E
+                #(
+                    .INIT(32'h00000000) // Initial Value of Shift <a href="./Register.html">Register</a>
+                )
+                data_pipeline
+                (
+                  .Q    (output_data [i]),      // SRL data output
+                  .Q31  (),                     // SRL cascade output pin
+                  .A    (tap_number_current),   // 5-bit shift depth select input
+                  .CE   (shift_data),           // Clock enable input
+                  .CLK  (clock),                // Clock input
+                  .D    (input_data [i])        // SRL data input
+                );
+
+            end
+            else if (PIPE_DEPTH == 16) begin
+
+                SRL16E
+                #(
+                    .INIT(16'h0000) // Initial Value of Shift <a href="./Register.html">Register</a>
+                )
+                data_pipeline
+                (
+                  .Q        (output_data        [i]),   // SRL data output
+                  .A0       (tap_number_current [0]),   // Select[0] input
+                  .A1       (tap_number_current [1]),   // Select[1] input
+                  .A2       (tap_number_current [2]),   // Select[2] input
+                  .A3       (tap_number_current [3]),   // Select[3] input
+                  .CE       (shift_data),               // Clock enable input
+                  .CLK      (clock),                    // Clock input
+                  .D        (input_data         [i])    // SRL data input
+                );
+
+            end
+
+        end
+
+    endgenerate
+
+endmodule
+</pre>
+
+<hr>
+<p><a href="./index.html">Back to FPGA Design Elements</a>
+<center><a href="https://fpgacpu.ca/">fpgacpu.ca</a></center>
+</body>
+</html>
+
